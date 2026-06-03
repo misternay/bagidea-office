@@ -161,14 +161,14 @@ func _make_char(id: String) -> Sprite3D:
 	s.hair_color = Color.from_hsv(fmod(hue + 0.35, 1.0), 0.45, 0.22)
 	s.skin_color = [Color8(236, 188, 152), Color8(208, 152, 110), Color8(140, 95, 66)][(h / 360) % 3]
 	s.tie_color = Color.from_hsv(fmod(hue + 0.5, 1.0), 0.7, 0.6)
-	# Real art when available: main = composited custom character (keeps its
-	# identity tints), everyone else = one of the 12 premade NPC sheets.
+	# Real art when available: everyone uses the premade NPC sheets (full
+	# idle+walk animation). Sheets 7 & 8 are reserved for main/ceo so the
+	# leadership stays visually distinct. (Custom compositor remains for
+	# when the full layer pack with walk frames is available.)
 	if id == "main":
-		s.npc_index = 0
-		s.hair_color = Color(0.9, 0.75, 0.4)   # golden hair for the boss
-		s.suit_color = Color(0.85, 0.8, 0.75)
+		s.npc_index = 7   # the beret — director look
 	else:
-		s.npc_index = 1 + (h % 12)
+		s.npc_index = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12][h % 10]
 	s.pixel_size = 0.07
 	s.billboard = StandardMaterial3D.BILLBOARD_FIXED_Y
 	s.shaded = true
@@ -180,9 +180,9 @@ func _make_char(id: String) -> Sprite3D:
 
 func _spawn_ceo() -> void:
 	ceo = _make_char("ceo")
-	ceo.suit_color = Color8(64, 52, 26)   # gold-brown suit
+	ceo.suit_color = Color8(64, 52, 26)   # gold-brown suit (procedural fallback)
 	ceo.hair_color = Color8(70, 70, 74)
-	ceo.npc_index = 0  # composited custom character (idle-only is fine for pacing)
+	ceo.npc_index = 8  # straw hat + suspenders — reserved for the chairman
 	ceo.position = world.WP["pace_a"]
 	get_parent().add_child(ceo)
 	_ceo_loop()
