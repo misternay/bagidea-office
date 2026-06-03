@@ -1,0 +1,14 @@
+# Godot editor/import cache
+godot/.godot/
+
+# Rust build artifacts
+shell/target/
+
+# Runtime artifacts
+daemon/journal.jsonl
+
+# Adapter session workspace (keep only the permission-hook config)
+workspace/*
+!workspace/.claude/
+workspace/.claude/*
+!workspace/.claude/settings.json

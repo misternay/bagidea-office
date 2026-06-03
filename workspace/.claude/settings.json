@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\Projects\\bagidea-ai-agents-office\\daemon\\perm.ps1\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
