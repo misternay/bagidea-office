@@ -65,6 +65,36 @@ var beam_mats: Array[ShaderMaterial] = []
 var _wp_ids := {}
 var _board_slots := {}
 var _board_free: Array[int] = [0, 1, 2, 3, 4, 5]
+# Mission-board card anchor (moves onto the Briefing_Screen when the kit is present).
+var _board_z := -9.91
+var _board_y0 := 2.25
+var _glb_cache := {}
+
+# ------------------------------------------------------- sci-fi model kit
+
+const SCIFI_DIR := "res://assets/scifi/"
+
+## Molten Maps models are licensed (gitignored): present → modern furniture,
+## absent → the original CSG greybox props. Loaded at runtime via GLTFDocument
+## so no Godot import step is needed.
+func _kit_available() -> bool:
+	return FileAccess.file_exists(ProjectSettings.globalize_path(SCIFI_DIR + "Chair_1.glb"))
+
+func _kit(model: String, pos: Vector3, rot_y := 0.0, s := 1.0) -> Node3D:
+	if not _glb_cache.has(model):
+		var doc := GLTFDocument.new()
+		var state := GLTFState.new()
+		var path := ProjectSettings.globalize_path(SCIFI_DIR + model + ".glb")
+		_glb_cache[model] = doc.generate_scene(state) if doc.append_from_file(path, state) == OK else null
+	var proto: Node3D = _glb_cache[model]
+	if proto == null:
+		return null
+	var inst: Node3D = proto.duplicate()
+	add_child(inst)
+	inst.position = pos
+	inst.rotation_degrees = Vector3(0, rot_y, 0)
+	inst.scale = Vector3.ONE * s
+	return inst
 
 func _ready() -> void:
 	_build_graph()
@@ -121,7 +151,7 @@ func board_set(key: String, state: String, label := "") -> void:
 		var box := CSGBox3D.new()
 		box.size = Vector3(0.5, 0.26, 0.04)
 		add_child(box)
-		box.position = Vector3(4.75 + ((idx % 3) - 1) * 0.6, 2.25 - float(idx / 3) * 0.4, -9.91)
+		box.position = Vector3(4.75 + ((idx % 3) - 1) * 0.6, _board_y0 - float(idx / 3) * 0.4, _board_z)
 		var lbl := Label3D.new()
 		lbl.text = label if label != "" else key
 		lbl.font_size = 40
@@ -293,12 +323,12 @@ func _build_geometry() -> void:
 	# ---- Sky + city skyline + shadows-only ceiling
 	sky_mat = _mat(Color(0.55, 0.75, 1.0), 1.0, Color(0.55, 0.72, 1.0), 1.6)
 	sky_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_box(Vector3(0, 4, -13.4), Vector3(28, 13, 0.1), sky_mat, 0)
+	_box(Vector3(0, 5, -14.5), Vector3(48, 18, 0.1), sky_mat, 0)
 	var bldg := _mat(Color(0.1, 0.12, 0.2), 0.9)
 	var bldg_rng := RandomNumberGenerator.new()
 	bldg_rng.seed = 21
-	var bx := -12.0
-	while bx < 12.0:
+	var bx := -20.0
+	while bx < 20.0:
 		var bw := bldg_rng.randf_range(1.4, 2.8)
 		var bh := bldg_rng.randf_range(2.5, 8.0)
 		_box(Vector3(bx + bw / 2.0, bh / 2.0, -11.8 - bldg_rng.randf_range(0.0, 0.8)),
@@ -310,15 +340,21 @@ func _build_geometry() -> void:
 	_box(Vector3(0, 3.7, -2), Vector3(20.6, 0.2, 16.6), wall, 3)
 
 	# ---- Executive Office
-	_box(Vector3(-6, 0.42, -8.3), Vector3(2.6, 0.84, 1.1), dark_wood)
-	_box(Vector3(-6, 0.88, -8.3), Vector3(2.9, 0.08, 1.3), wood)
-	_box(Vector3(-7.6, 0.42, -7.7), Vector3(0.7, 0.84, 2.3), dark_wood)        # L-return
-	_box(Vector3(-7.6, 0.88, -7.7), Vector3(0.85, 0.08, 2.5), wood)
-	var sC := _box(Vector3(-6, 1.95, -9.55), Vector3(1.6, 0.85, 0.05), screen)
-	var sL := _box(Vector3(-7.45, 1.85, -9.35), Vector3(1.0, 0.65, 0.05), screen)
-	var sR := _box(Vector3(-4.55, 1.85, -9.35), Vector3(1.0, 0.65, 0.05), screen)
-	sL.rotation_degrees.y = 18
-	sR.rotation_degrees.y = -18
+	var kit := _kit_available()
+	if kit:
+		_kit("Command_Console", Vector3(-6, 0, -8.4), 0.0, 0.5)   # the command station
+		_kit("Orrery", Vector3(-8.6, 0, -4.2), 0.0, 0.35)
+		_kit("Large_Monitor_Blue", Vector3(-4.75, 0, -9.55), 0.0, 0.5)
+	else:
+		_box(Vector3(-6, 0.42, -8.3), Vector3(2.6, 0.84, 1.1), dark_wood)
+		_box(Vector3(-6, 0.88, -8.3), Vector3(2.9, 0.08, 1.3), wood)
+		_box(Vector3(-7.6, 0.42, -7.7), Vector3(0.7, 0.84, 2.3), dark_wood)    # L-return
+		_box(Vector3(-7.6, 0.88, -7.7), Vector3(0.85, 0.08, 2.5), wood)
+		var sC := _box(Vector3(-6, 1.95, -9.55), Vector3(1.6, 0.85, 0.05), screen)
+		var sL := _box(Vector3(-7.45, 1.85, -9.35), Vector3(1.0, 0.65, 0.05), screen)
+		var sR := _box(Vector3(-4.55, 1.85, -9.35), Vector3(1.0, 0.65, 0.05), screen)
+		sL.rotation_degrees.y = 18
+		sR.rotation_degrees.y = -18
 	# World-map panel on the window pillar (teal scan shader)
 	var map_mat := ShaderMaterial.new()
 	map_mat.shader = SCREEN_SHADER
@@ -332,18 +368,30 @@ func _build_geometry() -> void:
 
 	# ---- Ops Floor: 4 desk pods
 	for d in [Vector3(1, 0, -8), Vector3(5, 0, -8), Vector3(1, 0, -5.5), Vector3(5, 0, -5.5)]:
-		_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), wood)
-		_box(Vector3(d.x, 0.86, d.z + 0.08), Vector3(0.08, 0.16, 0.08), cap)    # stand
-		_box(Vector3(d.x, 1.05, d.z + 0.08), Vector3(0.74, 0.46, 0.05), screen) # monitor
-		_box(Vector3(d.x, 0.83, d.z - 0.22), Vector3(0.5, 0.03, 0.18), _mat(Color(0.1, 0.1, 0.12), 0.4))
+		if kit:
+			_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), dark_wood)     # desk slab
+			_kit("Large_Monitor_Blue", Vector3(d.x, 0.8, d.z + 0.1), 0.0, 0.26) # kit monitor on top
+			_kit("Chair_1", Vector3(d.x, 0, d.z - 0.95), 180.0, 0.6)            # chair at the anchor side
+		else:
+			_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), wood)
+			_box(Vector3(d.x, 0.86, d.z + 0.08), Vector3(0.08, 0.16, 0.08), cap)
+			_box(Vector3(d.x, 1.05, d.z + 0.08), Vector3(0.74, 0.46, 0.05), screen)
+			_box(Vector3(d.x, 0.83, d.z - 0.22), Vector3(0.5, 0.03, 0.18), _mat(Color(0.1, 0.1, 0.12), 0.4))
 	_pendant(Vector3(3, 0, -8), Color(0.8, 0.88, 1.0))
 	_pendant(Vector3(3, 0, -5.5), Color(0.8, 0.88, 1.0))
 	_omni(Vector3(3, 2.8, -6.5), Color(0.7, 0.8, 1.0), 3.0, 11.0)
 
 	# ---- Mission Control board
-	_box(Vector3(4.75, 2.05, -9.96), Vector3(1.9, 1.3, 0.05), _mat(Color(0.08, 0.09, 0.12), 0.3))
-	var title := _label("MISSION CONTROL", Vector3(4.75, 2.56, -9.9), 44, Color(0.6, 0.85, 1.0))
-	title.pixel_size = 0.0035
+	if kit:
+		_kit("Briefing_Screen_Blue", Vector3(4.75, 0, -9.45), 0.0, 0.6)
+		_board_z = -9.0
+		_board_y0 = 1.5
+		var title := _label("MISSION CONTROL", Vector3(4.75, 2.15, -9.0), 44, Color(0.6, 0.85, 1.0))
+		title.pixel_size = 0.0035
+	else:
+		_box(Vector3(4.75, 2.05, -9.96), Vector3(1.9, 1.3, 0.05), _mat(Color(0.08, 0.09, 0.12), 0.3))
+		var title := _label("MISSION CONTROL", Vector3(4.75, 2.56, -9.9), 44, Color(0.6, 0.85, 1.0))
+		title.pixel_size = 0.0035
 
 	# ---- Lobby: totem, floor logo, reception, doorway, armchair
 	totem_mat = _mat(Color(0.15, 0.2, 0.25), 0.3, Color(1.0, 0.25, 0.2), 2.2)
@@ -355,6 +403,10 @@ func _build_geometry() -> void:
 	_box(Vector3(-4.2, 0.5, 3.8), Vector3(1.8, 1.0, 0.7), dark_wood)           # reception
 	_box(Vector3(-4.2, 1.02, 3.8), Vector3(2.0, 0.06, 0.85), wood)
 	_box(Vector3(-4.5, 1.25, 3.8), Vector3(0.4, 0.3, 0.04), screen)
+	if kit:
+		_kit("End_Table", Vector3(-3.55, 0, 2.1), 0.0, 0.8)                    # chess corner
+		_kit("3D_Chess_Board", Vector3(-3.55, 0.75, 2.1), 25.0, 0.35)
+		_kit("Floor_Lamp", Vector3(-4.5, 0, 4.6), 0.0, 1.0)
 	for px in [-1.9, -0.1]:
 		_box(Vector3(px, 1.2, 5.6), Vector3(0.2, 2.4, 0.2), dark_wood)
 	_box(Vector3(-1, 2.5, 5.6), Vector3(2.0, 0.2, 0.2), dark_wood)
@@ -370,12 +422,21 @@ func _build_geometry() -> void:
 	_box(Vector3(9.3, 1.35, -1.0), Vector3(0.06, 0.1, 0.1), amber)             # machine light
 	_box(Vector3(9.9, 2.1, -0.2), Vector3(0.05, 0.9, 1.6), amber)              # menu board
 	for tp in [Vector3(6.5, 0, 1.5), Vector3(8.2, 0, 3.5)]:
-		_cyl(Vector3(tp.x, 0.4, tp.z), 0.12, 0.8, cap)
-		_cyl(Vector3(tp.x, 0.82, tp.z), 0.62, 0.06, wood)
-		_cyl(Vector3(tp.x + 0.25, 0.9, tp.z - 0.2), 0.05, 0.09, _mat(Color(0.9, 0.88, 0.85), 0.4))
-		_cyl(Vector3(tp.x - 0.2, 0.9, tp.z + 0.15), 0.05, 0.09, _mat(Color(0.85, 0.3, 0.25), 0.4))
-		_cyl(Vector3(tp.x + 0.55, 0.22, tp.z + 0.55), 0.16, 0.44, dark_wood)   # stools
-		_cyl(Vector3(tp.x - 0.55, 0.22, tp.z - 0.55), 0.16, 0.44, dark_wood)
+		if kit:
+			_kit("Cafeteria_Table", tp, 0.0, 0.8)
+			_kit("Chair_1", tp + Vector3(0.95, 0, 0.55), -120.0, 0.6)
+			_kit("Chair_1", tp + Vector3(-0.95, 0, -0.55), 60.0, 0.6)
+			_kit("Space_Ketchup", tp + Vector3(0.15, 0.62, -0.1), 0.0, 0.8)
+			_kit("Space_Mayo_Naise", tp + Vector3(-0.12, 0.62, 0.12), 0.0, 0.8)
+		else:
+			_cyl(Vector3(tp.x, 0.4, tp.z), 0.12, 0.8, cap)
+			_cyl(Vector3(tp.x, 0.82, tp.z), 0.62, 0.06, wood)
+			_cyl(Vector3(tp.x + 0.25, 0.9, tp.z - 0.2), 0.05, 0.09, _mat(Color(0.9, 0.88, 0.85), 0.4))
+			_cyl(Vector3(tp.x - 0.2, 0.9, tp.z + 0.15), 0.05, 0.09, _mat(Color(0.85, 0.3, 0.25), 0.4))
+			_cyl(Vector3(tp.x + 0.55, 0.22, tp.z + 0.55), 0.16, 0.44, dark_wood)
+			_cyl(Vector3(tp.x - 0.55, 0.22, tp.z - 0.55), 0.16, 0.44, dark_wood)
+	if kit:
+		_kit("Lava_Lamp", Vector3(9.5, 1.05, 0.4), 0.0, 1.0)
 	_pendant(Vector3(6.5, 0, 1.5), Color(1.0, 0.72, 0.45))
 	_pendant(Vector3(8.2, 0, 3.5), Color(1.0, 0.72, 0.45))
 	_omni(Vector3(7, 2.4, 1), Color(1.0, 0.7, 0.45), 4.0, 10.0)
@@ -404,12 +465,16 @@ func _build_geometry() -> void:
 	steam.position = Vector3(9.45, 1.68, -1.2)
 
 	# ---- Security Center
-	for i in 3:
-		var sm := ShaderMaterial.new()
-		sm.shader = SCREEN_SHADER
-		sm.set_shader_parameter("glow_col", Vector3(1.0, 0.55, 0.2))
-		sm.set_shader_parameter("speed", 0.35 + i * 0.2)
-		_box(Vector3(-9.85, 2.0, -1.6 + i * 1.1), Vector3(0.06, 0.5, 0.8), sm)
+	if kit:
+		_kit("Large_Monitor_Orange", Vector3(-9.6, 0, -0.5), 90.0, 0.5)
+		_kit("BioMonitor_Red", Vector3(-9.7, 0, -2.2), 90.0, 0.5)
+	else:
+		for i in 3:
+			var sm := ShaderMaterial.new()
+			sm.shader = SCREEN_SHADER
+			sm.set_shader_parameter("glow_col", Vector3(1.0, 0.55, 0.2))
+			sm.set_shader_parameter("speed", 0.35 + i * 0.2)
+			_box(Vector3(-9.85, 2.0, -1.6 + i * 1.1), Vector3(0.06, 0.5, 0.8), sm)
 	_box(Vector3(-8.6, 0.45, 0.9), Vector3(1.4, 0.9, 0.6), dark_wood)          # sec desk
 	_box(Vector3(-6.3, 2.2, -0.5), Vector3(0.12, 0.12, 0.12),
 		_mat(Color(0.6, 0.1, 0.1), 0.4, Color(1, 0.15, 0.1), 2.5))             # beacon
@@ -418,7 +483,10 @@ func _build_geometry() -> void:
 	# ---- Plants
 	for pp in [Vector3(-4.6, 0, 4.8), Vector3(3.4, 0, 5.2), Vector3(5.0, 0, -2.3),
 			Vector3(-2.6, 0, -9.4), Vector3(9.3, 0, 4.6), Vector3(-9.4, 0, -9.3)]:
-		_plant(pp)
+		if kit:
+			_kit("Plant_1", pp, randf_range(0.0, 360.0), 1.7)
+		else:
+			_plant(pp)
 
 	# ---- Atmosphere: room fog + god-ray cards + dust
 	var fog := FogVolume.new()

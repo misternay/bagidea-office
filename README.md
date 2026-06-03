@@ -5,10 +5,10 @@
 
 Not a dashboard. Not a chat window. A **world** that renders the true state of your AI agents — Claude Code sessions, headless agent runs, custom scripts — as living pixel-art employees, behind your desktop icons.
 
-![Real characters working the night shift](shots/real_characters.png)
-*4 AM, real local time — the Main Agent (custom-composited character) thinks at the executive desk while NPC agents work ops desks with live tool labels ("Bash", "PowerShell" — real tool calls). Desktop icons render on top: this is a real wallpaper.*
+![Sci-fi office on the night shift](shots/scifi_office.png)
+*5 AM, real local time — agents work glowing consoles in a sci-fi office, city lights outside, the camera slowly drifting. Desktop icons render on top: this is a real wallpaper.*
 
-> ⚠️ **Status: working prototype.** The full pipeline works end-to-end (wallpaper → daemon → real Claude Code sessions → approvals). Environment art is procedural placeholder; character art uses [Schwarnhild's customizable 32×32 characters](https://schwarnhild.itch.io/customizable-characters-top-down-32x32) (not bundled — see [Character art](#character-art-optional-but-recommended)). Built and verified on Windows 11.
+> ⚠️ **Status: working prototype.** The full pipeline works end-to-end (wallpaper → daemon → real Claude Code sessions → approvals). Art uses two third-party packs (not bundled — see [Art assets](#art-assets-optional-but-recommended)): characters by [Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32), environment by [Molten Maps SciFi Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack). Without them the game falls back to procedural placeholders. Built and verified on Windows 11.
 
 ---
 
@@ -158,11 +158,13 @@ cd shell
 cargo build --release   # → shell/target/release/bagidea-office-shell.exe
 ```
 
-### Character art (optional but recommended)
+### Art assets (optional but recommended)
 
-Character spritesheets are **not bundled** (third-party license). Download
-[Customizable Characters Top-Down 32x32 by Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32)
-and place the PNGs like this:
+Art packs are **not bundled** (third-party licenses). Both load at runtime —
+no Godot import step — and **the game still runs without them**, falling back
+to procedural placeholder visuals.
+
+**Characters** — [Customizable Characters Top-Down 32x32 by Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32):
 
 ```
 godot/assets/characters/
@@ -170,7 +172,15 @@ godot/assets/characters/
 └── layers/   ← contents of demo-character-idle.zip       (hair/head/eyes/torso/shirt/legs-idle.png)
 ```
 
-No import step needed — sheets load at runtime. **Without these files the game still runs**, using the original procedural pixel sprites.
+**Environment** — [Molten Maps SciFi Asset Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack):
+
+```
+godot/assets/scifi/   ← all .glb files from the pack's Assets/gtlf folder
+```
+
+Used for consoles, monitors, the briefing screen (mission board), cafeteria
+furniture, plants, lamps, the orrery and more — loaded via `GLTFDocument`
+with measured per-prop scaling.
 
 That's it — the daemon has zero npm dependencies.
 
@@ -251,7 +261,8 @@ The `docs/` folder is a complete V1 product-design specification written before 
 ## Roadmap
 
 - [x] Character art — Schwarnhild spritesheets + custom-character compositor (procedural fallback kept)
-- [ ] **Environment art pass** — real textures & furniture sprites (environment is still procedural placeholder)
+- [x] Environment furniture — Molten Maps sci-fi 3D models (consoles, monitors, briefing screen, cafeteria…)
+- [ ] Full environment rebuild on the kit's wall/floor tile system (current shell is still CSG)
 - [ ] Replay Theater — scrub & re-enact any past mission from the journal
 - [ ] Meeting-room choreography for multi-agent collaboration
 - [ ] More zones (Research Lab, Dev Studio, Dormitory, Archive Library…)

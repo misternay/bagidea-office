@@ -17,4 +17,6 @@ workspace/.claude/*
 # not redistributable in this repo. The game falls back to procedural
 # sprites when these are missing.
 godot/assets/characters/
+godot/assets/scifi/
+_assets_tmp/
 *.zip

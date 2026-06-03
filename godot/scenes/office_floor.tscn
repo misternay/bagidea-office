@@ -57,12 +57,12 @@ shadow_enabled = true
 script = ExtResource("2")
 target = Vector3(-0.5, 0.4, -2.8)
 yaw = -12.0
-pitch = -33.0
-distance = 28.0
+pitch = -32.0
+distance = 33.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 attributes = SubResource("dof")
-fov = 26.0
+fov = 28.0
 current = true
 
 [node name="World" type="Node3D" parent="."]
