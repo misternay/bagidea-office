@@ -17,10 +17,11 @@ const CharacterFactory := preload("res://scripts/character_factory.gd")
 const WALK_SPEED := 1.6        # m/s
 const IDLE_FPS := 5.0
 const WALK_FPS := 9.0
+# Sheet row order (verified against the art): down, LEFT, up, RIGHT.
 const DIR_DOWN := 0
-const DIR_RIGHT := 1
+const DIR_LEFT := 1
 const DIR_UP := 2
-const DIR_LEFT := 3
+const DIR_RIGHT := 3
 
 # --- procedural fallback art (original look) -------------------------------
 const ART_IDLE: Array[String] = [
@@ -119,6 +120,9 @@ func _setup_visual() -> void:
 			# Char body spans rows 10..63 of the 64px cell (54 px tall, feet on
 			# the cell's bottom edge): 0.032 → ~1.7 m tall.
 			pixel_size = 0.032
+			# Full billboard: the sprite plane faces the camera even at the
+			# high pitch (FIXED_Y reads paper-thin from a -45° camera).
+			billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			return
 	if npc_index == 0 and CharacterFactory.has_assets():
 		var tex: ImageTexture = CharacterFactory.custom_texture(skin_color, hair_color, suit_color, suit_color.darkened(0.4))
@@ -129,6 +133,7 @@ func _setup_visual() -> void:
 			_mode = "custom"
 			_has_walk_rows = false
 			pixel_size = 0.032
+			billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			return
 	_build_procedural()
 
