@@ -5,7 +5,15 @@ extends CanvasLayer
 ## - Meeting-minutes panel pinned over the meeting room.
 ## - Replay Theater marquee banner.
 
-var _plates := {}  # agent Node3D -> {root, sub, role, accent}
+var _plates := {}  # agent Node3D -> {root, sub, role, pill, pill_label, pill_style}
+
+const STATE_COLORS := {
+	"idle": Color(0.35, 0.9, 0.5),
+	"working": Color(0.4, 0.8, 1.0),
+	"meeting": Color(0.8, 0.55, 1.0),
+	"blocked": Color(1.0, 0.72, 0.32),
+	"offline": Color(0.6, 0.63, 0.72),
+}
 var _wb_panel: PanelContainer
 var _wb_box: VBoxContainer
 var _wb_lines: Array[String] = []
@@ -77,8 +85,31 @@ func register(agent: Node3D, display_name: String, role: String,
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vb.add_child(sub)
 
+	# State pill: every agent in the office shows its live state at a glance.
+	var pill := PanelContainer.new()
+	var pill_style := StyleBoxFlat.new()
+	pill_style.bg_color = Color(0.35, 0.9, 0.5, 0.16)
+	pill_style.set_corner_radius_all(6)
+	pill_style.set_border_width_all(1)
+	pill_style.border_color = Color(0.35, 0.9, 0.5, 0.7)
+	pill_style.content_margin_left = 6
+	pill_style.content_margin_right = 6
+	pill_style.content_margin_top = 0
+	pill_style.content_margin_bottom = 1
+	pill.add_theme_stylebox_override("panel", pill_style)
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var pill_label := Label.new()
+	pill_label.text = "IDLE"
+	pill_label.add_theme_font_size_override("font_size", 9)
+	pill_label.add_theme_color_override("font_color", Color(0.35, 0.9, 0.5))
+	pill_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.add_child(pill_label)
+	vb.add_child(pill)
+
 	add_child(root)
-	_plates[agent] = {"root": root, "sub": sub, "role": role}
+	_plates[agent] = {"root": root, "sub": sub, "role": role,
+		"pill": pill, "pill_label": pill_label, "pill_style": pill_style}
 
 func set_status(agent: Node3D, text: String) -> void:
 	if not _plates.has(agent):
@@ -99,6 +130,16 @@ func set_status(agent: Node3D, text: String) -> void:
 		elif "💤" in text or "offline" in text:
 			c = Color(0.55, 0.58, 0.7)
 		p.sub.add_theme_color_override("font_color", c)
+
+func set_state(agent: Node3D, state: String) -> void:
+	if not _plates.has(agent):
+		return
+	var p: Dictionary = _plates[agent]
+	var c: Color = STATE_COLORS.get(state, Color(0.6, 0.65, 0.75))
+	p.pill_label.text = state.to_upper()
+	p.pill_label.add_theme_color_override("font_color", c)
+	p.pill_style.bg_color = Color(c.r, c.g, c.b, 0.16)
+	p.pill_style.border_color = Color(c.r, c.g, c.b, 0.7)
 
 func unregister(agent: Node3D) -> void:
 	if _plates.has(agent):
@@ -186,7 +227,13 @@ func _process(_delta: float) -> void:
 			continue
 		p.root.visible = true
 		var sp := cam.unproject_position(wp)
-		p.root.position = sp - Vector2(p.root.size.x * 0.5, p.root.size.y)
+		# Perspective-consistent size: scale by camera distance so a plate is
+		# never bigger than its far-away character or tiny on a near one.
+		var dist := cam.global_position.distance_to(wp)
+		var s: float = clampf(44.0 / dist, 0.62, 1.2)
+		p.root.scale = Vector2(s, s)
+		# Anchor the BOTTOM-CENTER of the (scaled) plate to the head point.
+		p.root.position = sp - Vector2(p.root.size.x * 0.5 * s, p.root.size.y * s)
 	for agent in dead:
 		_plates[agent].root.queue_free()
 		_plates.erase(agent)

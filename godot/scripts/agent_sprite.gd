@@ -233,6 +233,10 @@ func set_status(text: String) -> void:
 	if _hud:
 		_hud.set_status(self, text)
 
+func set_state(state: String) -> void:
+	if _hud:
+		_hud.set_state(self, state)
+
 ## Walk through waypoints (straight tween legs along the A* graph).
 ## Returns the total walk duration in seconds.
 func walk_to(points: Array) -> float:

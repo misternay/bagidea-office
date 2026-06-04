@@ -21,6 +21,11 @@ func _ready() -> void:
 func set_connected(connected: bool) -> void:
 	world.set_totem(connected)
 
+## Single place where an agent's state changes — body, plate, everything.
+func _set_state(a: Dictionary, state: String) -> void:
+	a.state = state
+	a.node.set_state(state)
+
 # ---------------------------------------------------------------- events
 
 func handle(evt: Dictionary) -> void:
@@ -53,7 +58,7 @@ func handle(evt: Dictionary) -> void:
 		return
 	var a: Dictionary = _ensure(id)
 	if a.state == "offline":
-		a.state = "idle"
+		_set_state(a, "idle")
 		a.node.set_status("good morning ☀")
 		_clear_status_later(a, 3.0)
 	match type:
@@ -86,14 +91,14 @@ func handle(evt: Dictionary) -> void:
 			if a.tasks.is_empty():
 				_finish(a, "failed ✗")
 		"perm.requested":
-			a.state = "blocked"
+			_set_state(a, "blocked")
 			a.node.set_status("needs approval ⚠")
 			_walk(a.node, "sec_window")
 			_pulse_security()
 			if not theatrical:
 				world.board_set(task, "blocked", id)
 		"perm.approved":
-			a.state = "working"
+			_set_state(a, "working")
 			a.node.set_status("approved ✓")
 			if a.desk != "":
 				_walk(a.node, a.desk)
@@ -117,7 +122,7 @@ func handle(evt: Dictionary) -> void:
 			# Agents physically gather at the meeting table (design doc 4.7).
 			if a.state != "meeting":
 				world.whiteboard_reset("◤ MEETING · " + task)
-			a.state = "meeting"
+			_set_state(a, "meeting")
 			a.node.set_status("meeting 🗣")
 			var seat: String = meeting_cycle.pop_front()
 			meeting_cycle.append(seat)
@@ -128,7 +133,7 @@ func handle(evt: Dictionary) -> void:
 			if a.tasks.is_empty():
 				_finish(a, "done ✓")
 			else:
-				a.state = "working"
+				_set_state(a, "working")
 				a.node.set_status("working…")
 				if a.desk != "":
 					_walk(a.node, a.desk)
@@ -160,7 +165,7 @@ func _to_dorm(id: String) -> void:
 	for t in a.tasks:
 		world.board_set(t, "none")
 	a.tasks.clear()
-	a.state = "offline"
+	_set_state(a, "offline")
 	a.node.set_status("offline 💤")
 	var bed: String = bed_pool.pop_front() if bed_pool.size() > 0 else "dorm_c"
 	if bed != "dorm_c":
@@ -173,14 +178,14 @@ func _to_desk(a: Dictionary) -> void:
 			a.desk = "ceo_desk"  # the main agent runs the company from exec
 		else:
 			a.desk = desk_pool.pop_front() if desk_pool.size() > 0 else "ops_c"
-	a.state = "working"
+	_set_state(a, "working")
 	a.node.set_status("thinking…")
 	_walk(a.node, a.desk)
 
 func _finish(a: Dictionary, label: String) -> void:
 	a.node.set_status(label)
 	_release_desk(a)
-	a.state = "idle"
+	_set_state(a, "idle")
 	await get_tree().create_timer(2.0).timeout
 	if a.state == "idle":  # may have started a new task meanwhile
 		_walk(a.node, "exec_c" if a.id == "main" else _next_seat())
@@ -255,6 +260,7 @@ func _spawn_ceo() -> void:
 	ceo.npc_index = 8  # straw hat + suspenders — reserved for the chairman
 	ceo.position = world.WP["pace_a"]
 	get_parent().add_child(ceo)
+	ceo.set_state("idle")
 	_ceo_loop()
 
 func _ceo_loop() -> void:
