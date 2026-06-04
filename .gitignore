@@ -4,6 +4,9 @@ godot/.godot/
 # Rust build artifacts
 shell/target/
 
+# Personal Claude Code permission overrides (per-machine)
+.claude/settings.local.json
+
 # Runtime artifacts
 daemon/journal.jsonl
 daemon/registry.json
