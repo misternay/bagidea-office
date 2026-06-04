@@ -47,7 +47,7 @@ enum UserEvent {
 const ORB_HTML: &str = r#"<!doctype html>
 <html><body style="margin:0;overflow:hidden;background:#0a111d;user-select:none;-webkit-user-select:none;cursor:pointer">
 <img id="ic" src="http://127.0.0.1:8787/brand/logo_ico_cute.png" draggable="false"
-     style="position:absolute;left:-3.2px;top:-2.6px;width:79.1px;height:79.1px"
+     style="position:absolute;left:0.9px;top:1.4px;width:70.8px;height:70.8px"
      onerror="document.body.style.background='radial-gradient(circle at 32% 28%,#2a78d8,#0b1422)'">
 <script>
   // Messenger chat-head feel: press-and-move drags, clean click toggles.
