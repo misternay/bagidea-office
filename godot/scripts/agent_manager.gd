@@ -5,6 +5,7 @@ extends Node
 ## several missions at once (board cards are per-task, body is per-agent).
 
 const AgentScript := preload("res://scripts/agent_sprite.gd")
+const Fx := preload("res://scripts/fx_factory.gd")
 
 @onready var world: Node3D = get_node("../World")
 
@@ -61,6 +62,11 @@ func _set_state(a: Dictionary, state: String) -> void:
 	a.state = state
 	a.node.set_state(state)
 
+## Pixel FX above an agent's head (node origin floats at y 0.86).
+func _fx(a: Dictionary, name: String, y := 2.15, loops := 1, ppm := 0.02) -> void:
+	if a.has("node") and is_instance_valid(a.node):
+		Fx.spawn(a.node, name, Vector3(0, y - 0.86, 0), ppm, loops)
+
 # ---------------------------------------------------------------- events
 
 func handle(evt: Dictionary) -> void:
@@ -111,6 +117,7 @@ func handle(evt: Dictionary) -> void:
 			bed_pool.append(a.bed)  # check out of the bunk
 			a.bed = ""
 		a.node.set_status("good morning ☀")
+		_fx(a, "sparkle", 1.9)
 		_clear_status_later(a, 3.0)
 	match type:
 		"agent.online":
@@ -129,6 +136,7 @@ func handle(evt: Dictionary) -> void:
 			a.node.set_status(str(evt.get("tool", "working…")))
 		"task.completed":
 			a.tasks.erase(task)
+			_fx(a, "success")
 			if not theatrical:
 				world.board_set(task, "done", id)
 				_board_clear_later(task)
@@ -136,6 +144,7 @@ func handle(evt: Dictionary) -> void:
 				_finish(a, "done ✓")
 		"task.failed":
 			a.tasks.erase(task)
+			_fx(a, "failure")
 			if not theatrical:
 				world.board_set(task, "failed", id)
 				_board_clear_later(task)
@@ -144,6 +153,7 @@ func handle(evt: Dictionary) -> void:
 		"perm.requested":
 			_set_state(a, "blocked")
 			a.node.set_status("needs approval ⚠")
+			_fx(a, "alert", 2.15, 3)
 			_walk(a.node, "sec_window")
 			_pulse_security()
 			if not theatrical:
@@ -151,12 +161,14 @@ func handle(evt: Dictionary) -> void:
 		"perm.approved":
 			_set_state(a, "working")
 			a.node.set_status("approved ✓")
+			_fx(a, "thumbs_up")
 			if a.desk != "":
 				_walk(a.node, a.desk)
 			if not theatrical:
 				world.board_set(task, "running", id)
 		"perm.denied":
 			a.tasks.erase(task)
+			_fx(a, "thumbs_down")
 			if not theatrical:
 				world.board_set(task, "failed", id)
 				_board_clear_later(task)
@@ -168,6 +180,7 @@ func handle(evt: Dictionary) -> void:
 			a.node.set_status("รับคำสั่งจาก CEO 📋")
 			if is_instance_valid(ceo):
 				ceo.set_status("สั่งงาน 🗣")
+				Fx.spawn(ceo, "heart", Vector3(0, 1.3, 0))
 				a.node.walk_to([ceo.position + Vector3(0.7, 0, 0.45)])
 		"task.delegated":
 			# ...then walks to the assignee and hands the work over.
@@ -180,11 +193,14 @@ func handle(evt: Dictionary) -> void:
 		"skill.created":
 			# Hermes moment: the agent distilled its work into a new skill.
 			a.node.set_status("📚 learned: " + str(evt.get("skill", "")))
+			_fx(a, "light_burst", 1.3, 1, 0.024)
 			_clear_status_later(a, 6.0)
 		"chat.message":
 			# Speech bubble: first line of what the agent actually said.
 			var text := str(evt.get("text", "")).split("\n")[0]
 			a.node.set_status("💬 " + text.left(28))
+			if not evt.get("replay", false):
+				_fx(a, "music", 2.0, 1, 0.014)
 			# In a meeting, words land on the whiteboard (truth, not theater).
 			if a.state == "meeting":
 				world.whiteboard_add(id, text)
@@ -244,6 +260,8 @@ func _remove_agent(id: String) -> void:
 		bed_pool.append(a.bed)
 	for t in a.tasks:
 		world.board_set(t, "none")
+	# Farewell warp where they stood (parented to the world — the node dies).
+	Fx.spawn(world, "warp_out", a.node.position + Vector3(0, -0.2, 0), 0.022)
 	a.node.queue_free()  # _exit_tree unregisters the nameplate
 	agents.erase(id)
 
@@ -259,6 +277,8 @@ func _ensure(id: String) -> Dictionary:
 	node.set_status(id)
 	var a := {"node": node, "state": "idle", "desk": "", "bed": "", "id": id, "tasks": {}}
 	agents[id] = a
+	# New hires teleport in — a little sci-fi warp at the door.
+	Fx.spawn(node, "warp_in", Vector3(0, -0.2, 0), 0.022)
 	# The main agent heads to the executive office; everyone else idles in cafe.
 	_walk(node, "exec_c" if id == "main" else _next_seat())
 	_clear_status_later(a, 5.0)
