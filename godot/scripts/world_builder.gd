@@ -82,10 +82,6 @@ var totem_mat: StandardMaterial3D
 var sec_light: OmniLight3D
 var sky_mat: StandardMaterial3D
 var beam_mats: Array[ShaderMaterial] = []
-var wb_label: Label3D
-var theater_label: Label3D
-
-var _wb_lines: Array[String] = []
 
 var _wp_ids := {}
 var _board_slots := {}
@@ -254,31 +250,25 @@ func set_totem(connected: bool) -> void:
 	if totem_mat:
 		totem_mat.emission = Color(0.3, 1.0, 0.5) if connected else Color(1.0, 0.25, 0.2)
 
-## Meeting-room whiteboard: real collaboration text, last 7 lines.
+## Meeting-room whiteboard: forwarded to the crisp 2D HUD layer.
 func whiteboard_reset(header: String) -> void:
-	_wb_lines.clear()
-	if header != "":
-		_wb_lines.append(header)
-	_wb_refresh()
+	var hud := get_node_or_null("../Hud")
+	if hud:
+		hud.wb_reset(header)
 
 func whiteboard_add(who: String, text: String) -> void:
-	var line := text if who == "" else who + ": " + text
-	_wb_lines.append(line.left(48))
-	while _wb_lines.size() > 7:
-		_wb_lines.pop_front()
-	_wb_refresh()
+	var hud := get_node_or_null("../Hud")
+	if hud:
+		hud.wb_add(text if who == "" else who + ": " + text)
 
-func _wb_refresh() -> void:
-	if wb_label:
-		wb_label.text = "\n".join(_wb_lines)
-
-## Replay Theater: sepia grade + marquee while the journal re-enacts.
+## Replay Theater: sepia grade in-world + marquee banner on the HUD.
 func set_theater(on: bool) -> void:
-	if theater_label:
-		theater_label.visible = on
 	var we := get_node_or_null("../WorldEnvironment")
 	if we:
 		we.environment.adjustment_saturation = 0.5 if on else 1.22
+	var hud := get_node_or_null("../Hud")
+	if hud:
+		hud.set_theater(on)
 
 # ---------------------------------------------------------------- board
 
@@ -553,9 +543,12 @@ func _build_geometry() -> void:
 	totem_mat = _mat(Color(0.15, 0.2, 0.25), 0.3, Color(1.0, 0.25, 0.2), 2.2)
 	_cyl(Vector3(-2.6, 0.06, 3), 0.55, 0.12, cap)
 	_cyl(Vector3(-2.6, 1.26, 3), 0.35, 2.4, totem_mat)
-	var logo := _label("B A G I D E A", Vector3(-1, 0.03, 0.6), 96, Color(0.65, 0.9, 1.0), 1.4)
-	logo.rotation_degrees.x = -90
-	logo.pixel_size = 0.006
+	# Brand (never on the floor): horizontal logo on the ops north wall,
+	# camera-facing sign on the lobby entrance lintel, box logo on the
+	# reception desk front.
+	_logo("res://assets/brand/logo.png", Vector3(0.9, 3.12, -9.79), Vector2(3.4, 0.51), 0.0)
+	_logo("res://assets/brand/logo.png", Vector3(-1, 2.78, 5.72), Vector2(2.1, 0.31), 0.0)
+	_logo("res://assets/brand/logo_box.png", Vector3(-4.2, 0.55, 4.16), Vector2(0.62, 0.6), 0.0)
 	_box(Vector3(-4.2, 0.5, 3.8), Vector3(1.8, 1.0, 0.7), dark_wood)           # reception
 	_box(Vector3(-4.2, 1.02, 3.8), Vector3(2.0, 0.06, 0.85), wood)
 	_box(Vector3(-4.5, 1.25, 3.8), Vector3(0.4, 0.3, 0.04), screen)
@@ -618,14 +611,6 @@ func _build_geometry() -> void:
 		_kit("Chair_1", Vector3(14.2, 0, 0.45), -45.0, 0.6)
 		_kit("Briefing_Screen_Purple", Vector3(15.5, 0, -0.5), -90.0, 0.5)
 	_omni(Vector3(13, 2.5, -0.5), Color(0.85, 0.8, 1.0), 1.6, 6.0)
-	# Whiteboard text floats above the briefing screen, billboarded so the
-	# camera can always read the meeting minutes.
-	wb_label = _label("", Vector3(14.4, 2.7, -0.5), 40, Color(0.92, 0.88, 1.0))
-	wb_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	wb_label.pixel_size = 0.0036
-	wb_label.width = 460
-	wb_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	wb_label.outline_size = 10
 
 	# ---- Dormitory (offline agents sleep here)
 	if kit:
@@ -710,11 +695,6 @@ func _build_geometry() -> void:
 		mi.position = Vector3(wx - 0.5, 1.5, -8.3)
 		mi.rotation_degrees = Vector3(-48.0, -14.0, 0.0)
 
-	# Replay Theater marquee (hidden until the journal re-enacts)
-	theater_label = _label("⏪  R E P L A Y", Vector3(3, 5.4, -2), 120, Color(1.0, 0.35, 0.3), 1.3)
-	theater_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	theater_label.visible = false
-
 	var dust := GPUParticles3D.new()
 	dust.amount = 90
 	dust.lifetime = 14.0
@@ -737,6 +717,29 @@ func _build_geometry() -> void:
 	dust.draw_pass_1 = dq
 	add_child(dust)
 	dust.position = Vector3(0, 2, -5)
+
+## Branded quad: textured, gently emissive so it reads day and night.
+func _logo(path: String, pos: Vector3, size: Vector2, rot_y: float) -> void:
+	var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+	if img == null:
+		return
+	var tex := ImageTexture.create_from_image(img)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.emission_enabled = true
+	m.emission_texture = tex
+	m.emission = Color(1, 1, 1)
+	m.emission_energy_multiplier = 0.55
+	var quad := QuadMesh.new()
+	quad.size = size
+	quad.material = m
+	var mi := MeshInstance3D.new()
+	mi.mesh = quad
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.position = pos
+	mi.rotation_degrees.y = rot_y
 
 func _plant(pos: Vector3) -> void:
 	var pot := CSGCylinder3D.new()

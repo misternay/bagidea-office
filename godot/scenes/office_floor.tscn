@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/office_floor.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/camera_rig.gd" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/agent_manager.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/event_client.gd" id="5"]
 [ext_resource type="Shader" path="res://shaders/grain.gdshader" id="6"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="7"]
 
 [sub_resource type="Environment" id="env"]
 background_mode = 1
@@ -73,6 +74,9 @@ script = ExtResource("4")
 
 [node name="EventClient" type="Node" parent="."]
 script = ExtResource("5")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("7")
 
 [node name="GrainLayer" type="CanvasLayer" parent="."]
 

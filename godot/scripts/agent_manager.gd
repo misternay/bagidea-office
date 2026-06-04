@@ -223,10 +223,16 @@ func _make_char(id: String) -> Sprite3D:
 	# idle+walk animation). Sheets 7 & 8 are reserved for main/ceo so the
 	# leadership stays visually distinct. (Custom compositor remains for
 	# when the full layer pack with walk frames is available.)
+	s.agent_name = id.capitalize()
 	if id == "main":
 		s.npc_index = 7   # the beret — director look
+		s.agent_role = "Director"
+	elif id == "ceo":
+		s.agent_role = "Chairman"
 	else:
 		s.npc_index = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12][h % 10]
+		s.agent_role = ["Researcher", "Engineer", "Designer", "Analyst",
+			"Operator", "Specialist"][h % 6]
 	s.pixel_size = 0.07
 	s.billboard = StandardMaterial3D.BILLBOARD_FIXED_Y
 	s.shaded = true

@@ -12,6 +12,8 @@ extends Sprite3D
 @export var tie_color := Color8(168, 52, 58)
 ## 1..12 = premade NPC sheet, 0 = composited custom, -1 = procedural fallback.
 @export var npc_index := -1
+@export var agent_name := "agent"
+@export var agent_role := "Staff"
 
 const CharacterFactory := preload("res://scripts/character_factory.gd")
 const WALK_SPEED := 1.6        # m/s
@@ -78,7 +80,7 @@ const ART_WALK: Array[String] = [
 ]
 
 var idle_pos := Vector3.ZERO
-var _label: Label3D
+var _hud: Node
 var _walk_tween: Tween
 var _t := 0.0
 var _bob_speed := 2.2
@@ -98,15 +100,23 @@ func _ready() -> void:
 	_last_pos = position
 	_t = randf() * TAU
 
-	_label = Label3D.new()
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.font_size = 64
-	_label.outline_size = 16
-	_label.pixel_size = 0.004
-	# Slightly above the head (head top ≈ node + 0.85 for both art modes).
-	_label.position = Vector3(0, 1.1, 0)
-	_label.modulate = Color(0.75, 0.95, 1.0)
-	add_child(_label)
+	# MMO-style nameplate on the 2D HUD layer (crisp screen-space text).
+	_hud = get_tree().current_scene.get_node_or_null("Hud")
+	if _hud:
+		_hud.register(self, agent_name, agent_role, _portrait(), suit_color.lightened(0.25))
+
+func _exit_tree() -> void:
+	if _hud:
+		_hud.unregister(self)
+
+## Portrait for the nameplate: the face region of the sheet's first cell.
+func _portrait() -> Texture2D:
+	if _mode in ["npc", "custom"]:
+		var at := AtlasTexture.new()
+		at.atlas = texture
+		at.region = Rect2(16, 6, 32, 32)
+		return at
+	return texture  # procedural mini figure
 
 func _setup_visual() -> void:
 	if npc_index >= 1 and CharacterFactory.has_assets():
@@ -220,7 +230,8 @@ func _process(delta: float) -> void:
 				texture = _tex_idle
 
 func set_status(text: String) -> void:
-	_label.text = text
+	if _hud:
+		_hud.set_status(self, text)
 
 ## Walk through waypoints (straight tween legs along the A* graph).
 ## Returns the total walk duration in seconds.
