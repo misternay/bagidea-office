@@ -197,10 +197,14 @@ your desktop icons, shows the circular chat-head launcher, and adds a system
 tray icon. Set `BAGIDEA_GODOT` if your Godot binary lives somewhere other
 than `E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe`.
 
-- **Chat head** (circular, draggable): click = show/hide the overlay
-- **Overlay**: custom-chromed chat window; closing only hides it
-- **System tray icon → Exit BagIdea Office**: the only true exit — tears the
-  whole stack down and restores your wallpaper
+- **Chat head** (circular, draggable, never steals focus): click = show/hide
+  the overlay
+- **Overlay**: custom-chromed chat window; closing only hides it; stays out
+  of the taskbar
+- **System tray icon**: left-click toggles the chat; menu has
+  **Start with Windows** (HKCU Run key, toggle any time) and
+  **Exit BagIdea Office** — the only true exit, which tears the whole stack
+  down and restores your wallpaper
 
 Manual mode (development) still works:
 
@@ -270,6 +274,8 @@ The `docs/` folder is a complete V1 product-design specification written before 
 - [x] Environment furniture — Molten Maps sci-fi 3D models (consoles, monitors, briefing screen, cafeteria…)
 - [x] Full kit shell — walls (solid + glass window bays), railing partitions, zone-tinted metal floors
 - [x] Meeting Room choreography, Server Room, Dormitory (east wing)
+- [x] One-exe suite: chat head + overlay + tray + auto-start with Windows
+- [x] Rooftop company billboard (camera-facing brand signage)
 - [x] Replay Theater — `POST /replay` re-enacts a journal slice in-world (sepia grade + marquee), Replay button in the overlay
 - [x] Live meeting whiteboard — agents' real messages appear on the meeting-room minutes board
 - [ ] More zones (Research Lab, Dev Studio, Archive Library…)

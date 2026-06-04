@@ -19,7 +19,7 @@ use tao::{
     window::{Icon, Window, WindowBuilder},
 };
 use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     TrayIconBuilder, TrayIconEvent,
 };
 use windows_sys::Win32::Foundation::HWND;
@@ -188,6 +188,38 @@ fn attach_wallpaper_when_ready(pid: u32) {
     });
 }
 
+// ---- auto-start with Windows (HKCU Run key, toggled from the tray menu —
+// dev-friendly: nothing is forced, the checkbox controls it)
+
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_NAME: &str = "BagIdeaOffice";
+
+fn is_autostart() -> bool {
+    Command::new("reg")
+        .args(["query", RUN_KEY, "/v", RUN_NAME])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn set_autostart(on: bool) {
+    if on {
+        if let Ok(exe) = std::env::current_exe() {
+            let _ = Command::new("reg")
+                .args(["add", RUN_KEY, "/v", RUN_NAME, "/t", "REG_SZ", "/d",
+                    &exe.to_string_lossy(), "/f"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status();
+        }
+    } else {
+        let _ = Command::new("reg")
+            .args(["delete", RUN_KEY, "/v", RUN_NAME, "/f"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+}
+
 fn restore_wallpaper() {
     unsafe {
         SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, std::ptr::null_mut(), 3);
@@ -252,9 +284,11 @@ fn main() {
     // ---- system tray: the only true exit (the suite runs forever otherwise)
     let tray_menu = Menu::new();
     let open_item = MenuItem::new("Open Office Chat", true, None);
+    let autostart_item = CheckMenuItem::new("Start with Windows", true, is_autostart(), None);
     let exit_item = MenuItem::new("Exit BagIdea Office", true, None);
     let _ = tray_menu.append_items(&[
         &open_item,
+        &autostart_item,
         &PredefinedMenuItem::separator(),
         &exit_item,
     ]);
@@ -265,6 +299,7 @@ fn main() {
         .build()
         .expect("tray");
     let open_id = open_item.id().clone();
+    let autostart_id = autostart_item.id().clone();
     let exit_id = exit_item.id().clone();
 
     // ---- screen-aware default positions (inset, never sunk off-screen)
@@ -366,6 +401,9 @@ fn main() {
                 shutdown = true;
             } else if ev.id == open_id {
                 toggle = true;
+            } else if ev.id == autostart_id {
+                // CheckMenuItem already flipped its own state on click.
+                set_autostart(autostart_item.is_checked());
             }
         }
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
