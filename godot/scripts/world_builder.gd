@@ -293,69 +293,81 @@ const BirdScript := preload("res://scripts/bird_sprite.gd")
 
 ## Soft clouds drifting across the sky forever + occasional bird flocks.
 func _build_sky_life() -> void:
-	# Shaded (not unshaded!) so clouds dim with the night like everything else.
-	# Two layers: distant horizon puffs + big soft veils that drift UNDER the
-	# top-down camera, sweeping gently across the frame (user: clouds must
-	# actually pass the camera — but stay smooth, never cluttered).
+	# Cartoon clouds (opaque puffy clusters, flat-ish base — the Zelda look).
+	# Shaded so the day cycle lights them, plus a soft emission floor that
+	# keeps the undersides fluffy instead of hard-shadowed plastic balls.
 	var cmat := StandardMaterial3D.new()
-	cmat.albedo_color = Color(1.0, 1.0, 1.0, 0.75)
+	cmat.albedo_color = Color(0.93, 0.95, 1.0)
 	cmat.roughness = 1.0
-	cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cmat.emission_enabled = true
+	cmat.emission = Color(0.86, 0.9, 1.0)
+	cmat.emission_energy_multiplier = 0.16
+
+	# Horizon layer behind the building.
 	for i in 3:
-		var cloud := Node3D.new()
+		var cloud := _make_cloud(randf_range(2.2, 3.2), cmat)
 		add_child(cloud)
-		for b in randi_range(3, 5):
-			var puff := MeshInstance3D.new()
-			var sm := SphereMesh.new()
-			var r := randf_range(1.1, 2.4)
-			sm.radius = r
-			sm.height = r
-			sm.radial_segments = 16
-			sm.rings = 8
-			puff.mesh = sm
-			puff.material_override = cmat
-			puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			puff.layers = 2  # sky life stays off the static map render
-			puff.scale = Vector3(1.7, 0.45, 1.0)
-			puff.position = Vector3(b * randf_range(1.2, 1.9) - 3.0,
-				randf_range(-0.3, 0.4), randf_range(-0.7, 0.7))
-			cloud.add_child(puff)
-		# Behind the building (z < -14): the horizon layer.
 		cloud.position = Vector3(randf_range(-52.0, 52.0),
 			randf_range(15.0, 22.0), randf_range(-34.0, -14.0))
 		_drift_cloud(cloud, 56.0)
 
-	# Veil layer: parented to the CAMERA, drifting across its local X — the
-	# only placement a -45° top-down camera is guaranteed to actually see.
-	# At 26m in front of a 28° lens the visible half-width is ~10.5m.
+	# Crossing layer: parented to the CAMERA, drifting across its local X —
+	# the only placement a -45° top-down camera is guaranteed to actually
+	# see. Small distinct clouds glide over the office now and then.
 	var cam := get_node_or_null("../CameraRig/Camera3D")
 	if cam:
-		var vmat := StandardMaterial3D.new()
-		vmat.albedo_color = Color(1.0, 1.0, 1.0, 0.26)  # barely-there veil
-		vmat.roughness = 1.0
-		vmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var pin := "--cloudtest" in OS.get_cmdline_user_args()  # one dead-center
 		for i in 3:
-			var veil := Node3D.new()
-			cam.add_child(veil)
-			for b in randi_range(3, 5):
-				var puff := MeshInstance3D.new()
-				var sm := SphereMesh.new()
-				var r := randf_range(1.6, 3.0)
-				sm.radius = r
-				sm.height = r
-				sm.radial_segments = 16
-				sm.rings = 8
-				puff.mesh = sm
-				puff.material_override = vmat
-				puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				puff.layers = 2
-				puff.scale = Vector3(1.8, 0.5, 1.0)
-				puff.position = Vector3(b * randf_range(1.6, 2.4) - 4.0,
-					randf_range(-0.5, 0.5), randf_range(-1.0, 1.0))
-				veil.add_child(puff)
-			veil.position = Vector3(randf_range(-34.0, 34.0),
-				randf_range(2.0, 7.5), -26.0)
-			_drift_cloud(veil, 36.0)
+			var cloud := _make_cloud(randf_range(0.8, 1.15), cmat)
+			cam.add_child(cloud)
+			# At -30m a 28° lens sees ~±7.3 vertically: keep clouds in the
+			# upper band of the FRAME (local y ~0..4), not above it.
+			cloud.position = Vector3(0.0 if (pin and i == 0) else randf_range(-36.0, 36.0),
+				1.5 if (pin and i == 0) else randf_range(0.0, 4.0), -30.0)
+			_drift_cloud(cloud, 38.0)
+
+## A stylized puffy cloud: a row of overlapping spheres, bulging in the
+## middle, bottoms roughly level — reads as a cloud, not a UFO.
+func _make_cloud(s: float, mat: Material) -> Node3D:
+	var cloud := Node3D.new()
+	var n := randi_range(4, 6)
+	var xs: Array[float] = []
+	var rs: Array[float] = []
+	var x := 0.0
+	for i in n:
+		var t := float(i) / float(n - 1)
+		var bulge := 1.0 - absf(t - 0.5) * 1.3
+		var r := (randf_range(0.5, 0.75) * bulge + 0.28) * s
+		xs.append(x + r)
+		rs.append(r)
+		x += r * randf_range(1.5, 1.8)
+	var mid := (xs[0] + xs[n - 1]) * 0.5
+	for i in n:
+		cloud.add_child(_puff(rs[i], mat,
+			Vector3(xs[i] - mid, rs[i] * 0.35, randf_range(-0.18, 0.18) * s)))
+	# Toppers riding the center break the ball-row silhouette into a mound.
+	var crown: float = rs[n / 2] * 0.95
+	for i in randi_range(1, 2):
+		var tr := randf_range(0.42, 0.6) * s
+		cloud.add_child(_puff(tr, mat,
+			Vector3(randf_range(-0.55, 0.55) * s, crown + tr * 0.35,
+				randf_range(-0.12, 0.12) * s)))
+	return cloud
+
+func _puff(r: float, mat: Material, pos: Vector3) -> MeshInstance3D:
+	var puff := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = r
+	sm.height = r * 2.0
+	sm.radial_segments = 12
+	sm.rings = 6
+	puff.mesh = sm
+	puff.material_override = mat
+	puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	puff.layers = 2  # sky life stays off the static map render
+	puff.position = pos
+	puff.scale.y = 0.82
+	return puff
 
 func _drift_cloud(cloud: Node3D, span: float) -> void:
 	while is_instance_valid(cloud) and is_inside_tree():
