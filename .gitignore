@@ -20,3 +20,7 @@ godot/assets/characters/
 godot/assets/scifi/
 _assets_tmp/
 *.zip
+
+# Third-party asset archives
+*.rar
+*.7z
