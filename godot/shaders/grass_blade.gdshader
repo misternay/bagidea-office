@@ -10,6 +10,7 @@ uniform float wind_speed = 1.6;
 
 void vertex() {
 	float bend = 1.0 - UV.y; // QuadMesh: v=0 at the top → tips move, roots stay
+	VERTEX.x *= UV.y;        // taper to a point — blade reads as a spike, not a card
 	vec2 wpos = vec2(MODEL_MATRIX[3].x, MODEL_MATRIX[3].z);
 	float phase = wpos.x * 0.7 + wpos.y * 0.9;
 	float sway = sin(TIME * wind_speed + phase) + 0.4 * sin(TIME * wind_speed * 2.3 + phase * 1.7);
