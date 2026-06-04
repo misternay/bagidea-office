@@ -542,10 +542,15 @@
     permsEl.appendChild(d);
   }
   async function respondPerm(id, decision) {
-    await fetch("/perm/respond", {
+    const r = await fetch("/perm/respond", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, decision }),
     });
+    if (!r.ok) {
+      // Stale card (daemon restarted / request already timed out) — clean up.
+      removePermCard(id);
+      addChip("🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)");
+    }
   }
   function removePermCard(id) {
     const el = document.getElementById("perm-" + id);

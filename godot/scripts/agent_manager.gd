@@ -63,7 +63,7 @@ func _set_state(a: Dictionary, state: String) -> void:
 	a.node.set_state(state)
 
 ## Pixel FX above an agent's head (node origin floats at y 0.86).
-func _fx(a: Dictionary, name: String, y := 2.15, loops := 1, ppm := 0.02) -> void:
+func _fx(a: Dictionary, name: String, y := 2.3, loops := 1, ppm := 0.032) -> void:
 	if a.has("node") and is_instance_valid(a.node):
 		Fx.spawn(a.node, name, Vector3(0, y - 0.86, 0), ppm, loops)
 
@@ -200,7 +200,7 @@ func handle(evt: Dictionary) -> void:
 			var text := str(evt.get("text", "")).split("\n")[0]
 			a.node.set_status("💬 " + text.left(28))
 			if not evt.get("replay", false):
-				_fx(a, "music", 2.0, 1, 0.014)
+				_fx(a, "music", 2.1, 1, 0.02)
 			# In a meeting, words land on the whiteboard (truth, not theater).
 			if a.state == "meeting":
 				world.whiteboard_add(id, text)
