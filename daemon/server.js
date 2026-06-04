@@ -110,6 +110,20 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText) {
   } catch {}
 }
 
+// ---------------------------------------------------------------- sessions
+// Named chat sessions per agent. Default behavior: every /chat continues
+// the agent's latest session (continuous memory); "new" starts a thread;
+// an explicit key resumes that thread and makes it the latest again.
+
+const SESSIONS = path.join(__dirname, "sessions.json");
+let sess = {};
+try { sess = JSON.parse(fs.readFileSync(SESSIONS, "utf8")); } catch {}
+function saveSess() { fs.writeFileSync(SESSIONS, JSON.stringify(sess, null, 2)); }
+function latestSession(agent) {
+  const l = sess[agent] || [];
+  return l.length ? l.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
+}
+
 // Plain headless claude call → final text (prompt drafting, reflections).
 function claudeText(prompt) {
   return new Promise((resolve) => {
@@ -211,16 +225,22 @@ async function runReplay(minutes = 10, speed = 8) {
 // Dangerous tools route through the Security Center: the PreToolUse hook in
 // workspace/.claude/settings.json long-polls /perm/request and we hold it
 // until the user stamps Allow/Deny.
-function runClaude(agent, prompt) {
+function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
   broadcast({ type: "task.started", agent, task });
 
+  // Session resolution: explicit key > latest > fresh.
+  let entry = null;
+  if (opts.session && opts.session !== "new")
+    entry = (sess[agent] || []).find((e) => e.key === opts.session);
+  else if (!opts.session) entry = latestSession(agent);
+
   // Persona + assigned skills ride in a stdin preamble (robust across
-  // Windows shell quoting); tool access comes from the agent's registry row.
+  // Windows shell quoting); resumed sessions already carry it in context.
   const a = reg.agents[agent];
   const tools = a && a.tools && a.tools.length ? a.tools.join(",") : "Read,Glob,Grep";
   let preamble = "";
-  if (a && (a.prompt || (a.skills || []).length)) {
+  if (!entry && a && (a.prompt || (a.skills || []).length)) {
     preamble = `<persona>\nYou are "${a.name}" (${a.role}).\n${a.prompt || ""}\n`;
     for (const sid of a.skills || []) {
       const sk = reg.skills[sid];
@@ -229,16 +249,14 @@ function runClaude(agent, prompt) {
     preamble += "</persona>\n\n";
   }
 
-  const child = spawn(
-    "claude",
-    ["-p", "--output-format", "stream-json", "--verbose",
-     "--allowedTools", tools],
-    {
-      cwd: WORKSPACE,
-      shell: true,
-      env: { ...process.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
-    }
-  );
+  const args = ["-p", "--output-format", "stream-json", "--verbose",
+    "--allowedTools", tools];
+  if (entry && entry.sid) args.push("--resume", entry.sid);
+  const child = spawn("claude", args, {
+    cwd: WORKSPACE,
+    shell: true,
+    env: { ...process.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
+  });
   child.stdin.write(preamble + prompt);
   child.stdin.end();
 
@@ -262,10 +280,21 @@ function runClaude(agent, prompt) {
             broadcast({ type: "task.progress", agent, task, tool: b.name });
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
-            broadcast({ type: "chat.message", agent, task, text: b.text });
+            const out = opts.filterText ? opts.filterText(b.text) : b.text;
+            if (out) broadcast({ type: "chat.message", agent, task, text: out });
           }
         }
       } else if (m.type === "result") {
+        // Session bookkeeping: remember the thread we just extended.
+        if (m.session_id) {
+          if (entry) { entry.sid = m.session_id; entry.ts = Date.now(); }
+          else {
+            sess[agent] = sess[agent] || [];
+            sess[agent].push({ key: "s" + Date.now(), sid: m.session_id,
+              title: String(prompt).replace(/\s+/g, " ").slice(0, 48), ts: Date.now() });
+          }
+          saveSess();
+        }
         broadcast({ type: m.is_error ? "task.failed" : "task.completed", agent, task });
         if (!m.is_error) maybeLearnSkill(agent, task, prompt, acts, lastText);
       }
@@ -277,6 +306,76 @@ function runClaude(agent, prompt) {
     broadcast({ type: "chat.message", agent, task, text: "adapter error: " + e.message });
   });
   return task;
+}
+
+// ---------------------------------------------------------------- ceo flow
+// Talking to the CEO is the gimmick chain-of-command: the Director (main)
+// walks over, takes the order, replies with a plan, and may delegate via
+// `DELEGATE: <agent_id> :: <instruction>` lines — each spawns a real
+// session for that agent (plus a little walk in the world).
+function ceoFlow(prompt) {
+  broadcast({ type: "ceo.summon", agent: "main" });
+  const team = Object.entries(reg.agents)
+    .filter(([id]) => id !== "ceo" && id !== "main")
+    .map(([id, a]) => `- ${id}: ${a.name}, ${a.role}` +
+      (a.prompt ? ` — ${a.prompt.replace(/\s+/g, " ").slice(0, 100)}` : ""))
+    .join("\n") || "(no other staff yet)";
+  const wrapped =
+    `The owner (CEO) has called you over and given this order in person:\n` +
+    `"""${prompt}"""\n\n` +
+    `Your team:\n${team}\n\n` +
+    `Decide how to execute. For anything a team member should own, include a line:\n` +
+    `DELEGATE: <agent_id> :: <clear instruction for them>\n` +
+    `(exact format, one per assignment — these are dispatched automatically). ` +
+    `Anything not delegated you handle yourself. Reply to the owner with a short ` +
+    `plan in the language they used.`;
+  return runClaude("main", wrapped, {
+    filterText: (text) => {
+      const keep = [];
+      for (const ln of String(text).split("\n")) {
+        const m = ln.match(/^\s*DELEGATE:\s*([\w฀-๿-]+)\s*::\s*(.+)$/);
+        if (m && reg.agents[m[1]] && m[1] !== "ceo") {
+          broadcast({ type: "task.delegated", agent: "main", target: m[1] });
+          setTimeout(() => runClaude(m[1], m[2]), 4500);  // after the walk
+        } else keep.push(ln);
+      }
+      return keep.join("\n").trim();
+    },
+  });
+}
+
+// ---------------------------------------------------------------- discussion
+// Agents talk to each other: round-robin claude calls sharing a transcript,
+// staged in the meeting room (collab.* events drive seats + whiteboard).
+let discussing = false;
+
+async function runDiscussion(ids, topic, rounds) {
+  discussing = true;
+  const task = "disc" + (Date.now() % 100000);
+  broadcast({ type: "collab.started", agents: ids, task, text: topic });
+  let transcript = "";
+  try {
+    for (let r = 0; r < rounds; r++) {
+      for (const id of ids) {
+        const a = reg.agents[id] || { name: id, role: "Staff", prompt: "" };
+        const text = await claudeText(
+          `You are "${a.name}" (${a.role}) in a team meeting at the office.\n` +
+          (a.prompt ? `Your persona: ${a.prompt}\n` : "") +
+          `Meeting topic: ${topic}\n` +
+          (transcript ? `Discussion so far:\n${transcript}\n` : "You open the meeting.\n") +
+          `Give YOUR next contribution as ${a.name}: concrete, build on the others, ` +
+          `max 3 sentences, plain text only, in the same language as the topic.`);
+        const line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
+        if (line) {
+          transcript += `${a.name}: ${line}\n`;
+          broadcast({ type: "chat.message", agent: id, task, text: line });
+        }
+      }
+    }
+  } finally {
+    broadcast({ type: "collab.ended", agents: ids, task });
+    discussing = false;
+  }
 }
 
 // ---------------------------------------------------------------- http
@@ -324,11 +423,35 @@ const server = http.createServer((req, res) => {
   } else if (req.method === "POST" && req.url === "/chat") {
     readBody(req, (body) => {
       try {
-        const { agent = "main", prompt } = JSON.parse(body);
+        const { agent = "main", prompt, session } = JSON.parse(body);
         if (!prompt) throw new Error("no prompt");
-        const task = runClaude(agent, prompt);
+        // Orders to the CEO route through the Director — chain of command.
+        const task = agent === "ceo" ? ceoFlow(prompt) : runClaude(agent, prompt, { session });
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ task }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(String(e.message));
+      }
+    });
+
+  } else if (req.method === "GET" && req.url.startsWith("/sessions")) {
+    const agent = new URL(req.url, "http://x").searchParams.get("agent") || "main";
+    const list = (sess[agent] || []).slice().sort((a, b) => b.ts - a.ts).slice(0, 20);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ sessions: list }));
+
+  } else if (req.method === "POST" && req.url === "/discuss") {
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        const ids = (p.agents || []).filter((id) => id !== "ceo").slice(0, 4);
+        if (ids.length < 2) throw new Error("need at least 2 agents");
+        if (!p.topic) throw new Error("no topic");
+        if (discussing) { res.writeHead(409); return res.end("discussion in progress"); }
+        runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
       } catch (e) {
         res.writeHead(400);
         res.end(String(e.message));

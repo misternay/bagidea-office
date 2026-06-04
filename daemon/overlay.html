@@ -177,6 +177,22 @@
     background: rgba(94,200,255,0.1); border: 1px solid var(--line); border-radius: 10px;
   }
   footer .send:hover { background: rgba(94,200,255,0.2); }
+  footer { position: relative; }
+  #sessMenu {
+    display: none; position: absolute; bottom: 56px; right: 12px; z-index: 60;
+    min-width: 240px; max-height: 280px; overflow-y: auto;
+    background: var(--glass); backdrop-filter: blur(12px);
+    border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  }
+  #sessMenu.open { display: block; }
+  #sessMenu .opt {
+    padding: 7px 11px; border-radius: 8px; font-size: 12px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #sessMenu .opt:hover { background: rgba(94,200,255,0.12); }
+  #sessMenu .opt.active { color: var(--accent); font-weight: 700; }
+  #sessMenu .opt small { color: var(--dim); display: block; font-size: 10px; }
 
   /* ---------- settings / editor / ID-card modal ---------- */
   #modal {
@@ -310,6 +326,7 @@
   <span id="conn"></span>
   <span id="theater">⏪ REPLAY</span>
   <button id="replayBtn" title="Re-enact the last 15 minutes in the office">⏪ Replay</button>
+  <button id="discussBtn" title="Let agents discuss together" style="margin-left:6px">🗣</button>
   <button id="mapBtn" title="Top-down office map" style="margin-left:6px">🗺</button>
   <button id="dayBtn" title="World atmosphere" style="margin-left:6px">🌗</button>
   <button id="setBtn" title="Office settings — agents, roles" style="margin-left:6px">⚙</button>
@@ -338,7 +355,9 @@
 
 <footer>
   <input id="inp" placeholder="Message Main… (Enter to send)" autofocus>
+  <button class="send" id="sessBtn" title="Chat sessions (threads)">🧵</button>
   <button class="send" id="send">➤</button>
+  <div id="sessMenu"></div>
 </footer>
 
 <div id="modal"><div id="modalCard"></div></div>
@@ -804,6 +823,67 @@
     modalCard.querySelector("#cardChat").onclick = () => { closeModal(); setTarget(id); };
   }
 
+  // ---- sessions (threads) ---------------------------------------------------
+  const SESS = {};  // target -> "new" | session key | undefined (= latest)
+  document.getElementById("sessBtn").onclick = async (e) => {
+    e.stopPropagation();
+    const m = document.getElementById("sessMenu");
+    if (m.classList.contains("open")) return m.classList.remove("open");
+    const r = await fetch(`/sessions?agent=${encodeURIComponent(target)}`).then((x) => x.json());
+    m.innerHTML = "";
+    const mk = (label, sub, key, active) => {
+      const o = document.createElement("div");
+      o.className = "opt" + (active ? " active" : "");
+      o.innerHTML = label + (sub ? `<small>${sub}</small>` : "");
+      o.onclick = () => { SESS[target] = key; m.classList.remove("open"); };
+      m.appendChild(o);
+    };
+    mk("🆕 New session — เริ่ม thread ใหม่", "", "new", SESS[target] === "new");
+    for (const s of r.sessions || [])
+      mk(`🧵 ${s.title || s.key}`, new Date(s.ts).toLocaleString(), s.key,
+        SESS[target] === s.key);
+    if (!(r.sessions || []).length)
+      mk("(ยังไม่มี session เก่า — คุยครั้งแรกจะสร้างให้เอง)", "", undefined, false);
+    m.classList.add("open");
+  };
+  document.addEventListener("click", () => document.getElementById("sessMenu").classList.remove("open"));
+
+  // ---- discussion launcher ----------------------------------------------------
+  document.getElementById("discussBtn").onclick = () => openDiscuss();
+  function openDiscuss() {
+    modal.classList.add("open");
+    const picked = new Set();
+    modalCard.innerHTML = hdr("🗣 AGENT DISCUSSION") +
+      `<div class="field"><label>TOPIC — หัวข้อให้ทีมถกกัน</label>
+         <input id="dTopic" placeholder='เช่น "วางแผนฟีเจอร์ onboarding ใหม่"'></div>
+       <div class="field"><label>PARTICIPANTS (เลือก 2-4 ตัว)</label>
+         <div class="checks" id="dWho"></div></div>
+       <div class="field"><label>ROUNDS</label>
+         <select id="dRounds"><option value="1">1 — เร็ว</option>
+         <option value="2" selected>2 — มาตรฐาน</option><option value="3">3 — ลึก</option></select></div>
+       <div class="btnrow">
+         <button id="dCancel">Cancel</button>
+         <button class="primary" id="dGo">🗣 Start discussion</button>
+       </div>`;
+    const box = modalCard.querySelector("#dWho");
+    for (const id of Object.keys(ROSTER).filter((x) => x !== "ceo")) {
+      const c = document.createElement("div");
+      c.className = "chk";
+      c.textContent = nameOf(id);
+      c.onclick = () => { picked.has(id) ? picked.delete(id) : picked.add(id); c.classList.toggle("on"); };
+      box.appendChild(c);
+    }
+    modalCard.querySelector("#dCancel").onclick = closeModal;
+    modalCard.querySelector("#dGo").onclick = async () => {
+      const topic = modalCard.querySelector("#dTopic").value.trim();
+      if (!topic || picked.size < 2) return;
+      await api("/discuss", { agents: [...picked], topic,
+        rounds: Number(modalCard.querySelector("#dRounds").value) });
+      closeModal();
+      addChip(`🗣 meeting started: <b>${topic.slice(0, 50)}</b>`);
+    };
+  }
+
   // ---- top-down map ---------------------------------------------------------
   // World→map transform; must match the ortho render in office_floor.gd.
   const MAP = { x0: -11.29, w: 28.57, z0: -11.0, d: 25.0 };
@@ -930,6 +1010,18 @@
       ensureAgent(ev.agent, "working");
       if (!ev.replay) addChip(`🛡 ${ev.tool} — <b>${ev.type === "perm.approved" ? "allowed" : "denied"}</b>`);
     }
+    else if (ev.type === "ceo.summon") {
+      if (!ev.replay) addChip(`👑 CEO เรียก <b>${nameOf("main")}</b> เข้ารับคำสั่ง`);
+    }
+    else if (ev.type === "task.delegated") {
+      if (!ev.replay) addChip(`📋 <b>${nameOf("main")}</b> มอบหมายงานให้ <b>${nameOf(ev.target)}</b>`);
+    }
+    else if (ev.type === "collab.started") {
+      if (!ev.replay) addChip(`🤝 ประชุมเริ่ม — ${(ev.agents || []).map(nameOf).join(", ")}`);
+    }
+    else if (ev.type === "collab.ended") {
+      if (!ev.replay) addChip(`🤝 ประชุมจบ`);
+    }
     else if (ev.type === "skill.created") {
       if (!ev.replay) addChip(`📚 <b>${ev.agent}</b> learned a new skill: <b>${ev.skill}</b>`);
     }
@@ -958,9 +1050,11 @@
     if (!prompt) return;
     inp.value = "";
     addMsg("you", null, prompt);
+    const session = SESS[target];
+    if (session === "new") SESS[target] = undefined;  // next sends continue it
     await fetch("/chat", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: target, prompt }),
+      body: JSON.stringify({ agent: target, prompt, session }),
     });
   }
   document.getElementById("send").onclick = send;

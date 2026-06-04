@@ -158,6 +158,21 @@ func handle(evt: Dictionary) -> void:
 				_board_clear_later(task)
 			if a.tasks.is_empty():
 				_finish(a, "denied ✗")
+		"ceo.summon":
+			# Chain of command: the Director walks over to take the order.
+			_set_state(a, "working")
+			a.node.set_status("รับคำสั่งจาก CEO 📋")
+			if is_instance_valid(ceo):
+				ceo.set_status("สั่งงาน 🗣")
+				a.node.walk_to([ceo.position + Vector3(0.7, 0, 0.45)])
+		"task.delegated":
+			# ...then walks to the assignee and hands the work over.
+			var tgt := str(evt.get("target", ""))
+			a.node.set_status("มอบหมาย → " + tgt + " 📋")
+			if agents.has(tgt):
+				var t: Dictionary = agents[tgt]
+				a.node.walk_to([t.node.position + Vector3(0.6, 0, 0.4)])
+				t.node.set_status("รับงานใหม่ ✏")
 		"skill.created":
 			# Hermes moment: the agent distilled its work into a new skill.
 			a.node.set_status("📚 learned: " + str(evt.get("skill", "")))
