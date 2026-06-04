@@ -387,6 +387,7 @@
   const NPCS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   // Live registry from the daemon (roster.sync) — identity source of truth.
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
+  let BUILTIN_DESC = {}, REGMCP = {};
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -596,7 +597,7 @@
   function openSettings(tab) {
     modal.classList.add("open");
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
-    const tabs = `<div class="tabs">${T("agents", "AGENTS")}${T("roles", "ROLES")}${T("skills", "SKILLS")}${T("tools", "TOOLS")}</div>`;
+    const tabs = `<div class="tabs">${T("agents", "AGENTS")}${T("roles", "ROLES")}${T("skills", "SKILLS")}${T("tools", "TOOLS")}${T("threads", "THREADS")}</div>`;
     let bodyHtml = "";
     if (tab === "agents") {
       bodyHtml = `<div id="alist"></div><button class="bigbtn" id="newAgent">＋ Hire a new agent</button>`;
@@ -605,11 +606,25 @@
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
         <div id="slist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
-      bodyHtml = `<div id="tlist"></div>
-        <div class="assistrow" style="margin-top:8px">
-          <input id="newTool" placeholder="Tool name… (e.g. WebSearch, Bash)">
-          <button class="sparkle" id="addTool">＋ Add</button>
-        </div>`;
+      bodyHtml = `<div class="field"><label>🔧 BUILT-IN — เครื่องมือมาตรฐานของ Claude (ลบไม่ได้ · เปิด/ปิดรายตัวในหน้าแก้ไข agent)</label>
+          <div id="tlist"></div></div>
+        <div class="field"><label>🔌 MCP SERVERS — เพิ่มความสามารถใหม่ตามมาตรฐาน MCP</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ใส่ชื่อ + คำสั่งรัน server แล้ว assign ให้ agent ในหน้าแก้ไข เช่น<br>
+            <b style="color:var(--text)">github</b> → <code>npx -y @modelcontextprotocol/server-github</code><br>
+            <b style="color:var(--text)">playwright</b> → <code>npx -y @playwright/mcp</code> (คุมเบราว์เซอร์)<br>
+            หาเพิ่มได้จาก github.com/modelcontextprotocol/servers</div>
+          <div id="mlist"></div>
+          <div class="assistrow" style="margin-top:8px">
+            <input id="mName" placeholder="ชื่อ เช่น github" style="flex:0 0 110px">
+            <input id="mCmd" placeholder="คำสั่งรัน เช่น npx -y @modelcontextprotocol/server-github">
+            <button class="sparkle" id="addMcp">＋</button>
+          </div></div>`;
+    } else if (tab === "threads") {
+      bodyHtml = `<div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+          ความจำสนทนาแยกตามตัว agent — คำสั่งผ่าน CEO จะอยู่กับ Claude (Director)
+          ส่วนวงประชุม 🗣 ไม่สร้าง thread · ลบ thread = agent ลืมเรื่องนั้น</div>
+        <div id="thlist">loading…</div>`;
     } else {
       bodyHtml = `<div id="rlist"></div>
         <div class="assistrow" style="margin-top:8px">
@@ -657,16 +672,57 @@
         const row = document.createElement("div");
         row.className = "arow";
         row.style.cursor = "default";
-        row.innerHTML = `<div class="meta"><b>🔧 ${t}</b></div>` +
-          `<div class="winbtn hide" title="Remove tool">✕</div>`;
-        row.querySelector(".winbtn").onclick = () =>
-          api("/registry/tool", { name: t, remove: true }).then(() => openSettings("tools"));
+        row.innerHTML = `<div class="meta"><b>🔧 ${t}</b><span>${BUILTIN_DESC[t] || ""}</span></div>`;
         list.appendChild(row);
       }
-      modalCard.querySelector("#addTool").onclick = () => {
-        const v = modalCard.querySelector("#newTool").value.trim();
-        if (v) api("/registry/tool", { name: v }).then(() => openSettings("tools"));
+      const ml = modalCard.querySelector("#mlist");
+      for (const [n, m] of Object.entries(REGMCP)) {
+        const row = document.createElement("div");
+        row.className = "arow";
+        row.style.cursor = "default";
+        row.innerHTML = `<div class="meta"><b>🔌 ${n}</b><span>${m.command}</span></div>` +
+          `<div class="winbtn hide" title="Remove server">✕</div>`;
+        row.querySelector(".winbtn").onclick = () =>
+          api("/registry/mcp", { name: n, remove: true }).then(() => openSettings("tools"));
+        ml.appendChild(row);
+      }
+      modalCard.querySelector("#addMcp").onclick = () => {
+        const n = modalCard.querySelector("#mName").value.trim();
+        const c = modalCard.querySelector("#mCmd").value.trim();
+        if (n && c) api("/registry/mcp", { name: n, command: c }).then(() => openSettings("tools"));
       };
+    } else if (tab === "threads") {
+      fetch("/sessions/all").then((x) => x.json()).then((r) => {
+        const box = modalCard.querySelector("#thlist");
+        if (!box) return;
+        box.innerHTML = "";
+        const entries = Object.entries(r.all || {});
+        if (!entries.length) box.innerHTML =
+          `<div style="font-size:12px;color:var(--dim)">ยังไม่มี thread เลย</div>`;
+        for (const [aid, list] of entries) {
+          const head = document.createElement("div");
+          head.className = "arow";
+          head.style.cursor = "default";
+          const f = document.createElement("div");
+          f.className = "face"; face(f, aid, 34);
+          head.appendChild(f);
+          head.insertAdjacentHTML("beforeend",
+            `<div class="meta"><b>${nameOf(aid)}</b><span>${list.length} thread</span></div>`);
+          box.appendChild(head);
+          for (const s of list.slice().sort((a, b) => b.ts - a.ts)) {
+            const row = document.createElement("div");
+            row.className = "arow";
+            row.style.cursor = "default";
+            row.style.marginLeft = "18px";
+            row.innerHTML = `<div class="meta"><b>🧵 ${s.title || s.key}</b>` +
+              `<span>${new Date(s.ts).toLocaleString()}</span></div>` +
+              `<div class="winbtn hide" title="ลบ thread นี้">✕</div>`;
+            row.querySelector(".winbtn").onclick = () =>
+              api("/sessions/delete", { agent: aid, key: s.key }).then(() => openSettings("threads"));
+            box.appendChild(row);
+          }
+        }
+      });
     } else {
       const list = modalCard.querySelector("#rlist");
       for (const r of REGROLES) {
@@ -722,12 +778,11 @@
   function openEditor(id) {
     modal.classList.add("open");
     const a = id ? ROSTER[id] : { name: "", role: REGROLES[2] || "Specialist", avatar: 1, prompt: "" };
+    const isUser = !!a.isUser;  // the CEO is YOU — no prompt/skills/tools
     let avatar = a.avatar || 1;
     const mySkills = new Set(a.skills || []);
     const myTools = new Set(a.tools || []);
-    modalCard.innerHTML = hdr(id ? "✏ EDIT AGENT" : "＋ HIRE AGENT") +
-      `<div class="field"><label>AVATAR</label><div id="avGrid"></div></div>
-       <div class="field"><label>NAME</label><input id="eName" maxlength="40"></div>
+    const aiFields = `
        <div class="field"><label>JOB TITLE</label><select id="eRole"></select></div>
        <div class="field"><label>✨ PROMPT COPILOT — บอกสั้นๆ ว่าอยากได้ agent แบบไหน</label>
          <div class="assistrow">
@@ -737,31 +792,45 @@
        <div class="field"><label>SYSTEM PROMPT (หน้าที่ / นิสัย / มาตรฐานงาน — แก้ได้อิสระ)</label>
          <textarea id="ePrompt"></textarea></div>
        <div class="field"><label>🎯 SKILLS</label><div class="checks" id="eSkills"></div></div>
-       <div class="field"><label>🔧 TOOLS (ว่าง = ชุดอ่านอย่างเดียว Read/Glob/Grep)</label><div class="checks" id="eTools"></div></div>
-       <div class="btnrow">
+       <div class="field"><label>🔧 TOOLS (ว่าง = ชุดอ่านอย่างเดียว Read/Glob/Grep)</label><div class="checks" id="eTools"></div></div>`;
+    modalCard.innerHTML = hdr(isUser ? "👑 YOUR AVATAR" : (id ? "✏ EDIT AGENT" : "＋ HIRE AGENT")) +
+      (isUser ? `<div style="font-size:11.5px;color:var(--dim);margin-bottom:10px">
+         นี่คือตัวคุณเองในออฟฟิศ — ไม่มี prompt/skills เพราะคุณคือคนสั่ง ไม่ใช่ AI 😄
+         เลือกหน้าตากับชื่อได้ตามใจ</div>` : "") +
+      `<div class="field"><label>AVATAR</label><div id="avGrid"></div></div>
+       <div class="field"><label>NAME</label><input id="eName" maxlength="40"></div>` +
+      (isUser ? "" : aiFields) +
+      `<div class="btnrow">
          ${id && !a.protected ? `<button class="danger" id="eDel">🗑 Delete</button>` : ""}
          <button id="eCancel">Cancel</button>
          <button class="primary" id="eSave">💾 Save</button>
        </div>`;
     // skill / tool assignment chips
     const skBox = modalCard.querySelector("#eSkills");
-    const ids = Object.keys(REGSKILLS);
-    skBox.innerHTML = ids.length ? "" : `<span style="font-size:11px;color:var(--dim)">no skills in the library yet</span>`;
-    for (const sid of ids) {
-      const c = document.createElement("div");
-      c.className = "chk" + (mySkills.has(sid) ? " on" : "");
-      c.textContent = REGSKILLS[sid].name;
-      c.title = REGSKILLS[sid].description || "";
-      c.onclick = () => { mySkills.has(sid) ? mySkills.delete(sid) : mySkills.add(sid); c.classList.toggle("on"); };
-      skBox.appendChild(c);
+    if (skBox) {
+      const ids = Object.keys(REGSKILLS);
+      skBox.innerHTML = ids.length ? "" : `<span style="font-size:11px;color:var(--dim)">no skills in the library yet</span>`;
+      for (const sid of ids) {
+        const c = document.createElement("div");
+        c.className = "chk" + (mySkills.has(sid) ? " on" : "");
+        c.textContent = REGSKILLS[sid].name;
+        c.title = REGSKILLS[sid].description || "";
+        c.onclick = () => { mySkills.has(sid) ? mySkills.delete(sid) : mySkills.add(sid); c.classList.toggle("on"); };
+        skBox.appendChild(c);
+      }
     }
     const tlBox = modalCard.querySelector("#eTools");
-    for (const t of REGTOOLS) {
-      const c = document.createElement("div");
-      c.className = "chk" + (myTools.has(t) ? " on" : "");
-      c.textContent = t;
-      c.onclick = () => { myTools.has(t) ? myTools.delete(t) : myTools.add(t); c.classList.toggle("on"); };
-      tlBox.appendChild(c);
+    if (tlBox) {
+      const addToolChip = (val, label, tip) => {
+        const c = document.createElement("div");
+        c.className = "chk" + (myTools.has(val) ? " on" : "");
+        c.textContent = label;
+        c.title = tip || "";
+        c.onclick = () => { myTools.has(val) ? myTools.delete(val) : myTools.add(val); c.classList.toggle("on"); };
+        tlBox.appendChild(c);
+      };
+      for (const t of REGTOOLS) addToolChip(t, t, BUILTIN_DESC[t]);
+      for (const n of Object.keys(REGMCP)) addToolChip("mcp:" + n, "🔌 " + n, REGMCP[n].command);
     }
     // avatar grid: the 12 NPC faces
     const grid = modalCard.querySelector("#avGrid");
@@ -780,37 +849,40 @@
       grid.appendChild(c);
     }
     const roleSel = modalCard.querySelector("#eRole");
-    for (const r of (REGROLES.length ? REGROLES : ROLES)) {
-      const o = document.createElement("option");
-      o.value = o.textContent = r;
-      roleSel.appendChild(o);
+    if (roleSel) {
+      for (const r of (REGROLES.length ? REGROLES : ROLES)) {
+        const o = document.createElement("option");
+        o.value = o.textContent = r;
+        roleSel.appendChild(o);
+      }
+      roleSel.value = a.role;
+      modalCard.querySelector("#ePrompt").value = a.prompt || "";
+      modalCard.querySelector("#eAssist").onclick = async (e) => {
+        const btn = e.target;
+        btn.disabled = true; btn.textContent = "⏳ thinking…";
+        try {
+          const r = await api("/assist/prompt", {
+            name: modalCard.querySelector("#eName").value || "Agent",
+            role: roleSel.value,
+            brief: modalCard.querySelector("#eBrief").value,
+          });
+          if (r.prompt) modalCard.querySelector("#ePrompt").value = r.prompt;
+        } finally { btn.disabled = false; btn.textContent = "✨ Draft"; }
+      };
     }
     modalCard.querySelector("#eName").value = a.name;
-    roleSel.value = a.role;
-    modalCard.querySelector("#ePrompt").value = a.prompt || "";
     modalCard.querySelector("#eCancel").onclick = () => openSettings("agents");
-    modalCard.querySelector("#eAssist").onclick = async (e) => {
-      const btn = e.target;
-      btn.disabled = true; btn.textContent = "⏳ thinking…";
-      try {
-        const r = await api("/assist/prompt", {
-          name: modalCard.querySelector("#eName").value || "Agent",
-          role: roleSel.value,
-          brief: modalCard.querySelector("#eBrief").value,
-        });
-        if (r.prompt) modalCard.querySelector("#ePrompt").value = r.prompt;
-      } finally { btn.disabled = false; btn.textContent = "✨ Draft"; }
-    };
     modalCard.querySelector("#eSave").onclick = async () => {
       const name = modalCard.querySelector("#eName").value.trim();
       if (!name) return modalCard.querySelector("#eName").focus();
-      const r = await api("/registry/agent", {
-        id, name, role: roleSel.value, avatar,
-        prompt: modalCard.querySelector("#ePrompt").value,
-        skills: [...mySkills], tools: [...myTools],
-      });
+      const payload = isUser
+        ? { id, name, avatar }  // the CEO row keeps no AI fields
+        : { id, name, role: roleSel.value, avatar,
+            prompt: modalCard.querySelector("#ePrompt").value,
+            skills: [...mySkills], tools: [...myTools] };
+      const r = await api("/registry/agent", payload);
       closeModal();
-      if (r.id) { ensureAgent(r.id); setTarget(r.id); }
+      if (r.id && !isUser) { ensureAgent(r.id); setTarget(r.id); }
     };
     const del = modalCard.querySelector("#eDel");
     if (del) del.onclick = async () => {
@@ -831,8 +903,10 @@
         <div class="role">${a.role}</div>
         <div class="uid">ID · ${id}${a.protected ? " · 🔒 core staff" : ""}</div>
         <div class="state" style="color:${DOTS[state] || "#4ade80"}">● ${state.toUpperCase()}</div>
-        <div class="promptbox">${(a.prompt || "(no system prompt yet)")
-          .replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</div>
+        <div class="promptbox">${a.isUser
+          ? "👑 นี่คือคุณเอง — เจ้าของออฟฟิศ\nสั่งงานผ่านช่องแชทนี้ แล้ว Director จะเดินมารับคำสั่งและกระจายงานให้ทีม"
+          : (a.prompt || "(no system prompt yet)")
+            .replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</div>
         <div class="btnrow">
           <button id="cardEdit">✏ Edit</button>
           <button class="primary" id="cardChat">💬 Chat</button>
@@ -999,6 +1073,8 @@
       REGROLES = ev.roles || [];
       REGSKILLS = ev.skills || {};
       REGTOOLS = ev.tools || [];
+      BUILTIN_DESC = ev.builtinTools || {};
+      REGMCP = ev.mcp || {};
       AUTOSKILLS = ev.autoSkills !== false;
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();

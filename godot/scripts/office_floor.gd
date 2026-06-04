@@ -31,6 +31,12 @@ func _ready() -> void:
 
 	_capture_map.call_deferred()
 
+	# Splash floats logo-only over the desktop (transparent window); once the
+	# scene is live the window goes opaque again — layered windows as a
+	# WorkerW child are unnecessary risk, and the scene fills every pixel.
+	get_viewport().transparent_bg = false
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_TRANSPARENT, false)
+
 	if "--wallpaper" in OS.get_cmdline_user_args():
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
 		DisplayServer.window_set_position(Vector2i.ZERO)

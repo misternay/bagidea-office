@@ -76,6 +76,10 @@ func handle(evt: Dictionary) -> void:
 	if type == "roster.removed":
 		_remove_agent(str(evt.get("agent", "")))
 		return
+	if type == "world.pos":
+		return  # our own position stream echoing back — not an agent event
+	if not evt.has("agent") and not evt.has("agents"):
+		return  # agent-less events must never spawn a default "agent" ghost
 	# Replay Theater: the daemon re-broadcasts journal slices time-compressed.
 	# Characters act them out, but the mission board stays in the present.
 	if type == "theater.started":

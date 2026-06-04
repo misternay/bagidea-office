@@ -33,14 +33,30 @@ let taskCounter = 0;
 const REGISTRY = path.join(__dirname, "registry.json");
 let reg;
 
+// Built-in Claude Code tools: fixed catalog with human descriptions.
+// These cannot be deleted — custom capability arrives as MCP servers.
+const BUILTIN_TOOLS = {
+  Read: "อ่านไฟล์ / รูปภาพ / PDF",
+  Glob: "ค้นหาไฟล์จากชื่อหรือแพทเทิร์น",
+  Grep: "ค้นหาข้อความ/โค้ดในไฟล์",
+  Edit: "แก้ไขไฟล์ที่มีอยู่",
+  Write: "สร้างไฟล์ใหม่ / เขียนทับ",
+  Bash: "รันคำสั่งเชลล์และโปรแกรม",
+  WebSearch: "ค้นหาข้อมูลบนเว็บ",
+  WebFetch: "เปิดอ่านหน้าเว็บ",
+  Task: "ปล่อย sub-agent ช่วยทำงานย่อย",
+  TodoWrite: "จดและติดตามรายการงาน",
+  NotebookEdit: "แก้ไข Jupyter notebook",
+};
+
 function loadReg() {
   try { reg = JSON.parse(fs.readFileSync(REGISTRY, "utf8")); } catch { reg = {}; }
   reg.agents = reg.agents || {};
   reg.roles = reg.roles || ["Director", "Founder", "Researcher", "Engineer",
     "Designer", "Analyst", "Operator", "Specialist"];
   reg.skills = reg.skills || {};
-  reg.tools = reg.tools || ["Read", "Glob", "Grep", "Edit", "Write", "Bash",
-    "WebSearch", "WebFetch", "Task", "TodoWrite", "NotebookEdit"];
+  reg.tools = Object.keys(BUILTIN_TOOLS);
+  reg.mcpServers = reg.mcpServers || {};
   if (!reg.agents.main) reg.agents.main = {
     name: "Claude", role: "Director", avatar: 7, protected: true,
     prompt: "You are Claude, the Director of this AI agents office. You run " +
@@ -61,7 +77,8 @@ loadReg();
 // also gets a fresh snapshot on connect.
 function rosterEvt() {
   return { type: "roster.sync", agents: reg.agents, roles: reg.roles,
-    tools: reg.tools, skills: reg.skills, autoSkills: reg.autoSkills !== false };
+    tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
+    skills: reg.skills, autoSkills: reg.autoSkills !== false };
 }
 function pushRoster() { broadcast(rosterEvt(), false); }
 
@@ -238,7 +255,22 @@ function runClaude(agent, prompt, opts = {}) {
   // Persona + assigned skills ride in a stdin preamble (robust across
   // Windows shell quoting); resumed sessions already carry it in context.
   const a = reg.agents[agent];
-  const tools = a && a.tools && a.tools.length ? a.tools.join(",") : "Read,Glob,Grep";
+  const picked = a && a.tools && a.tools.length ? a.tools : ["Read", "Glob", "Grep"];
+  // "mcp:<name>" entries become a real --mcp-config + server-level allow rule.
+  const mcpNames = picked.filter((t) => t.startsWith("mcp:"))
+    .map((t) => t.slice(4)).filter((n) => reg.mcpServers[n]);
+  let tools = picked.filter((t) => !t.startsWith("mcp:")).join(",");
+  let mcpConfig = null;
+  if (mcpNames.length) {
+    const conf = { mcpServers: {} };
+    for (const n of mcpNames) {
+      const parts = String(reg.mcpServers[n].command).trim().split(/\s+/);
+      conf.mcpServers[n] = { command: parts[0], args: parts.slice(1) };
+    }
+    mcpConfig = path.join(__dirname, `mcp_${agent.replace(/[^\w-]/g, "_")}.json`);
+    fs.writeFileSync(mcpConfig, JSON.stringify(conf));
+    tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
+  }
   let preamble = "";
   if (!entry && a && (a.prompt || (a.skills || []).length)) {
     preamble = `<persona>\nYou are "${a.name}" (${a.role}).\n${a.prompt || ""}\n`;
@@ -251,6 +283,7 @@ function runClaude(agent, prompt, opts = {}) {
 
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools];
+  if (mcpConfig) args.push("--mcp-config", mcpConfig);
   if (entry && entry.sid) args.push("--resume", entry.sid);
   const child = spawn("claude", args, {
     cwd: WORKSPACE,
@@ -435,6 +468,25 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "GET" && req.url === "/sessions/all") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ all: sess }));
+
+  } else if (req.method === "POST" && req.url === "/sessions/delete") {
+    readBody(req, (body) => {
+      try {
+        const { agent, key } = JSON.parse(body);
+        sess[agent] = (sess[agent] || []).filter((s) => s.key !== key);
+        if (!sess[agent].length) delete sess[agent];
+        saveSess();
+        res.writeHead(200);
+        res.end("ok");
+      } catch (e) {
+        res.writeHead(400);
+        res.end(String(e.message));
+      }
+    });
+
   } else if (req.method === "GET" && req.url.startsWith("/sessions")) {
     const agent = new URL(req.url, "http://x").searchParams.get("agent") || "main";
     const list = (sess[agent] || []).slice().sort((a, b) => b.ts - a.ts).slice(0, 20);
@@ -580,17 +632,23 @@ const server = http.createServer((req, res) => {
       }
     });
 
-  } else if (req.method === "POST" && req.url === "/registry/tool") {
+  } else if (req.method === "POST" && req.url === "/registry/mcp") {
+    // Custom capability = MCP servers (the Claude Code plugin standard).
+    // name + launch command; assignment per agent via "mcp:<name>" entries.
     readBody(req, (body) => {
       try {
-        const { name, remove } = JSON.parse(body);
-        const n = String(name || "").trim().slice(0, 60);
+        const { name, command, remove } = JSON.parse(body);
+        const n = String(name || "").trim().toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "-").slice(0, 40);
         if (!n) throw new Error("no name");
         if (remove) {
-          reg.tools = reg.tools.filter((t) => t !== n);
+          delete reg.mcpServers[n];
           for (const a of Object.values(reg.agents))
-            a.tools = (a.tools || []).filter((t) => t !== n);
-        } else if (!reg.tools.includes(n)) reg.tools.push(n);
+            a.tools = (a.tools || []).filter((t) => t !== "mcp:" + n);
+        } else {
+          if (!command) throw new Error("no command");
+          reg.mcpServers[n] = { command: String(command).trim().slice(0, 300) };
+        }
         saveReg();
         pushRoster();
         res.writeHead(200);

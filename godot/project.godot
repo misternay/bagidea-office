@@ -6,7 +6,7 @@ config_version=5
 config/name="BagIdea AI Agents Office - Visual Target"
 run/main_scene="res://scenes/office_floor.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/bg_color=Color(0, 0, 0, 0)
 boot_splash/image="res://assets/brand/logo_box.png"
 boot_splash/fullsize=false
 
@@ -15,6 +15,8 @@ boot_splash/fullsize=false
 window/size/viewport_width=1600
 window/size/viewport_height=900
 window/size/borderless=true
+window/size/transparent=true
+window/per_pixel_transparency/allowed=true
 
 [rendering]
 
