@@ -90,7 +90,9 @@
 <header>
   <span class="logo">◤ BAGIDEA</span> AI AGENTS OFFICE
   <span id="conn"></span>
-  <span class="sub">Layer 2 — overlay PoC</span>
+  <span id="theater" style="display:none;color:#ff5448;font-weight:700">⏪ REPLAY</span>
+  <button id="replayBtn" style="margin-left:auto;font-size:12px;padding:4px 10px">⏪ Replay 15m</button>
+  <span class="sub" style="margin-left:8px">Layer 2 — overlay PoC</span>
 </header>
 <main>
   <div id="chat"><div id="log"></div></div>
@@ -177,6 +179,22 @@
 
   function route(ev) {
     const key = ev.task || ev.agent;
+    if (ev.type === "theater.started") {
+      document.getElementById("theater").style.display = "inline";
+      addChip(`⏪ <b>Replay Theater</b> — re-enacting ${ev.events} events at ${ev.speed}×`);
+      return;
+    }
+    if (ev.type === "theater.ended") {
+      document.getElementById("theater").style.display = "none";
+      addChip("⏪ replay finished");
+      return;
+    }
+    if (ev.theater) {
+      // Cinema feed: show what's being re-enacted, never touch live state.
+      if (ev.type === "chat.message") addChip(`⏪ 💬 <b>${ev.agent}</b>: ${String(ev.text).slice(0, 60)}`);
+      else if (ev.type === "task.progress") addChip(`⏪ ⚙ ${ev.tool || ""} — ${ev.agent}`);
+      return;
+    }
     if (ev.type === "chat.message") addMsg("agent", ev.agent, ev.text);
     else if (ev.type === "task.progress") {
       if (!ev.replay) addChip(`⚙ <b>${ev.tool || "…"}</b> — ${ev.agent}`);
@@ -226,5 +244,11 @@
   document.getElementById("inp").addEventListener("keydown", (e) => {
     if (e.key === "Enter") send();
   });
+  document.getElementById("replayBtn").onclick = () =>
+    fetch("/replay", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ minutes: 15, speed: 10 }),
+    });
 </script>
 </html>

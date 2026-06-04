@@ -2,13 +2,14 @@
 // e.g.  node send.js task.started claude "" t1
 //       node send.js task.progress claude Edit t1
 //       node send.js collab.started rin,dev,mira "" t9   (comma = multi-agent)
-const [type = "task.progress", agent = "claude", tool, task] = process.argv.slice(2);
+const [type = "task.progress", agent = "claude", tool, task, text] = process.argv.slice(2);
 const multi = agent.includes(",");
 const body = JSON.stringify({
   type,
   ...(multi ? { agents: agent.split(",") } : { agent }),
   ...(tool ? { tool } : {}),
   ...(task ? { task } : {}),
+  ...(text ? { text } : {}),
 });
 
 fetch("http://127.0.0.1:8787/event", {

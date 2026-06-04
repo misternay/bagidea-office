@@ -74,6 +74,37 @@ function broadcast(evt) {
   console.log("[oep] →", json);
 }
 
+// ---------------------------------------------------------------- replay theater
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let replaying = false;
+
+// Re-enacts a journal slice: events re-broadcast time-compressed with a
+// `theater` flag. The world acts them out; the mission board stays real.
+async function runReplay(minutes = 10, speed = 8) {
+  if (replaying) return false;
+  replaying = true;
+  const since = Date.now() - minutes * 60000;
+  const slice = journalTail(4000)
+    .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter((e) => e && e.ts >= since && !e.theater &&
+      !String(e.type).startsWith("theater."));
+  console.log(`[theater] replaying ${slice.length} events over ${minutes}m at ${speed}x`);
+  broadcast({ type: "theater.started", events: slice.length, speed });
+  try {
+    let prev = null;
+    for (const e of slice) {
+      if (prev !== null) await sleep(Math.min((e.ts - prev) / speed, 2500));
+      prev = e.ts;
+      broadcast({ ...e, theater: true, src_ts: e.ts });
+    }
+  } finally {
+    broadcast({ type: "theater.ended" });
+    replaying = false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------- adapter
 
 // Spawns a headless Claude Code session, translating stream-json → OEP.
@@ -153,6 +184,20 @@ const server = http.createServer((req, res) => {
         res.writeHead(400);
         res.end(String(e.message));
       }
+    });
+
+  } else if (req.method === "POST" && req.url === "/replay") {
+    readBody(req, (body) => {
+      let p = {};
+      try { p = JSON.parse(body || "{}"); } catch {}
+      const ok = !replaying;
+      if (ok)
+        runReplay(
+          Math.min(Number(p.minutes) || 10, 240),
+          Math.max(Number(p.speed) || 8, 1)
+        );
+      res.writeHead(ok ? 200 : 409, { "content-type": "application/json" });
+      res.end(JSON.stringify({ replaying: ok }));
     });
 
   } else if (req.method === "POST" && req.url === "/event") {

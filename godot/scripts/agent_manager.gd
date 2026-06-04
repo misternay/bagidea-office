@@ -25,6 +25,16 @@ func set_connected(connected: bool) -> void:
 
 func handle(evt: Dictionary) -> void:
 	var type := str(evt.get("type", ""))
+	# Replay Theater: the daemon re-broadcasts journal slices time-compressed.
+	# Characters act them out, but the mission board stays in the present.
+	if type == "theater.started":
+		world.set_theater(true)
+		return
+	if type == "theater.ended":
+		world.set_theater(false)
+		return
+	var theatrical: bool = evt.get("theater", false)
+
 	# Collaboration events may target several agents at once.
 	if type in ["collab.started", "collab.ended"] and evt.has("agents"):
 		for member in evt.agents:
@@ -50,23 +60,27 @@ func handle(evt: Dictionary) -> void:
 		"task.started":
 			a.tasks[task] = true
 			_to_desk(a)
-			world.board_set(task, "running", id)
+			if not theatrical:
+				world.board_set(task, "running", id)
 		"task.progress":
 			if a.state != "working":
 				a.tasks[task] = true
 				_to_desk(a)
-				world.board_set(task, "running", id)
+				if not theatrical:
+					world.board_set(task, "running", id)
 			a.node.set_status(str(evt.get("tool", "working…")))
 		"task.completed":
 			a.tasks.erase(task)
-			world.board_set(task, "done", id)
-			_board_clear_later(task)
+			if not theatrical:
+				world.board_set(task, "done", id)
+				_board_clear_later(task)
 			if a.tasks.is_empty():
 				_finish(a, "done ✓")
 		"task.failed":
 			a.tasks.erase(task)
-			world.board_set(task, "failed", id)
-			_board_clear_later(task)
+			if not theatrical:
+				world.board_set(task, "failed", id)
+				_board_clear_later(task)
 			if a.tasks.is_empty():
 				_finish(a, "failed ✗")
 		"perm.requested":
@@ -74,31 +88,41 @@ func handle(evt: Dictionary) -> void:
 			a.node.set_status("needs approval ⚠")
 			_walk(a.node, "sec_window")
 			_pulse_security()
-			world.board_set(task, "blocked", id)
+			if not theatrical:
+				world.board_set(task, "blocked", id)
 		"perm.approved":
 			a.state = "working"
 			a.node.set_status("approved ✓")
 			if a.desk != "":
 				_walk(a.node, a.desk)
-			world.board_set(task, "running", id)
+			if not theatrical:
+				world.board_set(task, "running", id)
 		"perm.denied":
 			a.tasks.erase(task)
-			world.board_set(task, "failed", id)
-			_board_clear_later(task)
+			if not theatrical:
+				world.board_set(task, "failed", id)
+				_board_clear_later(task)
 			if a.tasks.is_empty():
 				_finish(a, "denied ✗")
 		"chat.message":
 			# Speech bubble: first line of what the agent actually said.
 			var text := str(evt.get("text", "")).split("\n")[0]
 			a.node.set_status("💬 " + text.left(28))
+			# In a meeting, words land on the whiteboard (truth, not theater).
+			if a.state == "meeting":
+				world.whiteboard_add(id, text)
 		"collab.started":
 			# Agents physically gather at the meeting table (design doc 4.7).
+			if a.state != "meeting":
+				world.whiteboard_reset("◤ MEETING · " + task)
 			a.state = "meeting"
 			a.node.set_status("meeting 🗣")
 			var seat: String = meeting_cycle.pop_front()
 			meeting_cycle.append(seat)
 			_walk(a.node, seat)
 		"collab.ended":
+			if a.state == "meeting":
+				world.whiteboard_add("", "— adjourned —")
 			if a.tasks.is_empty():
 				_finish(a, "done ✓")
 			else:

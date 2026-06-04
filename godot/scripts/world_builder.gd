@@ -82,6 +82,10 @@ var totem_mat: StandardMaterial3D
 var sec_light: OmniLight3D
 var sky_mat: StandardMaterial3D
 var beam_mats: Array[ShaderMaterial] = []
+var wb_label: Label3D
+var theater_label: Label3D
+
+var _wb_lines: Array[String] = []
 
 var _wp_ids := {}
 var _board_slots := {}
@@ -249,6 +253,32 @@ func path_to(from_pos: Vector3, target: String) -> Array:
 func set_totem(connected: bool) -> void:
 	if totem_mat:
 		totem_mat.emission = Color(0.3, 1.0, 0.5) if connected else Color(1.0, 0.25, 0.2)
+
+## Meeting-room whiteboard: real collaboration text, last 7 lines.
+func whiteboard_reset(header: String) -> void:
+	_wb_lines.clear()
+	if header != "":
+		_wb_lines.append(header)
+	_wb_refresh()
+
+func whiteboard_add(who: String, text: String) -> void:
+	var line := text if who == "" else who + ": " + text
+	_wb_lines.append(line.left(48))
+	while _wb_lines.size() > 7:
+		_wb_lines.pop_front()
+	_wb_refresh()
+
+func _wb_refresh() -> void:
+	if wb_label:
+		wb_label.text = "\n".join(_wb_lines)
+
+## Replay Theater: sepia grade + marquee while the journal re-enacts.
+func set_theater(on: bool) -> void:
+	if theater_label:
+		theater_label.visible = on
+	var we := get_node_or_null("../WorldEnvironment")
+	if we:
+		we.environment.adjustment_saturation = 0.5 if on else 1.22
 
 # ---------------------------------------------------------------- board
 
@@ -588,6 +618,14 @@ func _build_geometry() -> void:
 		_kit("Chair_1", Vector3(14.2, 0, 0.45), -45.0, 0.6)
 		_kit("Briefing_Screen_Purple", Vector3(15.5, 0, -0.5), -90.0, 0.5)
 	_omni(Vector3(13, 2.5, -0.5), Color(0.85, 0.8, 1.0), 1.6, 6.0)
+	# Whiteboard text floats above the briefing screen, billboarded so the
+	# camera can always read the meeting minutes.
+	wb_label = _label("", Vector3(14.4, 2.7, -0.5), 40, Color(0.92, 0.88, 1.0))
+	wb_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	wb_label.pixel_size = 0.0036
+	wb_label.width = 460
+	wb_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	wb_label.outline_size = 10
 
 	# ---- Dormitory (offline agents sleep here)
 	if kit:
@@ -671,6 +709,11 @@ func _build_geometry() -> void:
 		add_child(mi)
 		mi.position = Vector3(wx - 0.5, 1.5, -8.3)
 		mi.rotation_degrees = Vector3(-48.0, -14.0, 0.0)
+
+	# Replay Theater marquee (hidden until the journal re-enacts)
+	theater_label = _label("⏪  R E P L A Y", Vector3(3, 5.4, -2), 120, Color(1.0, 0.35, 0.3), 1.3)
+	theater_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	theater_label.visible = false
 
 	var dust := GPUParticles3D.new()
 	dust.amount = 90
