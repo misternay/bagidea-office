@@ -108,6 +108,10 @@
   .seat.ceoSeat { border-color: rgba(255, 200, 80, 0.55); background: rgba(255, 200, 80, 0.08); }
   .seat.ceoSeat .face { outline: 2px solid #ffc850; box-shadow: 0 0 10px rgba(255, 200, 80, 0.35); }
   .seat.ceoSeat .nm { color: #ffd28a; font-weight: 700; }
+  /* the Director (main) leads the AI staff — bright blue + a lead star */
+  .seat.leadSeat { border-color: rgba(90, 200, 255, 0.5); background: rgba(90, 200, 255, 0.07); }
+  .seat.leadSeat .face { outline: 2px solid #5ec8ff; box-shadow: 0 0 10px rgba(94, 200, 255, 0.35); }
+  .seat.leadSeat .nm { color: #9fdcff; font-weight: 700; }
   .seat .crown { position: absolute; top: -6px; left: 1px; font-size: 12px; text-shadow: 0 1px 3px #000; }
   .chk { display: inline-flex; align-items: center; gap: 6px; }
   .chk .mini { width: 18px; height: 18px; border-radius: 5px; background-color: #1c2740; flex: none; }
@@ -461,7 +465,8 @@
     });
     for (const id of ids) {
       const seat = document.createElement("div");
-      seat.className = "seat" + (id === target ? " active" : "") + (id === "ceo" ? " ceoSeat" : "");
+      seat.className = "seat" + (id === target ? " active" : "")
+        + (id === "ceo" ? " ceoSeat" : "") + (id === "main" ? " leadSeat" : "");
       const f = document.createElement("div");
       f.className = "face";
       f.textContent = id[0].toUpperCase();
@@ -472,9 +477,9 @@
       dot.className = "dot";
       dot.style.background = DOTS[agents[id].state] || "#4ade80";
       seat.append(f, nm, dot);
-      if (id === "ceo") {
+      if (id === "ceo" || id === "main") {
         const cr = document.createElement("div");
-        cr.className = "crown"; cr.textContent = "👑";
+        cr.className = "crown"; cr.textContent = id === "ceo" ? "👑" : "⭐";
         seat.appendChild(cr);
       }
       seat.onclick = () => setTarget(id);

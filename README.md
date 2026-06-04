@@ -1,27 +1,28 @@
 # BagIdea AI Agents Office
 
 > **A living AI Agent Office Simulation that runs as your desktop wallpaper.**
-> Every AI agent on your machine becomes a character in an HD-2D office — they walk to their desks when real work starts, gather at Security to ask for permission, and the lights follow your real local time.
+> Every AI agent on your machine becomes a character in an HD-2D office — they walk to their desks when real work starts, gather at Security to ask for permission, hold meetings, learn skills, and the lights follow your real local time.
 
 Not a dashboard. Not a chat window. A **world** that renders the true state of your AI agents — Claude Code sessions, headless agent runs, custom scripts — as living pixel-art employees, behind your desktop icons.
 
 ![Sci-fi office on the night shift](shots/scifi_office.png)
-*5 AM, real local time — agents work glowing consoles in a sci-fi office, city lights outside, the camera slowly drifting. Desktop icons render on top: this is a real wallpaper.*
+*Real local time — agents work glowing consoles in a sci-fi office in a countryside meadow, clouds drifting by, the camera slowly breathing. Desktop icons render on top: this is a real wallpaper.*
 
-> ⚠️ **Status: working prototype.** The full pipeline works end-to-end (wallpaper → daemon → real Claude Code sessions → approvals). Art uses two third-party packs (not bundled — see [Art assets](#art-assets-optional-but-recommended)): characters by [Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32), environment by [Molten Maps SciFi Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack). Without them the game falls back to procedural placeholders. Built and verified on Windows 11.
+> ⚠️ **Status: working product (Windows 11).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions → spatialized approvals → agent management UI. Some art packs are not bundled (licenses — see [Art assets](#art-assets)); the game falls back to procedural placeholders without them.
 
 ---
 
 ## Table of Contents
 
 - [What it does](#what-it-does)
-- [Screenshots](#screenshots)
 - [Architecture](#architecture)
 - [Repository structure](#repository-structure)
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Art assets](#art-assets)
 - [Running the full stack](#running-the-full-stack)
 - [Using it](#using-it)
+- [HTTP API](#http-api)
 - [Event protocol (OEP)](#event-protocol-oep)
 - [Performance](#performance)
 - [Design documents](#design-documents)
@@ -33,99 +34,102 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 
 ### 🖥️ Live wallpaper world (Layer 1 — Godot 4)
 - Renders **behind your desktop icons** (WorkerW technique, same as Wallpaper Engine)
-- HD-2D look: 3D office + billboarded pixel-art sprites lit by the 3D scene, volumetric god rays, bloom, tilt-shift DOF, film grain
-- **8 zones**: Executive Office, Operations Floor, Lobby, Cafeteria, Security Center, **Meeting Room** (agents physically gather for collaborations), **Server Room** (generator = infra), **Dormitory** (offline agents walk to a bunk and sleep — they never just vanish)
-- Agents **walk** between zones on an A* waypoint graph with **4-direction animated spritesheets** (idle + walk); facing follows actual movement
-- **Custom Character system**: composites layered sheets (hair/head/eyes/torso/shirt/legs) with per-agent tints — the Main Agent gets a unique look; NPCs draw from 12 premade sheets by agent-id hash; falls back to runtime-generated procedural sprites when art assets are absent
-- **Real-time day/night cycle** — sun angle, color, sky and god rays follow your machine's clock; at night the city skyline outside lights up
-- **Mission Control board** in-world: one card per running task, colored by state
-- Lobby **status totem**: green = daemon connected, red = disconnected (truth, not decoration)
-- Performance-tiered: wallpaper mode self-throttles (30 fps, reduced effects, ~9% GPU on a GTX 1060)
+- HD-2D look: 3D office + billboarded pixel-art sprites lit by the scene, sky-driven image-based lighting, SSR-polished reflective floors, a cinematic tilt-shift focus pass (breathing vignette, edge desaturation, anamorphic bars), film grain, native-res MSAA
+- **10 zones**: Executive Office, Operations Floor (6 desks), Lobby, Cafeteria, Security Center, Meeting Room, Server Room, two Dormitories (8 bunks — offline agents walk to a bed and sleep, they never just vanish), and a **Recreation Room** with a TV corner, chess, a hydroponics garden, a wandering pixel dog 🐕 and a self-kicking football ⚽
+- A **countryside** around the office: 4,200 blades of wind-swaying grass, low-poly mountains and trees, drifting cartoon clouds (a near layer actually crosses the camera frame), bird flocks, daytime pollen motes and fireflies at night
+- Agents **walk** between zones on an A* waypoint graph with 4-direction animated spritesheets; facing follows movement
+- **Real-time day/night cycle** — sun, sky color, ambient and reflections follow your machine's clock (sunset ~17:00, night by 18:00); manual override from the overlay (🌗) for golden-hour screenshots
+- A **roofline digital clock** with a phase icon (sun ☀ / low sun 🌇 / crescent moon 🌙) next to the brand billboard
+- **MMO-style nameplates** on a crisp 2D HUD: portrait, name, role/status, live state pill (IDLE/WORKING/MEETING/BLOCKED/OFFLINE), distance-scaled — with **rank dressing**: the CEO's plate is gold with a pixel crown, the Director's is bright blue with a lead star
+- **Event FX**: pixel-art flipbooks pop above characters — ✅ on task done, ❌ on failure, ❗ at Security, 👍/👎 on decisions, 🎵 when speaking, golden burst on a new skill, sci-fi warps on hire/fire
+- **Equippable auras**: an elemental magic ring (fire/ice/nature/arcane/shadow/gold) under any character, picked in the agent editor — the CEO can wear one too
+- The idle **Director makes rounds** through the office instead of standing still; the CEO paces the executive floor (that's you)
+- **Mission Control board** in-world: one card per running task, colored by state; lobby status totem shows daemon connectivity (truth, not decoration)
+- Branded boot: a transparent floating logo splash + a pulsing circular logo card — never a black box
 
 ### 🔌 Event daemon (Layer 0 — Node.js, zero dependencies)
 - WebSocket event hub — the Godot world and the overlay UI subscribe to one stream
-- **Event journal** (`journal.jsonl`) with **replay on connect**: restart anything, state comes back
-- **Claude Code adapter**: `POST /chat` spawns a real headless `claude -p` session and translates its stream-json output into world events
-- **Claude Code hooks integration**: any Claude Code session in this project reports its tool calls — your real work animates the wallpaper automatically
-- **Permission broker**: dangerous tools (Bash, Write, …) from adapter sessions are held until you approve
+- **Event journal** (`journal.jsonl`) with replay on connect: restart anything, state comes back
+- **Agent registry** (`registry.json`): persistent staff — name, job title, avatar, aura, system prompt, skills, tools. `main` (the Director — Claude itself) and `ceo` (you) are protected and cannot be deleted
+- **Claude Code adapter**: `POST /chat` spawns a real headless `claude -p` session with the agent's persona, assigned skills and allowed tools; stream-json output becomes world events
+- **Chat threads**: every conversation is a named, resumable session (`--resume`) with its own recorded history; agents keep continuous memory by default
+- **Skills library** with **Hermes-style auto-learning**: after a completed multi-tool task, a reflection pass decides whether the work distills into a reusable skill — if so it's saved, auto-assigned, and announced in the office
+- **Tools**: per-agent allowlist over the built-in Claude Code tools, plus custom capability via **MCP servers** (name + launch command → injected with `--mcp-config`)
+- **CEO chain of command**: ordering the CEO summons the Director — he walks over, takes the order, replies with a plan, and dispatches work to teammates via `DELEGATE:` lines (each spawns a real session, with the hand-over walk acted out)
+- **Agent discussions**: pick 2–4 agents and a topic — they hold a real meeting, round-robin turns over a shared transcript, minutes on the in-world whiteboard
+- **Claude Code hooks integration**: any Claude Code session in this project reports its tool calls — your real work animates the Director automatically
+- **Permission broker**: dangerous tools from adapter sessions are held until you approve
+- **Replay Theater**: `POST /replay` re-enacts the last N minutes time-compressed, in sepia
 
 ### 🛡️ Spatialized security
 When an agent needs a dangerous tool:
-1. Its character **physically walks to the Security Center** and waits (amber light pulses)
-2. The overlay shows an approval card with the **exact command**
+1. Its character **physically walks to the Security Center** and waits (amber light pulses, ❗ flashes over its head)
+2. The overlay's Security Center pops open with the **exact command**
 3. You click **Allow / Deny** — deny (or 50s timeout) makes the agent visibly re-plan
 4. Approve, and the tool actually executes
 
 This is real: the PreToolUse hook long-polls the daemon until you decide.
 
 ### 💬 Overlay (Layer 2)
-- Glassy chat panel + Security Center approval cards + Mission Control sidebar
-- Served by the daemon at `http://127.0.0.1:8787/` — open in a browser, as an Edge app window, or with the included **native Rust shell** (wry/tao, always-on-top)
-- Chat with the **Main Agent** (a real Claude Code session) — it answers, uses tools, and its character works at the executive desk while it does
-
-## Screenshots
-
-| | |
-|---|---|
-| ![Security flow](shots/security_flow.png) | **Spatialized security, live** — Main Agent waiting at the Security Center ("needs approval ⚠") while the native shell shows the exact Bash command with Allow/Deny. |
-| ![Full product](shots/full_product.png) | **Full loop** — chat with the Main Agent (real Claude session using Glob), mission sidebar, world behind. |
-| ![Visual target](shots/executive_office.png) | **HD-2D visual target** — the look study that started it all: volumetric god rays, shaded billboard sprites, tilt-shift. |
+Served by the daemon at `http://127.0.0.1:8787/` — best experienced through the included **native Rust shell**:
+- **Agent rail**: every staff member with live state dots — 👑 the CEO leads in gold (that seat is you), ⭐ the Director in blue; double-click any seat for an **ID card**
+- **⚙ Office Settings**: hire/edit/delete agents (12-face avatar picker, aura picker, job titles), a **✨ prompt copilot** (type a one-line brief in any language → a drafted system prompt), skills library with the auto-learn toggle, built-in tool catalog + MCP servers, and a thread manager
+- **🗺 Live map**: a real orthographic floorplan render with live agent icons (face, state ring, name) — click one to chat with it
+- **🧵 Threads**: per-conversation chat panes — switching threads or agents loads that conversation's history; a thread bar shows where you are
+- **🗣 Discussions**: launch agent-to-agent meetings
+- **🌗 Atmosphere picker**, **⏪ Replay**, collapsible **🛡 Security/Mission sidebar** with a pending-count badge that summons itself when an approval arrives
+- Circular **chat head** (Messenger-style, never steals focus) + system tray (Start with Windows, Exit)
 
 ## Architecture
 
 ```
-┌─ Overlay (browser / Edge app / Rust shell) ─┐   ┌─ Godot 4 Wallpaper ────────────┐
-│  chat · approval cards · mission sidebar    │   │  5 zones · agents walk (A*)    │
-│            ▲ WebSocket /ws                  │   │  mission board · day cycle     │
-└────────────┼────────────────────────────────┘   │        ▲ WebSocket /ws         │
+┌─ Overlay (Rust shell / browser) ────────────┐   ┌─ Godot 4 Wallpaper ────────────┐
+│  chat·threads · settings · map · approvals  │   │  10 zones · countryside        │
+│            ▲ WebSocket /ws                  │   │  agents walk (A*) · FX · clock │
+└────────────┼────────────────────────────────┘   │        ▲ WebSocket /ws  ▼ /pos │
              │                                    └────────┼────────────────────────┘
 ┌────────────┴─────────────────────────────────────────────┴───────────────────────┐
 │  DAEMON (Node.js, zero-dep)                    http://127.0.0.1:8787              │
-│  • broadcast + journal.jsonl (replay on connect)                                  │
-│  • POST /chat  → spawns headless `claude -p` (stream-json → events)               │
+│  • broadcast + journal.jsonl (replay on connect) + registry.json + sessions.json  │
+│  • POST /chat  → headless `claude -p` (persona+skills+tools, --resume threads)    │
 │  • POST /event ← Claude Code hooks (your own sessions feed the world)             │
 │  • POST /perm/request ←(long-poll)─ PreToolUse hook   POST /perm/respond ← UI     │
+│  • /registry/* CRUD · /sessions/* · /discuss · /assist/prompt · /map/bg           │
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Three independent processes: the **daemon** keeps agents running even if rendering dies; the **renderer** can crash/restart and rebuild from the journal; the **overlay** is just a web client. Truth lives in the daemon; the world is a renderer of truth.
+Three independent processes: the **daemon** keeps agents running even if rendering dies; the **renderer** can crash/restart and rebuild from the journal + registry; the **overlay** is just a web client. Truth lives in the daemon; the world is a renderer of truth.
 
 ## Repository structure
 
 ```
 ├── README.md                  ← you are here
 ├── docs/                      ← full V1 product-design spec (10 documents)
-│   ├── 01-ux-architecture.md      … UX model, modes, user journeys
-│   ├── 02-ui-wireframes.md        … Layer-2 overlay wireframes
-│   ├── 03-world-layout.md         … 14-zone office design, camera, lighting
-│   ├── 04-agent-behavior.md       … behavior sim: state machines, emotions
-│   ├── 05-technical-architecture.md
-│   ├── 06-performance.md          … GPU/CPU budgets, rendering ladder
-│   ├── 07-future-expansion.md
-│   ├── 08-progression.md          … XP, office levels, careers
-│   ├── 09-monetization.md
-│   └── 10-revolutionary-features.md
 ├── daemon/                    ← Layer 0 (Node.js, no npm install needed)
-│   ├── server.js                  … WS hub + journal + Claude adapter + perm broker
+│   ├── server.js                  … WS hub + journal + registry + adapter + perms
 │   ├── overlay.html               … Layer-2 web overlay (served at /)
-│   ├── hook.ps1                   … Claude Code hook → daemon forwarder
-│   ├── perm.ps1                   … PreToolUse permission hook (adapter sessions)
-│   └── send.js                    … test event CLI
+│   ├── hook.ps1 / perm.ps1        … Claude Code hook forwarders
+│   ├── send.js                    … test event CLI
+│   ├── registry.json              … your staff (generated at first run, gitignored)
+│   └── sessions.json              … chat threads + history (generated, gitignored)
 ├── godot/                     ← Layer 1 (Godot 4.6 project)
-│   ├── scenes/office_floor.tscn   … main scene
-│   ├── scenes/executive_office.tscn … original HD-2D visual target
-│   ├── scripts/world_builder.gd   … procedural office + waypoint graph + board
-│   ├── scripts/agent_manager.gd   … agent-id → character choreography
-│   ├── scripts/agent_sprite.gd    … runtime-generated pixel sprites + walk cycle
+│   ├── scenes/office_floor.tscn   … main scene (env: sky IBL, SSR, cinema pass)
+│   ├── scripts/world_builder.gd   … procedural office + countryside + clock + clouds
+│   ├── scripts/agent_manager.gd   … events → characters choreography + FX routing
+│   ├── scripts/agent_sprite.gd    … spritesheet characters, auras, identity
+│   ├── scripts/hud.gd             … nameplates (rank dressing), HUD FX, whiteboard
+│   ├── scripts/fx_factory.gd      … pixel-FX flipbook player
+│   ├── scripts/aura_factory.gd    … elemental aura rings (from Binbun shaders)
+│   ├── scripts/bird_sprite.gd / dog_sprite.gd / rec_ball.gd … ambient life
+│   ├── scripts/office_floor.gd    … day cycle, boot, wallpaper/screenshot modes
 │   ├── scripts/event_client.gd    … WebSocket client
-│   ├── scripts/office_floor.gd    … day cycle, wallpaper/screenshot modes
-│   └── shaders/                   … god-ray cards, scrolling code, wood planks, grain
-├── shell/                     ← native overlay shell (Rust, wry + tao)
-├── tools/wallpaper.ps1        ← attach/detach the Godot window behind desktop icons
+│   ├── shaders/                   … cinema focus, grass wind, god rays, grain…
+│   └── assets/BinbunVFX_Vol2/     … Elemental Magic FX (CC0 — bundled)
+├── shell/                     ← THE program (Rust, wry + tao): one exe runs it all
+├── tools/wallpaper.ps1        ← manual attach/detach (the shell does this natively)
 ├── workspace/                 ← cwd for adapter-spawned Claude sessions
 │   └── .claude/settings.json      … PreToolUse permission hook wiring
-├── .claude/settings.json      ← hooks: your Claude Code sessions → the office
-└── shots/                     ← screenshots (development log)
+└── .claude/settings.json      ← hooks: your Claude Code sessions → the office
 ```
 
 ## Requirements
@@ -135,8 +139,8 @@ Three independent processes: the **daemon** keeps agents running even if renderi
 | OS | Windows 11 (wallpaper embedding uses WorkerW; macOS/Linux planned) |
 | Renderer | [Godot 4.6+](https://godotengine.org/download) (standard build) |
 | Daemon | [Node.js](https://nodejs.org) 18+ (no npm packages needed) |
-| Agent | [Claude Code CLI](https://claude.com/claude-code) (`claude --version` ≥ 2.x) for the chat adapter & hooks |
-| Shell (optional) | Rust toolchain (`cargo`) — or just use a browser / `msedge --app=` |
+| Agent | [Claude Code CLI](https://claude.com/claude-code) (`claude --version` ≥ 2.x) |
+| Shell | Rust toolchain (`cargo`) — or use a browser for the overlay |
 | GPU | Anything Vulkan-capable; verified on GTX 1060 6GB |
 
 ## Installation
@@ -151,25 +155,27 @@ cd bagidea-ai-agents-office
 - `.claude/settings.json` — 3× path to `daemon\hook.ps1`
 - `workspace/.claude/settings.json` — 1× path to `daemon\perm.ps1`
 
-**2. (Optional) build the native shell:**
+**2. Build the shell:**
 
 ```powershell
 cd shell
 cargo build --release   # → shell/target/release/bagidea-office-shell.exe
 ```
 
-### Art assets (optional but recommended)
+## Art assets
 
-Art packs are **not bundled** (third-party licenses). Both load at runtime —
-no Godot import step — and **the game still runs without them**, falling back
-to procedural placeholder visuals.
+One pack is bundled; three are not (third-party licenses). Everything loads at
+runtime — no Godot import step — and **the game still runs without them**,
+falling back to procedural placeholder visuals.
+
+**Bundled** ✓ — [Elemental Magic FX by Binbun3D](https://binbun3d.itch.io/elemental-magic-fx) (CC0): the equippable aura rings.
 
 **Characters** — [Customizable Characters Top-Down 32x32 by Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32):
 
 ```
 godot/assets/characters/
 ├── npc/      ← contents of premade-npc-spritesheets.zip  (npc1.png … npc12.png)
-└── layers/   ← contents of demo-character-idle.zip       (hair/head/eyes/torso/shirt/legs-idle.png)
+└── layers/   ← contents of demo-character-idle.zip
 ```
 
 **Environment** — [Molten Maps SciFi Asset Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack):
@@ -178,21 +184,28 @@ godot/assets/characters/
 godot/assets/scifi/   ← all .glb files from the pack's Assets/gtlf folder
 ```
 
-**Countryside** — a low-poly environment pack (mountains/trees/rocks/bushes,
-FBX, loaded at runtime via FBXDocument):
+**Countryside** — a low-poly environment pack (FBX, runtime FBXDocument):
 
 ```
 godot/assets/env/     ← Mounting_*.fbx, Tree_*.fbx, Rock_*.fbx, Bush_*.fbx, …
 ```
 
-Without it the meadow keeps procedural placeholder mountains and pines; the
-wind-swaying grass field is always procedural (shader-driven).
+**Event FX** — [Super Pixel Effects Gigapack (Free) by untiedgames](https://untiedgames.itch.io/super-pixel-effects-gigapack):
+copy these `spritesheet.png` files from the pack's `spritesheet/` tree into
+`godot/assets/pixelfx/`, renamed as follows:
 
-Used for consoles, monitors, the briefing screen (mission board), cafeteria
-furniture, plants, lamps, the orrery and more — loaded via `GLTFDocument`
-with measured per-prop scaling.
-
-That's it — the daemon has zero npm dependencies.
+| File | From pack folder |
+|---|---|
+| `success.png` | `symbol_success_001_small_green` |
+| `failure.png` | `symbol_failure_001_small_red` |
+| `alert.png` | `symbol_alert_001_small_red` |
+| `warning.png` | `symbol_warning_001_small_yellow` |
+| `thumbs_up.png` / `thumbs_down.png` | `symbol_thumbs_up/down_001_small_*` |
+| `warp_in.png` / `warp_out.png` | `scifi_warp_001_small_green` / `scifi_warp_002_small_red` |
+| `heart.png` | `round_heart_burst_001_small_red` |
+| `sparkle.png` / `sparkle_green.png` | `round_sparkle_burst_001/002_small_*` |
+| `light_burst.png` | `round_light_burst_001_small_yellow` |
+| `music.png` | `directional_music_burst_002_small_yellow` |
 
 ## Running the full stack
 
@@ -202,98 +215,135 @@ That's it — the daemon has zero npm dependencies.
 .\shell\target\release\bagidea-office-shell.exe
 ```
 
-The shell spawns the daemon, launches the Godot office and embeds it behind
-your desktop icons, shows the circular chat-head launcher, and adds a system
-tray icon. Set `BAGIDEA_GODOT` if your Godot binary lives somewhere other
-than `E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe`.
+The shell spawns the daemon, launches the Godot office (hidden behind a pulsing
+logo splash until the first frame renders), embeds it behind your desktop icons,
+then brings in the chat head and the tray icon. A second launch exits instantly
+(single-instance mutex). Set `BAGIDEA_GODOT` if your Godot binary lives somewhere
+other than `E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe`.
 
-- **Chat head** (circular, draggable, never steals focus): click = show/hide
-  the overlay
-- **Overlay**: custom-chromed chat window; closing only hides it; stays out
-  of the taskbar
-- **System tray icon**: left-click toggles the chat; menu has
-  **Start with Windows** (HKCU Run key, toggle any time) and
-  **Exit BagIdea Office** — the only true exit, which tears the whole stack
-  down and restores your wallpaper
+- **Chat head**: circular, draggable, never steals focus; click = show/hide the overlay
+- **System tray**: left-click toggles the chat; menu has **Start with Windows**
+  and **Exit BagIdea Office** — the only true exit (tears the stack down and
+  restores your wallpaper)
 
-Manual mode (development) still works:
+Manual/dev mode still works:
 
 ```powershell
 node daemon\server.js
-$p = Start-Process "C:\path\to\Godot_win64.exe" -ArgumentList '--path', "$PWD\godot", '--', '--wallpaper' -PassThru
-.\tools\wallpaper.ps1 -Attach -ProcessId $p.Id      # …and -Detach to stop
-# overlay in a browser: http://127.0.0.1:8787/
+# windowed: open the Godot project normally
+# screenshot: godot --path godot -- --shot --hour=13 --cloudtest
 ```
-
-Windowed mode (no wallpaper) for development: just run the Godot project normally, or grab a screenshot with `-- --shot --hour=10` (the `--hour` flag forces a time of day).
 
 ## Using it
 
-### Chat with the Main Agent
-Type in the overlay (or `POST /chat {"agent":"main","prompt":"..."}`). The daemon spawns a real headless Claude Code session; its character walks to the executive desk, tool names appear over its head, replies stream into the chat, and a mission card tracks it on the board.
+### Hire your team
+⚙ → AGENTS → **Hire a new agent**: pick one of 12 faces, an aura, a job title,
+then either write the system prompt yourself or type a one-line brief
+(any language) and hit **✨ Draft** — a real Claude call writes the persona.
+Assign skills and tools with chips. Everything is editable later; deleting an
+agent warps them out of the office. `main` and `ceo` are protected.
+
+### Chat
+Click a face in the rail (or on the 🗺 map) and type. Each agent keeps
+continuous memory; use 🧵 to start a fresh thread or jump back into an old one —
+the pane shows that conversation's history. Threads are managed (and deletable)
+under ⚙ → THREADS.
+
+### Command through the CEO
+Type into the **CEO seat** (the gold one — that's you): the Director walks over,
+takes your order, answers with a plan, and delegates real work to the team —
+watch the hand-offs happen on the wallpaper.
+
+### Let them talk to each other
+🗣 → pick 2–4 agents + a topic + rounds: they gather in the meeting room and
+discuss over a shared transcript; minutes land on the in-world whiteboard.
 
 ### Watch your own Claude Code sessions
-Open any Claude Code session inside this project — the hooks in `.claude/settings.json` report your prompts and tool calls to the daemon, and agent **"claude"** works at an ops desk in real time while you work. (First run: Claude Code will ask you to trust the project hooks.)
+Any Claude Code session inside this project reports its prompts and tool calls
+through hooks — the **Director** works at his desk in real time while you work.
 
 ### Approve dangerous tools
-Ask the Main Agent to do something that needs Bash/Write. Its character walks to the **Security Center**, the amber light pulses, and an approval card with the exact command appears in the overlay. Allow / Deny — denial (or 50s timeout) makes the agent re-plan, visibly.
+When a session needs Bash/Write/etc., its character walks to Security and the
+overlay pops the exact command with Allow/Deny.
 
 ### Simulate events (no Claude needed)
 ```powershell
-node daemon\send.js agent.online rin        # rin walks in through the lobby
-node daemon\send.js task.started rin "" t9  # takes a desk, mission card appears
-node daemon\send.js task.progress rin Edit t9
-node daemon\send.js perm.requested rin      # walks to Security, light pulses
-node daemon\send.js task.completed rin "" t9
-node daemon\send.js agent.offline rin       # walks out, despawns
+node daemon\send.js task.started rin
+node daemon\send.js perm.requested rin
+node daemon\send.js task.completed rin
+node daemon\send.js agent.offline rin
 ```
+
+## HTTP API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /chat` `{agent, prompt, session?}` | run a real session (`session:"new"` forks a thread) |
+| `GET /sessions?agent=` · `GET /sessions/log?agent=&key=` · `POST /sessions/delete` | threads |
+| `GET /registry` · `POST /registry/agent` · `POST /registry/agent/delete` | staff CRUD |
+| `POST /registry/role` · `/registry/skill` · `/registry/mcp` · `/registry/autoskills` | libraries |
+| `POST /assist/prompt` `{name, role, brief}` | ✨ prompt copilot |
+| `POST /discuss` `{agents[], topic, rounds}` | agent-to-agent meeting |
+| `POST /ui/daylight` `{hour: 17.5 \| "auto"}` | atmosphere override |
+| `POST /replay` `{minutes, speed}` | Replay Theater |
+| `POST /event` | push any OEP event (custom integrations) |
+| `GET /map/bg` · `POST /pos` | live map plumbing |
+| `POST /perm/request` (long-poll) · `POST /perm/respond` | permission broker |
+| `GET /health` | liveness |
 
 ## Event protocol (OEP)
 
-One JSON event per WebSocket message / journal line: `{type, agent, task?, tool?, text?, perm?, ts}`.
+One JSON event per WebSocket message / journal line: `{type, agent, task?, tool?, text?, session?, ts}`.
 
-| Type | Meaning | World reaction |
-|---|---|---|
-| `agent.online` / `agent.offline` | agent joins / goes offline | walks in via lobby / walks to a dormitory bunk and sleeps |
-| `collab.started` / `collab.ended` (`agents[]`) | multi-agent session | participants gather around the meeting-room table, then return to work |
-| `task.started` | mission begins | takes a desk, board card → running (cyan) |
-| `task.progress` (`tool`) | tool call | tool name floats above the character |
-| `task.completed` / `task.failed` | mission ends | "done ✓"/"failed ✗", card green/red, returns to cafeteria |
-| `perm.requested` (`perm`, `input`) | approval needed | walks to Security, amber pulse, overlay card |
-| `perm.approved` / `perm.denied` | decision | returns to desk / re-plans |
-| `chat.message` (`text`) | agent speaks | speech-bubble status + overlay chat |
+| Type | World reaction |
+|---|---|
+| `agent.online` / `agent.offline` | walks in via the entrance / walks to a bunk and sleeps |
+| `task.started` / `task.progress` / `task.completed` / `task.failed` | desk + board card; ✅/❌ FX |
+| `perm.requested` / `perm.approved` / `perm.denied` | Security walk + ❗; 👍/👎 |
+| `chat.message` | speech-bubble status + 🎵 + thread history |
+| `collab.started` / `collab.ended` (`agents[]`) | meeting table + whiteboard minutes |
+| `skill.created` | golden burst + "📚 learned" |
+| `ceo.summon` / `task.delegated` | the Director's chain-of-command walks |
+| `roster.sync` / `roster.removed` | registry → world (spawn/update/despawn) |
+| `ui.daylight` | atmosphere override |
+| `theater.started` / `theater.ended` | Replay Theater sepia |
 
-Push your own events from anything: `POST http://127.0.0.1:8787/event` — that's the whole integration story for custom agents. New WS clients receive a journal replay (last 80 events) so state survives restarts.
+Push your own events from anything: `POST /event` — that's the whole integration
+story for custom agents. New WS clients receive a journal replay plus a fresh
+roster snapshot.
 
 ## Performance
 
-Measured on a GTX 1060 6GB @ 1680×1050, wallpaper mode (30 fps cap, 0.66× render scale, volumetrics → god-ray cards, no SSAO/DOF):
-
-- **~9% GPU**, ~400 MB RAM, <1% CPU; renderer pauses when occluded by fullscreen apps
-- Interact mode (60 fps, all effects) ≈ 17%
-
-See [docs/06-performance.md](docs/06-performance.md) for the full budget ladder; the production plan moves the wallpaper instance to Godot's compatibility renderer for single-digit targets on older GPUs.
+Wallpaper rung: 30 fps cap, native-res render + MSAA 2×, SSR trimmed, volumetrics
+replaced by god-ray cards, no SSAO/DOF. On a GTX 1060 @1680×1050 the full scene
+(countryside, grass field, clouds, cinematic pass) measures roughly 20–30% GPU —
+the renderer pauses entirely when occluded by fullscreen apps. Plenty of knobs
+remain (FSR scale, grass density, cinema pass) if you want it leaner.
 
 ## Design documents
 
-The `docs/` folder is a complete V1 product-design specification written before the first line of code — 14-zone world design, agent behavior simulation (honesty contract: *nothing tagged is fake*), scaling to 100+ agents, progression, monetization, and the competitive thesis ([doc 10](docs/10-revolutionary-features.md): *"cockpits make agents usable; this makes them employable"*).
+The `docs/` folder is a complete V1 product-design specification written before
+the first line of code — 14-zone world design, agent behavior simulation
+(honesty contract: *nothing tagged is fake*), scaling to 100+ agents,
+progression, monetization, and the competitive thesis
+([doc 10](docs/10-revolutionary-features.md): *"cockpits make agents usable;
+this makes them employable"*).
 
 ## Roadmap
 
-- [x] Character art — Schwarnhild spritesheets + custom-character compositor (procedural fallback kept)
-- [x] Environment furniture — Molten Maps sci-fi 3D models (consoles, monitors, briefing screen, cafeteria…)
-- [x] Full kit shell — walls (solid + glass window bays), railing partitions, zone-tinted metal floors
-- [x] Meeting Room choreography, Server Room, Dormitory (east wing)
-- [x] One-exe suite: chat head + overlay + tray + auto-start with Windows
-- [x] Rooftop company billboard (camera-facing brand signage)
-- [x] Replay Theater — `POST /replay` re-enacts a journal slice in-world (sepia grade + marquee), Replay button in the overlay
-- [x] Live meeting whiteboard — agents' real messages appear on the meeting-room minutes board
-- [ ] More zones (Research Lab, Dev Studio, Archive Library…)
+- [x] Characters, sci-fi furniture kit, glass-walled shell, countryside
+- [x] Meeting Room choreography, Server Room, Dormitories, Recreation Room (dog!)
+- [x] One-exe suite: chat head + overlay + tray + auto-start + single-instance
+- [x] Replay Theater + live meeting whiteboard
+- [x] Agent registry: hire/edit/delete, avatars, auras, ✨ prompt copilot
+- [x] Skills library + Hermes-style auto-learning; tools + MCP servers
+- [x] Live top-down map, chat threads with history, CEO chain of command, discussions
+- [x] Day/night + manual atmosphere, roofline clock, ambient life, event FX
+- [ ] **Sub-agents** — task forces that visibly split off a parent agent
 - [ ] Permission policies (always-allow rules, per-agent keycards)
 - [ ] Voice (push-to-talk, wake word)
-- [ ] Tauri packaging, macOS/Linux wallpaper backends
-- [ ] Agent SDK adapter tiers for OpenClaw / Open Interpreter / generic JSONL
+- [ ] Packaged installer; macOS/Linux wallpaper backends
 
 ---
 
-*Prototype built in one day with [Claude Code](https://claude.com/claude-code) — design docs in the morning, working security-approved Bash by night.*
+*Built with [Claude Code](https://claude.com/claude-code) — design docs in the morning of day one, a full agent-office product by sunrise of day two.*
