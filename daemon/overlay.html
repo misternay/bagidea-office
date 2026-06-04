@@ -986,17 +986,39 @@
 
   // ---- sessions (threads) ---------------------------------------------------
   const SESS = {};  // target -> "new" | session key | undefined (= latest)
+  const CUR = {};   // target -> resolved current thread key (for filtering)
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
 
+  // The chat pane shows ONE conversation: the current thread of the current
+  // agent — switching either reloads its history from the daemon.
+  async function loadThreadLog(key) {
+    log.innerHTML = "";
+    if (!key) return;
+    try {
+      const r = await fetch(`/sessions/log?agent=${encodeURIComponent(target)}&key=${encodeURIComponent(key)}`)
+        .then((x) => x.json());
+      for (const m of r.log || [])
+        addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : target, m.text);
+    } catch {}
+  }
+
   async function refreshThreadBar() {
-    if (SESS[target] === "new")
+    if (SESS[target] === "new") {
+      CUR[target] = null;
+      log.innerHTML = "";
       return setThreadLabel("🆕 thread ใหม่ — เริ่มเมื่อส่งข้อความแรก");
+    }
     try {
       const r = await fetch(`/sessions?agent=${encodeURIComponent(target)}`).then((x) => x.json());
       const list = r.sessions || [];
       let cur = SESS[target] ? list.find((s) => s.key === SESS[target]) : null;
       if (!cur) cur = list[0];
       setThreadLabel(cur ? cur.title : "ยังไม่มี — จะสร้างให้เองเมื่อคุยครั้งแรก");
+      const key = cur ? cur.key : null;
+      if (CUR[target] !== key) {
+        CUR[target] = key;
+        await loadThreadLog(key);
+      }
     } catch { setThreadLabel("ล่าสุด"); }
   }
 
@@ -1172,7 +1194,13 @@
     if (ev.agent) ensureAgent(ev.agent);
     if (ev.agents) ev.agents.forEach((a) => ensureAgent(a, "meeting"));
 
-    if (ev.type === "chat.message") addMsg("agent", ev.agent, ev.text);
+    if (ev.type === "chat.message") {
+      // The pane is per-conversation: bubble only for the current agent's
+      // current thread; history replays come from /sessions/log instead.
+      if (!ev.replay && ev.agent === target &&
+          (!ev.session || !CUR[target] || ev.session === CUR[target]))
+        addMsg("agent", ev.agent, ev.text);
+    }
     else if (ev.type === "task.progress") {
       if (!ev.replay) addChip(`⚙ <b>${ev.tool || "…"}</b> — ${ev.agent}`);
       if (missions[key]) { missions[key].tool = ev.tool; renderMissions(); }
@@ -1248,6 +1276,7 @@
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ agent: target, prompt, session }),
     });
+    refreshThreadBar();  // a fresh thread exists server-side immediately
   }
   document.getElementById("send").onclick = send;
   document.getElementById("inp").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });

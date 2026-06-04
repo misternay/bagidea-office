@@ -244,17 +244,32 @@ async function runReplay(minutes = 10, speed = 8) {
 // until the user stamps Allow/Deny.
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
-  broadcast({ type: "task.started", agent, task });
 
-  // Session resolution: explicit key > latest > fresh.
+  // Session resolution: explicit key > latest > fresh. Fresh threads are
+  // created up-front so their history records from the very first message.
   let entry = null;
+  let isNew = false;
   if (opts.session && opts.session !== "new")
     entry = (sess[agent] || []).find((e) => e.key === opts.session);
   else if (!opts.session) entry = latestSession(agent);
+  if (!entry) {
+    entry = { key: "s" + Date.now(), sid: null, ts: Date.now(),
+      title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 48), log: [] };
+    sess[agent] = sess[agent] || [];
+    sess[agent].push(entry);
+    isNew = true;
+  }
+  entry.log = entry.log || [];
+  entry.log.push({ who: "you", text: String(opts.logPrompt || prompt).slice(0, 4000), ts: Date.now() });
+  while (entry.log.length > 200) entry.log.shift();
+  saveSess();
+
+  broadcast({ type: "task.started", agent, task, session: entry.key });
 
   // Persona + assigned skills ride in a stdin preamble (robust across
   // Windows shell quoting); resumed sessions already carry it in context.
   const a = reg.agents[agent];
+  const isFresh = isNew;
   const picked = a && a.tools && a.tools.length ? a.tools : ["Read", "Glob", "Grep"];
   // "mcp:<name>" entries become a real --mcp-config + server-level allow rule.
   const mcpNames = picked.filter((t) => t.startsWith("mcp:"))
@@ -272,7 +287,7 @@ function runClaude(agent, prompt, opts = {}) {
     tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
   }
   let preamble = "";
-  if (!entry && a && (a.prompt || (a.skills || []).length)) {
+  if (isFresh && a && (a.prompt || (a.skills || []).length)) {
     preamble = `<persona>\nYou are "${a.name}" (${a.role}).\n${a.prompt || ""}\n`;
     for (const sid of a.skills || []) {
       const sk = reg.skills[sid];
@@ -314,21 +329,23 @@ function runClaude(agent, prompt, opts = {}) {
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             const out = opts.filterText ? opts.filterText(b.text) : b.text;
-            if (out) broadcast({ type: "chat.message", agent, task, text: out });
+            if (out) {
+              entry.log.push({ who: "agent", text: String(out).slice(0, 8000), ts: Date.now() });
+              while (entry.log.length > 200) entry.log.shift();
+              saveSess();
+              broadcast({ type: "chat.message", agent, task, text: out, session: entry.key });
+            }
           }
         }
       } else if (m.type === "result") {
         // Session bookkeeping: remember the thread we just extended.
         if (m.session_id) {
-          if (entry) { entry.sid = m.session_id; entry.ts = Date.now(); }
-          else {
-            sess[agent] = sess[agent] || [];
-            sess[agent].push({ key: "s" + Date.now(), sid: m.session_id,
-              title: String(prompt).replace(/\s+/g, " ").slice(0, 48), ts: Date.now() });
-          }
+          entry.sid = m.session_id;
+          entry.ts = Date.now();
           saveSess();
         }
-        broadcast({ type: m.is_error ? "task.failed" : "task.completed", agent, task });
+        broadcast({ type: m.is_error ? "task.failed" : "task.completed",
+          agent, task, session: entry.key });
         if (!m.is_error) maybeLearnSkill(agent, task, prompt, acts, lastText);
       }
     }
@@ -363,6 +380,7 @@ function ceoFlow(prompt) {
     `Anything not delegated you handle yourself. Reply to the owner with a short ` +
     `plan in the language they used.`;
   return runClaude("main", wrapped, {
+    logPrompt: "👑 (CEO) " + prompt,
     filterText: (text) => {
       const keep = [];
       for (const ln of String(text).split("\n")) {
@@ -467,6 +485,13 @@ const server = http.createServer((req, res) => {
         res.end(String(e.message));
       }
     });
+
+  } else if (req.method === "GET" && req.url.startsWith("/sessions/log")) {
+    // Per-thread chat history for the overlay.
+    const q = new URL(req.url, "http://x").searchParams;
+    const entry = (sess[q.get("agent")] || []).find((e) => e.key === q.get("key"));
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ log: (entry && entry.log) || [] }));
 
   } else if (req.method === "GET" && req.url === "/sessions/all") {
     res.writeHead(200, { "content-type": "application/json" });
