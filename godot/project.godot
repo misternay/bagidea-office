@@ -10,6 +10,10 @@ boot_splash/bg_color=Color(0, 0, 0, 0)
 boot_splash/image="res://assets/brand/logo_box.png"
 boot_splash/fullsize=false
 
+[autoload]
+
+Sfx="*res://scripts/sfx.gd"
+
 [display]
 
 window/size/viewport_width=1600

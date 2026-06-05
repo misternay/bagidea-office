@@ -117,13 +117,11 @@ func _exit_tree() -> void:
 var _aura_node: Node3D
 var aura := ""
 var is_ghost := false
-var _ghost_pulse := false
 var _trail_t := 0.0
 
-## Spectral mode for sub-agent clones: REALLY ghostly — deeply translucent
-## with a breathing alpha pulse, cool self-lit tint, rising soul-wisp
-## particles and an afterimage trail while gliding. Call after the node has
-## entered the tree.
+## Spectral mode for sub-agent clones: steadily translucent (see-through,
+## no flicker), cool self-lit tint, rising soul-wisp particles and an
+## afterimage trail while gliding. Call after the node has entered the tree.
 func set_ghost() -> void:
 	is_ghost = true
 	shaded = false
@@ -131,13 +129,11 @@ func set_ghost() -> void:
 	_bob_speed = 1.8
 	modulate = Color(0.66, 0.95, 1.3, 0.0)
 	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 0.42, 0.8)
-	tw.tween_callback(func() -> void: _ghost_pulse = true)
+	tw.tween_property(self, "modulate:a", 0.45, 0.8)
 	_add_ghost_wisps()
 
-## The way out: stop pulsing, fade to nothing, free.
+## The way out: fade to nothing, free.
 func ghost_dissolve() -> void:
-	_ghost_pulse = false
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(queue_free)
@@ -312,9 +308,6 @@ func _process(delta: float) -> void:
 	# Idle bob (procedural only — sheet anims carry their own life).
 	_t += delta * _bob_speed
 
-	if _ghost_pulse:
-		# Breathing translucency — never fully there.
-		modulate.a = 0.42 + sin(_t * 1.7) * 0.09
 	if is_ghost and _walking:
 		_trail_t -= delta
 		if _trail_t <= 0.0:

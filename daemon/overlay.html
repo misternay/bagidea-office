@@ -237,17 +237,29 @@
   #activity .act .t { color: rgba(160,170,190,0.55); font-size: 10px; margin-right: 5px; }
 
   /* ---- 📡 feed mode: a pure overlay — no chrome, no buttons, no input ---- */
-  #feed { display: none; }
+  #feed, #feedHead { display: none; }
   body.feedmode main, body.feedmode footer, body.feedmode #rail,
   body.feedmode #threadBar, body.feedmode #sideTab,
   body.feedmode header { display: none !important; }
   body.feedmode { background: rgba(4, 7, 13, 0.92); }
+  body.feedmode #feedHead {
+    display: flex; align-items: center; gap: 7px;
+    position: fixed; top: 0; left: 0; right: 0; height: 30px; padding: 0 12px;
+    font-size: 10.5px; letter-spacing: 2px; color: #9fb6d8; font-weight: 700;
+    background: rgba(16, 24, 42, 0.85); border-bottom: 1px solid var(--line);
+  }
+  #feedConn { width: 7px; height: 7px; border-radius: 50%; background: #4ade80;
+    box-shadow: 0 0 7px #4ade8088; margin-left: auto; }
   body.feedmode #feed {
     display: flex; flex-direction: column; gap: 5px;
-    position: fixed; top: 6px; bottom: 6px; left: 6px; right: 6px;
+    position: fixed; top: 34px; bottom: 6px; left: 6px; right: 6px;
     overflow-y: hidden; padding: 2px;
     justify-content: flex-end;  /* newest at the bottom, like stream chat */
-    mask-image: linear-gradient(to bottom, transparent, black 14%);
+    mask-image: linear-gradient(to bottom, transparent, black 12%);
+  }
+  #feedEmpty {
+    color: rgba(140, 158, 188, 0.55); font-size: 11px; text-align: center;
+    padding: 10px 0;
   }
   .fitem {
     display: flex; gap: 8px; align-items: flex-start; flex: none;
@@ -470,7 +482,13 @@
 
 <!-- 📡 Streamer feed mode: a quiet right-edge stream of who's doing what.
      Toggled by right-clicking the chat head (the shell flips the window). -->
-<div id="feed"></div>
+<div id="feedHead">
+  <img src="\brand\logo_ico_cute.png" width="16" height="16" draggable="false">
+  <span>📡 OFFICE FEED</span><span id="feedConn"></span>
+</div>
+<div id="feed">
+  <div id="feedEmpty">— เงียบสงบ… รอความเคลื่อนไหวในออฟฟิศ —</div>
+</div>
 
 <div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b></div>
 <footer>
@@ -499,7 +517,7 @@
   const NPCS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   // Live registry from the daemon (roster.sync) — identity source of truth.
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
-  let BUILTIN_DESC = {}, REGMCP = {};
+  let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true;
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -716,6 +734,8 @@
     body.textContent = String(text).slice(0, 220);
     t.append(b, body);
     d.append(f, t);
+    const empty = document.getElementById("feedEmpty");
+    if (empty) empty.remove();
     feedEl.appendChild(d);
     while (feedEl.children.length > 60) feedEl.removeChild(feedEl.firstChild);
     feedEl.scrollTop = feedEl.scrollHeight;
@@ -822,7 +842,9 @@
     const tabs = `<div class="tabs">${T("agents", "AGENTS")}${T("roles", "ROLES")}${T("skills", "SKILLS")}${T("tools", "TOOLS")}${T("threads", "THREADS")}</div>`;
     let bodyHtml = "";
     if (tab === "agents") {
-      bodyHtml = `<div id="alist"></div><button class="bigbtn" id="newAgent">＋ Hire a new agent</button>`;
+      bodyHtml = `<div class="switch ${SOUND ? "on" : ""}" id="sndSw">
+          <div class="knob"><\/div> 🔊 Sound effects — เสียงประกอบในโลก office</div>
+        <div id="alist"></div><button class="bigbtn" id="newAgent">＋ Hire a new agent</button>`;
     } else if (tab === "skills") {
       bodyHtml = `<div class="switch ${AUTOSKILLS ? "on" : ""}" id="autoSw">
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
@@ -872,6 +894,11 @@
         list.appendChild(row);
       }
       modalCard.querySelector("#newAgent").onclick = () => openEditor(null);
+      modalCard.querySelector("#sndSw").onclick = async (e) => {
+        SOUND = !SOUND;
+        await api("/registry/sound", { enabled: SOUND });
+        e.currentTarget.classList.toggle("on", SOUND);
+      };
     } else if (tab === "skills") {
       modalCard.querySelector("#autoSw").onclick = async (e) => {
         await api("/registry/autoskills", { enabled: !AUTOSKILLS });
@@ -1520,6 +1547,7 @@
       BUILTIN_DESC = ev.builtinTools || {};
       REGMCP = ev.mcp || {};
       AUTOSKILLS = ev.autoSkills !== false;
+      SOUND = ev.sound !== false;
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();
       setTarget(target);   // refresh name/role if the target was edited

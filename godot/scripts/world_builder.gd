@@ -112,6 +112,8 @@ var beam_mats: Array[ShaderMaterial] = []
 var pet: Sprite3D        # the office cat (or fallback dog) — agents play with it
 var ball: CSGSphere3D    # the rec football
 var _tv_glow: Node3D     # screen glow + light, on while someone watches
+var _lamp_lights: Array[OmniLight3D] = []      # garden lamps — night only
+var _lamp_heads: Array[StandardMaterial3D] = []
 
 var _wp_ids := {}
 var _board_slots := {}
@@ -340,6 +342,7 @@ func _ready() -> void:
 	_build_graph()
 	_build_geometry()
 	_build_ghost_deck()
+	_build_garden_lamps()
 	_build_sky_life()
 	_build_ambient_particles()
 	_build_clock()
@@ -665,6 +668,47 @@ func set_night_life(night: bool) -> void:
 		pollen.emitting = not night
 	if fireflies:
 		fireflies.emitting = night
+	# Garden lamps wake with the dark — the lawn never goes pitch black.
+	for l in _lamp_lights:
+		l.visible = night
+	for m in _lamp_heads:
+		m.emission_energy_multiplier = 2.6 if night else 0.0
+
+## Cozy lamp posts around the building (night dressing for the lawn).
+func _build_garden_lamps() -> void:
+	var pole_mat := _mat(Color(0.13, 0.14, 0.18), 0.5)
+	for pos in [Vector3(-12.2, 0, -7.5), Vector3(-12.2, 0, 2.0), Vector3(-12.2, 0, 11.5),
+			Vector3(18.2, 0, -7.5), Vector3(18.2, 0, 2.0), Vector3(18.2, 0, 11.5),
+			Vector3(2.0, 0, 16.2), Vector3(11.0, 0, 16.2)]:
+		var lamp := Node3D.new()
+		add_child(lamp)
+		lamp.position = pos
+		var pole := CSGCylinder3D.new()
+		pole.radius = 0.055
+		pole.height = 1.7
+		pole.material = pole_mat
+		lamp.add_child(pole)
+		pole.position = Vector3(0, 0.85, 0)
+		var head_mat := StandardMaterial3D.new()
+		head_mat.albedo_color = Color(1.0, 0.9, 0.7)
+		head_mat.emission_enabled = true
+		head_mat.emission = Color(1.0, 0.78, 0.45)
+		head_mat.emission_energy_multiplier = 0.0  # day: off
+		var head := CSGSphere3D.new()
+		head.radius = 0.17
+		head.material = head_mat
+		lamp.add_child(head)
+		head.position = Vector3(0, 1.78, 0)
+		_lamp_heads.append(head_mat)
+		var l := OmniLight3D.new()
+		l.light_color = Color(1.0, 0.78, 0.5)
+		l.light_energy = 1.7
+		l.omni_range = 5.5
+		l.visible = false
+		lamp.add_child(l)
+		l.position = Vector3(0, 1.9, 0)
+		_lamp_lights.append(l)
+		_set_layer(lamp, 2)  # decorative night prop — skip the map render
 
 # ---------------------------------------------------------------- clock
 

@@ -78,7 +78,8 @@ loadReg();
 function rosterEvt() {
   return { type: "roster.sync", agents: reg.agents, roles: reg.roles,
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
-    skills: reg.skills, autoSkills: reg.autoSkills !== false };
+    skills: reg.skills, autoSkills: reg.autoSkills !== false,
+    sound: reg.sound !== false };
 }
 function pushRoster() { broadcast(rosterEvt(), false); }
 
@@ -956,6 +957,22 @@ const server = http.createServer((req, res) => {
       } catch (e) {
         res.writeHead(400);
         res.end(String(e.message));
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/sound") {
+    // World sound effects on/off (persisted + live ui.sound broadcast).
+    readBody(req, (body) => {
+      try {
+        reg.sound = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        broadcast({ type: "ui.sound", on: reg.sound });
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
       }
     });
 

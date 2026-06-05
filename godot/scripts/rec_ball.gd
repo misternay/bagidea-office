@@ -9,7 +9,7 @@ var _rolling := 0.0
 
 func _ready() -> void:
 	layers = 2  # moving prop — keep it off the static map render
-	_kick_loop()
+	# No phantom kicks: the ball rests until someone actually plays with it.
 
 func _process(delta: float) -> void:
 	# The texture sells the kick: spin while airborne, settle when resting.
@@ -20,14 +20,8 @@ func _process(delta: float) -> void:
 
 ## One immediate kick — idle agents playing football call this.
 func kick_now() -> void:
+	Sfx.play("pop")
 	_do_kick()
-
-func _kick_loop() -> void:
-	while is_inside_tree():
-		await get_tree().create_timer(randf_range(2.5, 7.0)).timeout
-		if not is_inside_tree():
-			return
-		await _do_kick()
 
 func _do_kick() -> void:
 	var target := Vector3(
