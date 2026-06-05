@@ -36,6 +36,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const ORB_SIZE: f64 = 72.0;
 const FULL: (f64, f64) = (560.0, 700.0);
 const MINI: (f64, f64) = (390.0, 430.0);
+const FEED_W: f64 = 330.0;
 const PARK: (f64, f64) = (-9000.0, 100.0);
 
 #[derive(Debug)]
@@ -45,6 +46,7 @@ enum UserEvent {
     DragOverlay,
     HideOverlay,
     MiniToggle,
+    FeedToggle,
     WorldReady,
 }
 
@@ -83,7 +85,11 @@ const ORB_HTML: &str = r#"<!doctype html>
     if (!dragged) window.ipc.postMessage('toggle');
     dragged = false;
   });
-  document.body.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Right-click flips chat ↔ streamer feed (a quiet right-edge status strip).
+  document.body.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    window.ipc.postMessage('mode');
+  });
 </script>
 </body></html>"#;
 
@@ -376,6 +382,10 @@ fn main() {
     let orb_y = ORB_SIZE;
     let overlay_x = (logical_w - FULL.0 - ORB_SIZE * 2.2).max(20.0);
     let overlay_y = 90.0;
+    // 📡 feed mode: a tall quiet strip hugging the right screen edge.
+    let feed_h = (logical_h - 80.0).max(400.0);
+    let feed_x = logical_w - FEED_W - 8.0;
+    let feed_y = 44.0;
 
     // ---- boot splash: a pulsing circular logo, centered — visible while
     // the Godot window is cloaked and the world builds.
@@ -468,6 +478,7 @@ fn main() {
             let _ = match req.body().as_str() {
                 "toggle" => p_orb.send_event(UserEvent::Toggle),
                 "drag-orb" => p_orb.send_event(UserEvent::DragOrb),
+                "mode" => p_orb.send_event(UserEvent::FeedToggle),
                 _ => Ok(()),
             };
         })
@@ -484,6 +495,7 @@ fn main() {
     };
 
     let mut mini = false;
+    let mut feed = false;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -509,13 +521,14 @@ fn main() {
 
         // State is derived from reality (window position), so the button can
         // never get out of sync with what's on screen.
-        let do_toggle = || {
+        let do_toggle = |feed_now: bool| {
             let hidden = overlay
                 .outer_position()
                 .map(|p| p.x < -2000)
                 .unwrap_or(true);
             if hidden {
-                overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                let (px, py) = if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
+                overlay.set_outer_position(LogicalPosition::new(px, py));
                 overlay.set_focus();
                 raise_orb(&orb);
             } else {
@@ -525,7 +538,7 @@ fn main() {
         };
 
         if toggle {
-            do_toggle();
+            do_toggle(feed);
         }
 
         match event {
@@ -545,8 +558,8 @@ fn main() {
                 if window_id == orb_id {
                     circle_region(&orb, ORB_SIZE);
                 } else if window_id == overlay_id {
-                    let (w, h) = if mini { MINI } else { FULL };
-                    round_region(&overlay, w, h, 18.0);
+                    let (w, h) = if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
+                    round_region(&overlay, w, h, if feed { 14.0 } else { 18.0 });
                 } else if window_id == splash_id {
                     circle_region(&splash, SPLASH_SIZE);
                 }
@@ -559,15 +572,34 @@ fn main() {
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
                     raise_orb(&orb);
                 }
-                UserEvent::Toggle => do_toggle(),
+                UserEvent::Toggle => do_toggle(feed),
                 UserEvent::HideOverlay => {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
                 }
                 UserEvent::MiniToggle => {
-                    mini = !mini;
-                    let (w, h) = if mini { MINI } else { FULL };
-                    overlay.set_inner_size(LogicalSize::new(w, h));
-                    round_region(&overlay, w, h, 18.0);
+                    if !feed {
+                        mini = !mini;
+                        let (w, h) = if mini { MINI } else { FULL };
+                        overlay.set_inner_size(LogicalSize::new(w, h));
+                        round_region(&overlay, w, h, 18.0);
+                        raise_orb(&orb);
+                    }
+                }
+                UserEvent::FeedToggle => {
+                    // 📡 chat ↔ streamer feed: same window, new clothes.
+                    feed = !feed;
+                    let _ = overlay_view.evaluate_script(&format!(
+                        "window.setFeedMode && setFeedMode({})", feed));
+                    if feed {
+                        overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
+                        overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
+                        round_region(&overlay, FEED_W, feed_h, 14.0);
+                    } else {
+                        let (w, h) = if mini { MINI } else { FULL };
+                        overlay.set_inner_size(LogicalSize::new(w, h));
+                        overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                        round_region(&overlay, w, h, 18.0);
+                    }
                     raise_orb(&orb);
                 }
                 UserEvent::DragOrb => { let _ = orb.drag_window(); }

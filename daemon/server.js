@@ -351,7 +351,13 @@ function runClaude(agent, prompt, opts = {}) {
         for (const b of m.message.content) {
           if (b.type === "tool_use") {
             acts.push(b.name);
-            broadcast({ type: "task.progress", agent, task, tool: b.name });
+            // Tool calls belong to the conversation: a tiny "tool" entry in
+            // the thread history + a session-tagged progress event.
+            entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
+            while (entry.log.length > 200) entry.log.shift();
+            saveSess();
+            broadcast({ type: "task.progress", agent, task, tool: b.name,
+              session: entry.key });
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             let raw = b.text;
@@ -616,6 +622,9 @@ function runSub(parentId, subId, taskText, entry, onDone) {
       if (m.type === "assistant" && m.message && Array.isArray(m.message.content)) {
         for (const b of m.message.content) {
           if (b.type === "tool_use") {
+            entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
+            while (entry.log.length > 200) entry.log.shift();
+            saveSess();
             broadcast({ type: "subagent.progress", agent: parentId, sub: subId,
               tool: b.name, session: entry.key });
           } else if (b.type === "text" && b.text.trim()) {

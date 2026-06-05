@@ -12,7 +12,9 @@ const Fx := preload("res://scripts/fx_factory.gd")
 var agents := {}  # id -> {node, state, desk, bed, id, tasks: {task_id: true}}
 var roster := {}  # id -> {name, role, avatar} — the daemon's persistent registry
 var ghosts := {}  # sub id ("pixel#s1") -> {node, desk: GHOST_DESKS index or -1}
-var ghost_desks_free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7]
+var ghost_desks_free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+var ceo_hold_until := 0.0  # the boss stands still while giving/receiving work
+var _tv_watchers := 0
 var desk_pool: Array[String] = ["desk1", "desk2", "desk3", "desk4", "desk5", "desk6"]
 # Idle agents spread across the cafeteria AND the recreation room (TV,
 # games, the ball corner, the garden) — the office feels lived-in.
@@ -27,6 +29,8 @@ var _pos_busy := false
 func _ready() -> void:
 	_spawn_ceo.call_deferred()
 	_main_wander_loop()
+	_idle_life_loop()
+	_nap_loop()
 	# Live positions → daemon → overlay map (1 Hz, fire-and-forget).
 	_pos_req = HTTPRequest.new()
 	add_child(_pos_req)
@@ -67,6 +71,8 @@ func set_connected(connected: bool) -> void:
 
 ## Single place where an agent's state changes — body, plate, everything.
 func _set_state(a: Dictionary, state: String) -> void:
+	if state == "idle" and a.state != "idle":
+		a["idle_since"] = Time.get_ticks_msec() / 1000.0  # the nap clock
 	a.state = state
 	a.node.set_state(state)
 
@@ -143,7 +149,7 @@ func handle(evt: Dictionary) -> void:
 		_to_dorm(id)
 		return
 	var a: Dictionary = _ensure(id)
-	if a.state == "offline":
+	if a.state == "offline" or a.state == "resting":
 		_set_state(a, "idle")
 		if a.bed != "":
 			bed_pool.append(a.bed)  # check out of the bunk
@@ -207,15 +213,19 @@ func handle(evt: Dictionary) -> void:
 			if a.tasks.is_empty():
 				_finish(a, "denied ✗")
 		"ceo.summon":
-			# Chain of command: the Director walks over to take the order.
+			# Chain of command: the Director walks over and stands BESIDE the
+			# boss (face to face, never on top), staying put while planning.
 			_set_state(a, "working")
 			a.node.set_status("รับคำสั่งจาก CEO 📋")
+			a["hold_at_ceo"] = Time.get_ticks_msec() / 1000.0 + 28.0
 			if is_instance_valid(ceo):
+				ceo_hold_until = Time.get_ticks_msec() / 1000.0 + 20.0
 				ceo.set_status("สั่งงาน 🗣")
 				Fx.spawn(ceo, "heart", Vector3(0, 1.3, 0))
-				a.node.walk_to([ceo.position + Vector3(0.7, 0, 0.45)])
+				a.node.walk_to([ceo.position + Vector3(1.15, 0, 0.6)])
 		"task.delegated":
 			# ...then walks to the assignee and hands the work over.
+			a["hold_at_ceo"] = 0.0  # order taken — moving out
 			var tgt := str(evt.get("target", ""))
 			a.node.set_status("มอบหมาย → " + tgt + " 📋")
 			if agents.has(tgt):
@@ -226,7 +236,8 @@ func handle(evt: Dictionary) -> void:
 			# The round trip closes: the Director walks the summary to the boss.
 			a.node.set_status("ส่งสรุปงานให้ CEO 📋")
 			if is_instance_valid(ceo):
-				a.node.walk_to([ceo.position + Vector3(-0.7, 0, 0.45)])
+				ceo_hold_until = Time.get_ticks_msec() / 1000.0 + 12.0
+				a.node.walk_to([ceo.position + Vector3(-1.15, 0, 0.6)])
 				Fx.spawn(ceo, "heart", Vector3(0, 1.3, 0))
 			_clear_status_later(a, 9.0)
 		"subagent.split":
@@ -352,13 +363,35 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 		di = ghost_desks_free.pop_front()
 	var target: Vector3 = world.GHOST_DESKS[di] if di >= 0 \
 		else Vector3(14.1, 4.9, -4.3) + Vector3(randf_range(-1.6, 1.6), 0, randf_range(-1.2, 1.2))
-	ghosts[sub] = {"node": g, "desk": di}
+	ghosts[sub] = {"node": g, "desk": di, "spot": target}
 	g.set_state("working")
 	g.set_status("👻 " + job.replace("\n", " ").left(26))
 	Fx.spawn(pnode, "warp_in", Vector3(0, -0.2, 0), 0.022)
-	# Materialize (set_ghost fades itself in), rise straight out of the
-	# office, then glide onto the deck.
-	g.walk_to([g.position + Vector3(0, 3.6, 0), target])
+	# Materialize (set_ghost fades itself in) and HURRY to the deck — on the
+	# walkable graph like everyone else, just much faster, via the glass
+	# stairs in the server room.
+	g.walk_to(_ghost_desk_route(g, target))
+
+## Ground → deck: graph walk to the server room, climb the stairs, desk.
+func _ghost_desk_route(g: Sprite3D, spot: Vector3) -> Array:
+	var pts: Array = []
+	if g.position.y <= 1.5:
+		pts += world.path_to(g.position, "server_c")
+		pts.append(world.GHOST_STAIR_BASE)
+	pts.append(world.GHOST_STAIR_TOP)
+	pts.append(spot)
+	return pts
+
+## Deck (or anywhere) → a ground waypoint, descending the stairs if needed.
+func _ghost_ground_route(g: Sprite3D, target_wp: String) -> Array:
+	var pts: Array = []
+	var start: Vector3 = g.position
+	if start.y > 1.5:
+		pts.append(world.GHOST_STAIR_TOP)
+		pts.append(world.GHOST_STAIR_BASE)
+		start = world.GHOST_STAIR_BASE
+	pts += world.path_to(start, target_wp)
+	return pts
 
 func _despawn_ghost(sub: String, ok: bool) -> void:
 	if not ghosts.has(sub):
@@ -375,12 +408,19 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 	var info: Array = Fx.strip("success" if ok else "failure")
 	if hud and not info.is_empty():
 		hud.fx(g, info[0], info[1], 1)
-	# Glide home and dissolve back into the owner.
+	# Hurry home along the graph (down the stairs) and dissolve into the owner.
 	var dur := 0.0
 	var pid := sub.get_slice("#", 0)
 	if agents.has(pid) and is_instance_valid(agents[pid].node):
 		var home: Vector3 = agents[pid].node.position
-		dur = g.walk_to([g.position + Vector3(0, 1.4, 0), home + Vector3(0, 1.6, 0), home])
+		var pts: Array = []
+		var start: Vector3 = g.position
+		if start.y > 1.5:
+			pts.append(world.GHOST_STAIR_TOP)
+			pts.append(world.GHOST_STAIR_BASE)
+			start = world.GHOST_STAIR_BASE
+		pts += world.path_between(start, home)
+		dur = g.walk_to(pts)
 	await get_tree().create_timer(maxf(dur, 0.1) + 0.5).timeout
 	if is_instance_valid(g):
 		Fx.spawn(world, "warp_out", g.position + Vector3(0, -0.2, 0), 0.022)
@@ -389,17 +429,23 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 func _route_hook_to_ghost(id: String, type: String, evt: Dictionary) -> void:
 	if not ghosts.has(id) or not is_instance_valid(ghosts[id].node):
 		return
-	var g: Sprite3D = ghosts[id].node
+	var gh: Dictionary = ghosts[id]
+	var g: Sprite3D = gh.node
 	match type:
 		"task.progress":
 			g.set_status(str(evt.get("tool", "working…")))
 		"perm.requested":
+			# Ghosts answer to Security like everyone else: down the stairs,
+			# over to the window, wait for the stamp.
 			g.set_status("needs approval ⚠")
+			g.walk_to(_ghost_ground_route(g, "sec_window"))
 			_pulse_security()
 		"perm.approved":
 			g.set_status("approved ✓")
+			g.walk_to(_ghost_desk_route(g, gh.spot))
 		"perm.denied":
 			g.set_status("denied ✗")
+			g.walk_to(_ghost_desk_route(g, gh.spot))
 
 # ---------------------------------------------------------------- agents
 
@@ -452,6 +498,10 @@ func _to_desk(a: Dictionary) -> void:
 			a.desk = desk_pool.pop_front() if desk_pool.size() > 0 else "ops_c"
 	_set_state(a, "working")
 	a.node.set_status("thinking…")
+	# Taking an order in person: stay with the CEO while planning — the
+	# exec computer can wait until the hand-overs are done.
+	if a.id == "main" and Time.get_ticks_msec() / 1000.0 < float(a.get("hold_at_ceo", 0.0)):
+		return
 	_walk(a.node, a.desk)
 
 func _finish(a: Dictionary, label: String) -> void:
@@ -552,11 +602,14 @@ func _spawn_ceo() -> void:
 	_ceo_loop()
 
 func _ceo_loop() -> void:
-	# Light flavor behavior: the CEO paces around the executive office.
+	# Light flavor behavior: the CEO paces around the executive office —
+	# but stands still while giving orders or receiving a report.
 	while is_instance_valid(ceo):
 		await get_tree().create_timer(randf_range(5.0, 9.0)).timeout
 		if not is_instance_valid(ceo):
 			return
+		if Time.get_ticks_msec() / 1000.0 < ceo_hold_until:
+			continue
 		_walk(ceo, ["pace_a", "pace_b", "exec_c"].pick_random())
 
 ## The Director doesn't hover over the CEO all day: when idle he makes the
@@ -571,6 +624,127 @@ func _main_wander_loop() -> void:
 		var a: Dictionary = agents["main"]
 		if a.state == "idle" and is_instance_valid(a.node):
 			_walk(a.node, rounds.pick_random())
+
+# ---------------------------------------------------------------- idle life
+# Idle agents actually LIVE in the office: watch TV (it really turns on),
+# kick the football, play with the cat, chat with a colleague. Activities
+# only dress the idle state — a new task interrupts them cleanly.
+
+func _idle_life_loop() -> void:
+	while is_inside_tree():
+		await get_tree().create_timer(randf_range(9.0, 16.0)).timeout
+		var pool: Array = []
+		for id in agents:
+			var a: Dictionary = agents[id]
+			if a.state == "idle" and id != "ceo" and is_instance_valid(a.node):
+				pool.append(a)
+		if pool.is_empty():
+			continue
+		var a: Dictionary = pool.pick_random()
+		match randi() % 4:
+			0: _act_tv(a)
+			1: _act_ball(a)
+			2: _act_pet(a)
+			3: _act_chat(a, pool)
+
+func _act_tv(a: Dictionary) -> void:
+	a.node.set_status("ดูทีวี 📺")
+	var spot := Vector3(-7.25, 0.86, randf_range(7.6, 9.2))
+	var d: float = a.node.walk_to(world.path_to(a.node.position, "rec_s1") + [spot])
+	await get_tree().create_timer(d).timeout
+	if a.state != "idle":
+		return
+	_tv_watchers += 1
+	world.tv_set(true)
+	await get_tree().create_timer(randf_range(14.0, 26.0)).timeout
+	_tv_watchers -= 1
+	if _tv_watchers <= 0:
+		world.tv_set(false)  # nobody watching — the office saves power
+	if a.state == "idle":
+		a.node.set_status("")
+
+func _act_ball(a: Dictionary) -> void:
+	if not is_instance_valid(world.ball):
+		return
+	a.node.set_status("เตะบอล ⚽")
+	var bp: Vector3 = world.ball.position
+	var d: float = a.node.walk_to(world.path_to(a.node.position, "rec_s2") +
+		[Vector3(bp.x - 0.45, 0.86, bp.z + 0.3)])
+	await get_tree().create_timer(d + 0.2).timeout
+	if a.state != "idle":
+		return
+	if world.ball.has_method("kick_now"):
+		world.ball.kick_now()
+	Fx.spawn(a.node, "sparkle", Vector3(0, 0.4, 0), 0.03)
+	_clear_status_later(a, 6.0)
+
+func _act_pet(a: Dictionary) -> void:
+	if not is_instance_valid(world.pet):
+		return
+	a.node.set_status("เล่นกับแมว 🐱")
+	var pp: Vector3 = world.pet.position
+	var d: float = a.node.walk_to(world.path_to(a.node.position, "rec_c") +
+		[Vector3(pp.x + 0.7, 0.86, pp.z + 0.35)])
+	await get_tree().create_timer(d).timeout
+	if a.state != "idle":
+		return
+	if world.pet.has_method("attend"):
+		world.pet.attend(a.node.position)
+	Fx.spawn(a.node, "heart", Vector3(0, 1.2, 0))
+	Fx.spawn(world.pet, "heart", Vector3(0, 0.5, 0), 0.02)
+	_clear_status_later(a, 7.0)
+
+func _act_chat(a: Dictionary, pool: Array) -> void:
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	if others.is_empty():
+		return
+	var b: Dictionary = others.pick_random()
+	a.node.set_status("คุยเล่น 💬")
+	b.node.set_status("คุยเล่น 💬")
+	var d: float = a.node.walk_to(world.path_between(a.node.position,
+		b.node.position + Vector3(0.6, 0, 0.35)))
+	await get_tree().create_timer(d + 0.3).timeout
+	if a.state == "idle" and is_instance_valid(a.node):
+		_fx(a, "music")
+	_clear_status_later(a, 6.0)
+	_clear_status_later(b, 6.0)
+
+# ---------------------------------------------------------------- naps
+# No orders for 3 minutes → an agent may decide to take a bunk nap (beds
+# are limited!) or keep idling. Any event wakes them right back up.
+
+func _nap_loop() -> void:
+	while is_inside_tree():
+		await get_tree().create_timer(25.0).timeout
+		var now := Time.get_ticks_msec() / 1000.0
+		for id in agents:
+			if id in ["main", "ceo"]:
+				continue
+			var a: Dictionary = agents[id]
+			if a.state != "idle" or not is_instance_valid(a.node):
+				continue
+			if now - float(a.get("idle_since", now)) < 180.0:
+				continue
+			if randf() < 0.5 and bed_pool.size() > 0:
+				_take_nap(a)
+			else:
+				a["idle_since"] = now  # stays up — re-rolls in 3 minutes
+
+func _take_nap(a: Dictionary) -> void:
+	a.bed = bed_pool.pop_front()
+	_set_state(a, "resting")
+	a.node.set_status("งีบพักผ่อน 💤")
+	_walk(a.node, a.bed)
+	await get_tree().create_timer(randf_range(60.0, 180.0)).timeout
+	# Wake on the alarm only if nothing else woke them first.
+	if a.state == "resting":
+		if a.bed != "":
+			bed_pool.append(a.bed)
+			a.bed = ""
+		_set_state(a, "idle")
+		a.node.set_status("ตื่นแล้ว ☀")
+		_walk(a.node, _next_seat())
+		_clear_status_later(a, 4.0)
 
 func _pulse_security() -> void:
 	var l: OmniLight3D = world.sec_light

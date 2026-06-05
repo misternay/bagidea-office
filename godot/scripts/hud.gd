@@ -13,6 +13,7 @@ const STATE_COLORS := {
 	"meeting": Color(0.8, 0.55, 1.0),
 	"blocked": Color(1.0, 0.72, 0.32),
 	"offline": Color(0.6, 0.63, 0.72),
+	"resting": Color(0.72, 0.6, 0.95),
 }
 var _fx_list: Array = []  # {s: Sprite2D, agent, frames, loops, t}
 var _wb_panel: PanelContainer

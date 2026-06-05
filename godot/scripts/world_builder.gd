@@ -109,6 +109,9 @@ var totem_mat: StandardMaterial3D
 var sec_light: OmniLight3D
 var sky_mat: StandardMaterial3D
 var beam_mats: Array[ShaderMaterial] = []
+var pet: Sprite3D        # the office cat (or fallback dog) — agents play with it
+var ball: CSGSphere3D    # the rec football
+var _tv_glow: Node3D     # screen glow + light, on while someone watches
 
 var _wp_ids := {}
 var _board_slots := {}
@@ -348,14 +351,22 @@ func _ready() -> void:
 ## characters) so the boot-time floorplan capture culls it: the overlay map
 ## keeps showing the real rooms beneath. No stairs on purpose — ghosts float.
 
-## Standing spots (one per desk) for ghost clones. Deck top is y 3.46;
-## characters hover at floor + 0.86.
+## Standing spots (one per desk) for ghost clones — 12 desks, 3 rows of 4
+## (the west strip is the staircase landing). Deck top is y 3.46; characters
+## stand at floor + 0.86.
 const GHOST_DESKS := [
-	Vector3(12.0, 4.32, -5.75), Vector3(13.5, 4.32, -5.75),
-	Vector3(15.0, 4.32, -5.75), Vector3(16.5, 4.32, -5.75),
-	Vector3(12.0, 4.32, -2.55), Vector3(13.5, 4.32, -2.55),
-	Vector3(15.0, 4.32, -2.55), Vector3(16.5, 4.32, -2.55),
+	Vector3(12.6, 4.32, -5.75), Vector3(13.95, 4.32, -5.75),
+	Vector3(15.3, 4.32, -5.75), Vector3(16.6, 4.32, -5.75),
+	Vector3(12.6, 4.32, -3.75), Vector3(13.95, 4.32, -3.75),
+	Vector3(15.3, 4.32, -3.75), Vector3(16.6, 4.32, -3.75),
+	Vector3(12.6, 4.32, -1.75), Vector3(13.95, 4.32, -1.75),
+	Vector3(15.3, 4.32, -1.75), Vector3(16.6, 4.32, -1.75),
 ]
+
+## The glass staircase: ghosts walk the office graph to the server room,
+## then climb this straight flight onto the deck (no more wall-phasing).
+const GHOST_STAIR_BASE := Vector3(11.55, 0.86, -3.1)
+const GHOST_STAIR_TOP := Vector3(11.55, 4.32, -7.3)
 
 func _build_ghost_deck() -> void:
 	var deck := Node3D.new()
@@ -409,6 +420,18 @@ func _build_ghost_deck() -> void:
 		leg.position = Vector3(stand.x, 3.74, dz)
 		var scr := _deck_box(deck, Vector3(stand.x, 4.32, dz - 0.12), Vector3(0.64, 0.38, 0.03), screen)
 		scr.rotation_degrees = Vector3(-12, 0, 0)
+
+	# Glass staircase up from the server room — steps follow the
+	# GHOST_STAIR_BASE→TOP line so walking the slope lands on every tread.
+	var steps := 14
+	for i in steps:
+		var f := (float(i) + 0.5) / float(steps)
+		var sy := lerpf(0.12, 3.4, f)
+		var sz := lerpf(-3.1, -7.3, f)
+		_deck_box(deck, Vector3(11.55, sy, sz), Vector3(1.15, 0.07, 0.34), glass)
+		if i % 2 == 0:
+			_deck_box(deck, Vector3(10.97, sy + 0.02, sz), Vector3(0.05, 0.05, 0.34), trim)
+			_deck_box(deck, Vector3(12.13, sy + 0.02, sz), Vector3(0.05, 0.05, 0.34), trim)
 
 	# Sign over the north edge, tilted at the camera like the roof billboard.
 	var plate := Label3D.new()
@@ -775,6 +798,60 @@ func path_to(from_pos: Vector3, target: String) -> Array:
 	if out.size() > 1 and from_pos.distance_to(out[0]) < 0.4:
 		out.pop_front()
 	return out
+
+## Graph walk between two free positions (nearest waypoints both ends) —
+## ghosts route home to wherever their owner currently stands.
+func path_between(from_pos: Vector3, to_pos: Vector3) -> Array:
+	var pts := astar.get_point_path(_nearest(from_pos), _nearest(to_pos))
+	var out: Array = []
+	for p in pts:
+		out.append(p)
+	if out.size() > 1 and from_pos.distance_to(out[0]) < 0.4:
+		out.pop_front()
+	out.append(to_pos)
+	return out
+
+## TV truth: the screen glows only while someone is actually watching.
+func tv_set(on: bool) -> void:
+	if _tv_glow:
+		_tv_glow.visible = on
+
+func _build_tv_glow() -> void:
+	_tv_glow = Node3D.new()
+	add_child(_tv_glow)
+	# The rec TV (Large_Monitor_White) sits at x -9.45 facing east.
+	var quad := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.96, 0.6)
+	quad.mesh = qm
+	quad.material_override = _mat(Color(0.6, 0.8, 1.0), 0.4, Color(0.55, 0.8, 1.0), 2.4)
+	quad.rotation_degrees = Vector3(0, 90, 0)
+	_tv_glow.add_child(quad)
+	quad.position = Vector3(-9.18, 1.06, 8.4)
+	var l := OmniLight3D.new()
+	l.light_color = Color(0.6, 0.82, 1.0)
+	l.light_energy = 1.6
+	l.omni_range = 3.2
+	_tv_glow.add_child(l)
+	l.position = Vector3(-8.6, 1.2, 8.4)
+	_tv_glow.visible = false
+
+## Classic black-patch football texture (equirect-wrapped on the CSG sphere).
+func _soccer_texture() -> ImageTexture:
+	var img := Image.create(128, 64, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.96, 0.96, 0.97))
+	var spots := [Vector2(0, 32), Vector2(43, 14), Vector2(43, 50),
+		Vector2(85, 14), Vector2(85, 50), Vector2(64, 32), Vector2(21, 32), Vector2(107, 32)]
+	for s in spots:
+		for dx in range(-8, 9):
+			for dy in range(-7, 8):
+				if Vector2(dx, dy).length() > 6.5:
+					continue
+				var py := int(s.y) + dy
+				if py < 2 or py > 61:
+					continue
+				img.set_pixel((int(s.x) + dx + 128) % 128, py, Color(0.07, 0.07, 0.09))
+	return ImageTexture.create_from_image(img)
 
 func set_totem(connected: bool) -> void:
 	if totem_mat:
@@ -1156,17 +1233,27 @@ func _build_geometry() -> void:
 		_kit("Hydroponics_Lamp", Vector3(-7.8, 0, 11.9), 0.0, 0.85)
 		_kit("Plant_1", Vector3(-9.3, 0, 6.7), 60.0, 1.7)
 		_stanchion(Vector3(0.5, 0, 12.4), -20.0)
-	# Procedural rec life: the office dog and a football (kit-independent).
-	var dog := Sprite3D.new()
-	dog.set_script(load("res://scripts/dog_sprite.gd"))
-	add_child(dog)
-	dog.position = Vector3(-5.0, 0.27, 10.4)
-	var ball := CSGSphere3D.new()
+	# Rec life: the office cat (xzany pack; procedural dog when missing) and
+	# a properly dressed football.
+	var cat_script := load("res://scripts/cat_sprite.gd")
+	pet = Sprite3D.new()
+	if cat_script.has_assets():
+		pet.set_script(cat_script)
+		pet.position = Vector3(-5.0, 0.14, 10.4)
+	else:
+		pet.set_script(load("res://scripts/dog_sprite.gd"))
+		pet.position = Vector3(-5.0, 0.27, 10.4)
+	add_child(pet)
+	ball = CSGSphere3D.new()
 	ball.radius = 0.2
-	ball.material = _mat(Color(0.94, 0.94, 0.96), 0.35)
+	var ball_mat := StandardMaterial3D.new()
+	ball_mat.albedo_texture = _soccer_texture()
+	ball_mat.roughness = 0.35
+	ball.material = ball_mat
 	ball.set_script(load("res://scripts/rec_ball.gd"))
 	add_child(ball)
 	ball.position = Vector3(-1.8, 0.2, 10.4)
+	_build_tv_glow()
 	_omni(Vector3(-3.5, 2.6, 9.5), Color(1.0, 0.85, 0.6), 2.4, 9.0)
 	_omni(Vector3(-7.8, 1.9, 11.9), Color(0.6, 1.0, 0.7), 1.2, 4.0)           # garden glow
 

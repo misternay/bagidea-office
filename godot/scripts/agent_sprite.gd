@@ -374,8 +374,8 @@ func walk_to(points: Array) -> float:
 	_walk_tween = create_tween()
 	var from := position
 	var total := 0.0
-	# Ghosts glide much faster than feet walk — and through anything.
-	var speed: float = 3.4 if is_ghost else WALK_SPEED
+	# Ghosts hurry — same walkable graph as everyone, 4x the pace.
+	var speed: float = WALK_SPEED * 4.0 if is_ghost else WALK_SPEED
 	for p in points:
 		var leg_time: float = max(from.distance_to(p) / speed, 0.05)
 		_walk_tween.tween_property(self, "position", p, leg_time)

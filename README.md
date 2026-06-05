@@ -180,6 +180,13 @@ godot/assets/characters/
 └── layers/   ← contents of demo-character-idle.zip
 ```
 
+**The office cat** — [Cat 2D Pixel Art by xzany](https://xzany.itch.io/cat-2d-pixel-art) (free):
+
+```
+godot/assets/characters/cat/Sprites/   ← IDLE.png, WALK.png, RUN.png … (80x64 cells)
+```
+(missing → the original procedural pixel dog roams instead)
+
 **Environment** — [Molten Maps SciFi Asset Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack):
 
 ```

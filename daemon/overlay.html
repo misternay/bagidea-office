@@ -152,15 +152,60 @@
     align-self: flex-start; font-size: 11.5px; color: var(--dim);
     border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 3px 10px;
     background: rgba(255,255,255,0.03);
+    animation: chipIn 0.3s ease both;
   }
   .chip b { color: #ffd28a; font-weight: 600; }
-
-  aside {
-    width: 240px; flex: none; border-left: 1px solid var(--line); background: var(--glass);
-    backdrop-filter: blur(12px); padding: 12px; overflow-y: auto;
+  .toolrow {
+    align-self: flex-start; font-size: 10px; color: rgba(150,165,195,0.65);
+    padding: 0 0 0 30px; animation: chipIn 0.25s ease both;
   }
-  aside.closed { display: none; }
+
+  /* ---- micro-animations: the UI breathes -------------------------------- */
+  @keyframes msgIn { from { opacity: 0; transform: translateY(9px) scale(0.985); } }
+  @keyframes chipIn { from { opacity: 0; transform: translateY(6px); } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.92); } }
+  @keyframes badgePop { from { transform: scale(0); } 70% { transform: scale(1.35); } }
+  .msg { animation: msgIn 0.26s cubic-bezier(.3,1,.5,1) both; }
+  .seat { transition: transform 0.16s ease, filter 0.16s ease; }
+  .seat:hover { transform: translateY(-3px); filter: brightness(1.18); }
+  .seat.active { transform: translateY(-2px); }
+  header button, footer button { transition: transform 0.14s ease, filter 0.14s ease; }
+  header button:hover, footer button:hover { transform: translateY(-1.5px); filter: brightness(1.25); }
+  header button:active, footer button:active { transform: scale(0.92); }
+  .perm { animation: popIn 0.34s cubic-bezier(.2,1.4,.4,1) both; }
+  #activity .act { animation: chipIn 0.25s ease both; }
+  .mission { animation: chipIn 0.25s ease both; }
+  #permBadge.on { animation: badgePop 0.45s cubic-bezier(.2,1.6,.4,1) both; }
+  .dot { transition: background 0.5s ease; }
+  #threadBar { transition: opacity 0.3s; }
+
+  /* The sidebar is a slide-over panel everywhere: it covers the chat
+     instead of resizing it, and animates in/out. */
+  aside {
+    position: fixed; top: 44px; right: 0; bottom: 0; z-index: 150;
+    width: 250px; border-left: 1px solid var(--line); background: var(--glass);
+    backdrop-filter: blur(14px); padding: 12px; overflow-y: auto;
+    box-shadow: -16px 0 36px rgba(0,0,0,0.5);
+    transition: transform 0.28s cubic-bezier(.3,1,.4,1), opacity 0.28s ease;
+  }
+  aside.closed { transform: translateX(108%); opacity: 0; pointer-events: none; }
   #sideBtn { position: relative; }
+  /* Big friendly edge handle — one obvious place to open/close the panel. */
+  #sideTab {
+    position: fixed; top: 50%; right: 0; transform: translateY(-50%);
+    z-index: 160; width: 24px; padding: 10px 2px; text-align: center;
+    background: rgba(20,30,52,0.92); border: 1px solid var(--line); border-right: none;
+    border-radius: 10px 0 0 10px; cursor: pointer; user-select: none;
+    font-size: 13px; line-height: 1.5; color: #cfe3ff;
+    transition: right 0.28s cubic-bezier(.3,1,.4,1), background 0.2s;
+    box-shadow: -6px 0 18px rgba(0,0,0,0.35);
+  }
+  #sideTab:hover { background: rgba(40,60,100,0.95); }
+  #sideTab.alert { animation: tabPulse 1.1s ease infinite; border-color: #ffb054; }
+  @keyframes tabPulse {
+    0%, 100% { background: rgba(20,30,52,0.92); }
+    50% { background: rgba(255,150,60,0.45); }
+  }
   #permBadge {
     display: none; position: absolute; top: -6px; right: -6px;
     min-width: 16px; height: 16px; line-height: 16px; border-radius: 9px;
@@ -181,6 +226,32 @@
   }
   #activity .act b { color: #cfe3ff; font-weight: 600; }
   #activity .act .t { color: rgba(160,170,190,0.55); font-size: 10px; margin-right: 5px; }
+
+  /* ---- 📡 feed mode ------------------------------------------------------ */
+  #feed { display: none; }
+  body.feedmode main, body.feedmode footer, body.feedmode #rail,
+  body.feedmode #threadBar, body.feedmode #sideTab { display: none !important; }
+  body.feedmode header button { display: none !important; }
+  body.feedmode #miniBtn, body.feedmode #hideBtn { display: inline-flex !important; }
+  body.feedmode #feed {
+    display: flex; flex-direction: column; gap: 6px;
+    position: fixed; top: 42px; bottom: 8px; left: 6px; right: 6px;
+    overflow-y: auto; padding: 4px;
+  }
+  .fitem {
+    display: flex; gap: 8px; align-items: flex-start; flex: none;
+    background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 6px 9px; font-size: 11.5px; line-height: 1.45;
+    animation: msgIn 0.25s ease both;
+  }
+  .fitem .face { width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: #1c2740; }
+  .fitem .ftxt { min-width: 0; }
+  .fitem .ftxt b { display: block; font-size: 11px; color: #cfe3ff; }
+  .fitem .ftxt .sess { color: var(--dim); font-weight: 400; font-size: 9.5px; }
+  .fitem .ftxt .body { color: rgba(225,232,245,0.92); word-break: break-word; }
+  .fitem.alert { border-color: rgba(255,176,84,0.8); background: rgba(255,150,60,0.13); }
+  .fitem.ghostly { border-color: rgba(140,160,255,0.4); }
   .mission.running { border-left-color: #5ec8ff; }
   .mission.blocked { border-left-color: #ffb054; }
   .mission.done { border-left-color: #4ade80; opacity: 0.7; }
@@ -224,7 +295,8 @@
     background: rgba(5, 8, 14, 0.72); backdrop-filter: blur(3px);
     align-items: center; justify-content: center; border-radius: 18px;
   }
-  #modal.open { display: flex; }
+  #modal.open { display: flex; animation: chipIn 0.2s ease both; }
+  #modal.open #modalCard { animation: popIn 0.3s cubic-bezier(.2,1.3,.4,1) both; }
   #modalCard {
     width: min(470px, 92vw); max-height: 86vh; overflow-y: auto;
     background: linear-gradient(160deg, #15203a 0%, #0c1322 70%);
@@ -335,14 +407,7 @@
      Secondary header buttons hide so ◱ (restore) and — never fall off. */
   @media (max-width: 480px), (max-height: 460px) {
     #companion { display: none; }
-    /* Mini mode: the sidebar becomes a slide-over panel instead of dying —
-       the 🛡 toggle (and an arriving approval) must still work here. */
-    aside {
-      position: fixed; top: 34px; right: 0; bottom: 0; z-index: 150;
-      width: min(250px, 82vw);
-      box-shadow: -14px 0 34px rgba(0,0,0,0.5);
-    }
-    aside.closed { display: none; }
+    aside { top: 34px; width: min(250px, 82vw); }
     #rail { padding: 5px 10px; }
     .seat .nm { display: none; }
     .seat .face { width: 30px; height: 30px; }
@@ -389,7 +454,12 @@
     <h2>📜 OFFICE LOG</h2>
     <div id="activity"></div>
   </aside>
+  <div id="sideTab" title="Security / Mission / Office Log">🛡<br>◀</div>
 </main>
+
+<!-- 📡 Streamer feed mode: a quiet right-edge stream of who's doing what.
+     Toggled by right-clicking the chat head (the shell flips the window). -->
+<div id="feed"></div>
 
 <div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b></div>
 <footer>
@@ -548,6 +618,14 @@
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
+  // Tiny inline tool-call marker inside a conversation.
+  function addToolRow(name) {
+    const d = document.createElement("div");
+    d.className = "toolrow";
+    d.textContent = "⚙ " + name;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
 
   // Office activity (tool calls, hand-overs, ghost trips…) belongs to the
   // 📜 OFFICE LOG in the sidebar — the chat pane stays pure conversation.
@@ -574,21 +652,82 @@
     }
   }
 
-  // ---- collapsible sidebar (chat gets the space; perms summon it) --------
+  // ---- slide-over sidebar (covers the chat; perms summon it) -------------
   const sideEl = document.getElementById("side");
+  const sideTab = document.getElementById("sideTab");
   function setSide(open) {
     sideEl.classList.toggle("closed", !open);
+    sideTab.innerHTML = open ? "▶" : "🛡<br>◀";
+    sideTab.style.right = open ? "250px" : "0";
     try { localStorage.setItem("sideOpen", open ? "1" : "0"); } catch {}
   }
   if ((() => { try { return localStorage.getItem("sideOpen") === "1"; } catch { return false; } })())
     setSide(true);
   document.getElementById("sideBtn").onclick = () =>
     setSide(sideEl.classList.contains("closed"));
+  sideTab.onclick = () => setSide(sideEl.classList.contains("closed"));
   function renderBadge() {
     const n = permsEl.children.length;
     const b = document.getElementById("permBadge");
     b.textContent = n;
     b.classList.toggle("on", n > 0);
+    sideTab.classList.toggle("alert", n > 0);
+  }
+
+  // Native context menu has no business in our chrome.
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // ---- 📡 feed mode (streamer overlay) ------------------------------------
+  const feedEl = document.getElementById("feed");
+  window.setFeedMode = (on) => {
+    document.body.classList.toggle("feedmode", on);
+    if (on) feedEl.scrollTop = feedEl.scrollHeight;
+  };
+  function addFeed(id, text, session, kind = "") {
+    const d = document.createElement("div");
+    d.className = "fitem" + (kind ? " " + kind : "");
+    const f = document.createElement("div");
+    f.className = "face px";
+    face(f, String(id).split("#")[0], 26);
+    const t = document.createElement("div");
+    t.className = "ftxt";
+    const b = document.createElement("b");
+    b.textContent = nameOf(String(id).split("#")[0]) +
+      (String(id).includes("#") ? " 👻" : "");
+    if (session) {
+      const s = document.createElement("span");
+      s.className = "sess";
+      s.textContent = "  · " + session;
+      b.appendChild(s);
+    }
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = String(text).slice(0, 220);
+    t.append(b, body);
+    d.append(f, t);
+    feedEl.appendChild(d);
+    while (feedEl.children.length > 60) feedEl.removeChild(feedEl.firstChild);
+    feedEl.scrollTop = feedEl.scrollHeight;
+  }
+  // One mirror for everything worth glancing at while streaming/debugging.
+  function feedRoute(ev) {
+    if (ev.replay || ev.theater) return;
+    const sess = ev.session || "";
+    if (ev.type === "chat.message") addFeed(ev.sub || ev.agent, ev.text, sess, ev.sub ? "ghostly" : "");
+    else if (ev.type === "task.progress") addFeed(ev.agent, "⚙ " + (ev.tool || "…"), sess);
+    else if (ev.type === "subagent.progress") addFeed(ev.sub, "⚙ " + (ev.tool || "…"), sess, "ghostly");
+    else if (ev.type === "subagent.spawned") addFeed(ev.sub, "👻 แตกร่างรับงาน: " + String(ev.text || "").slice(0, 80), sess, "ghostly");
+    else if (ev.type === "subagent.done") addFeed(ev.sub, ev.ok ? "✓ งานเสร็จ กลับเข้าร่าง" : "✗ ล้มเหลว", sess, "ghostly");
+    else if (ev.type === "perm.requested") addFeed(ev.agent, "🛡 ขอใช้ " + ev.tool + " — รอ Allow/Deny (คลิกซ้าย chat head เพื่อสลับไปกด)", sess, "alert");
+    else if (ev.type === "perm.approved") addFeed(ev.agent, "🛡 " + ev.tool + " — allowed ✓", sess);
+    else if (ev.type === "perm.denied") addFeed(ev.agent, "🛡 " + ev.tool + " — denied ✗", sess);
+    else if (ev.type === "task.completed") addFeed(ev.agent, "✓ งานเสร็จ", sess);
+    else if (ev.type === "task.failed") addFeed(ev.agent, "✗ งานล้มเหลว", sess);
+    else if (ev.type === "task.delegated") addFeed("main", "📋 มอบหมายงานให้ " + nameOf(ev.target), sess);
+    else if (ev.type === "ceo.summon") addFeed("main", "👑 เข้ารับคำสั่งจาก CEO", sess);
+    else if (ev.type === "ceo.report") addFeed("main", "📨 ส่งสรุปงานให้ CEO", sess);
+    else if (ev.type === "collab.started") addFeed((ev.agents || ["main"])[0], "🤝 ประชุมเริ่ม: " + String(ev.text || ""), sess);
+    else if (ev.type === "skill.created") addFeed(ev.agent, "📚 เรียนรู้สกิลใหม่: " + ev.skill, sess);
   }
 
   function addPermCard(ev) {
@@ -1082,7 +1221,8 @@
       const r = await fetch(`/sessions/log?agent=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`)
         .then((x) => x.json());
       for (const m of r.log || []) {
-        if (m.who === "you") addMsg("you", null, m.text);
+        if (m.who === "tool") addToolRow(m.text);
+        else if (m.who === "you") addMsg("you", null, m.text);
         else addMsg("agent", faceId || m.who, m.text);
       }
     } catch {}
@@ -1101,8 +1241,10 @@
     try {
       const r = await fetch(`/sessions/log?agent=${encodeURIComponent(sessAgent())}&key=${encodeURIComponent(key)}`)
         .then((x) => x.json());
-      for (const m of r.log || [])
-        addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text);
+      for (const m of r.log || []) {
+        if (m.who === "tool") addToolRow(m.text);
+        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text);
+      }
     } catch {}
   }
 
@@ -1333,8 +1475,10 @@
       addLog(`👻 <b>${gname}</b> แตกร่างขึ้น Ghost Deck — ${String(ev.text || "").slice(0, 60)}`);
     else if (ev.type === "subagent.done")
       addLog(`👻 <b>${gname}</b> ${ev.ok ? "งานเสร็จ ✓ กลับเข้าร่าง" : "ล้มเหลว ✗ กลับเข้าร่าง"}`);
-    else if (ev.type === "subagent.progress")
+    else if (ev.type === "subagent.progress") {
       addLog(`⚙ <b>${ev.tool || "…"}</b> — 👻 ${gname}`);
+      if (groupView && ev.session === groupView) addToolRow(ev.tool || "…");
+    }
     else if (ev.type === "chat.message") {
       if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text);
     }
@@ -1395,6 +1539,8 @@
       else if (ev.type === "task.progress") addLog(`⏪ ⚙ ${ev.tool || ""} — ${ev.agent}`);
       return;
     }
+    feedRoute(ev);  // the 📡 feed mirrors everything glanceable
+
     // Ghost traffic peels off before anything can mint a rail seat for it.
     const subId = ev.sub || (ev.agent && String(ev.agent).includes("#") ? ev.agent : null);
     if (subId) return routeSub(ev, subId);
@@ -1417,7 +1563,14 @@
         addMsg("agent", ev.agent, ev.text);
     }
     else if (ev.type === "task.progress") {
-      if (!ev.replay) addLog(`⚙ <b>${ev.tool || "…"}</b> — ${nameOf(ev.agent)}`);
+      if (!ev.replay) {
+        addLog(`⚙ <b>${ev.tool || "…"}</b> — ${nameOf(ev.agent)}`);
+        // Inline marker inside the conversation it belongs to.
+        if (!groupView &&
+            (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
+            ev.session && ev.session === CUR[target])
+          addToolRow(ev.tool || "…");
+      }
       if (missions[key]) { missions[key].tool = ev.tool; renderMissions(); }
       ensureAgent(ev.agent, "working");
     }
