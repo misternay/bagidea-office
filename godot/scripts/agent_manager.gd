@@ -105,11 +105,16 @@ func handle(evt: Dictionary) -> void:
 
 	# Collaboration events may target several agents at once.
 	if type in ["collab.started", "collab.ended"] and evt.has("agents"):
+		if type == "collab.started":
+			# The whiteboard carries the real meeting topic.
+			world.whiteboard_reset("◤ " + str(evt.get("text", "MEETING")).left(46))
 		for member in evt.agents:
 			var sub := evt.duplicate()
 			sub.erase("agents")
 			sub["agent"] = str(member)
 			handle(sub)
+		if type == "collab.ended":
+			_wb_clear_later()
 		return
 
 	var id := str(evt.get("agent", "agent"))
@@ -213,8 +218,6 @@ func handle(evt: Dictionary) -> void:
 				world.whiteboard_add(id, text)
 		"collab.started":
 			# Agents physically gather at the meeting table (design doc 4.7).
-			if a.state != "meeting":
-				world.whiteboard_reset("◤ MEETING · " + task)
 			_set_state(a, "meeting")
 			a.node.set_status("meeting 🗣")
 			var seat: String = meeting_cycle.pop_front()
@@ -343,6 +346,11 @@ func _next_seat() -> String:
 	var seat: String = seat_cycle.pop_front()
 	seat_cycle.append(seat)
 	return seat
+
+## The minutes board takes a bow a few seconds after the meeting adjourns.
+func _wb_clear_later(delay := 8.0) -> void:
+	await get_tree().create_timer(delay).timeout
+	world.whiteboard_reset("")
 
 func _board_clear_later(id: String, delay := 10.0) -> void:
 	await get_tree().create_timer(delay).timeout

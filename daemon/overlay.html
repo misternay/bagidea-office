@@ -497,6 +497,7 @@
   }
 
   function setTarget(id) {
+    groupView = null;  // leaving a meeting log view
     target = id;
     document.getElementById("compName").textContent = nameOf(id);
     document.getElementById("compRole").textContent = roleOf(id);
@@ -741,25 +742,37 @@
         if (!entries.length) box.innerHTML =
           `<div style="font-size:12px;color:var(--dim)">ยังไม่มี thread เลย</div>`;
         for (const [aid, list] of entries) {
+          const isGroup = aid === "@group";
           const head = document.createElement("div");
           head.className = "arow";
           head.style.cursor = "default";
-          const f = document.createElement("div");
-          f.className = "face"; face(f, aid, 34);
-          head.appendChild(f);
+          if (!isGroup) {
+            const f = document.createElement("div");
+            f.className = "face"; face(f, aid, 34);
+            head.appendChild(f);
+          }
           head.insertAdjacentHTML("beforeend",
-            `<div class="meta"><b>${nameOf(aid)}</b><span>${list.length} thread</span></div>`);
+            `<div class="meta"><b>${isGroup ? "🗣 การประชุม (group sessions)" : nameOf(aid)}</b>` +
+            `<span>${list.length} ${isGroup ? "ครั้ง" : "thread"}</span></div>`);
           box.appendChild(head);
           for (const s of list.slice().sort((a, b) => b.ts - a.ts)) {
             const row = document.createElement("div");
             row.className = "arow";
-            row.style.cursor = "default";
             row.style.marginLeft = "18px";
-            row.innerHTML = `<div class="meta"><b>🧵 ${s.title || s.key}</b>` +
-              `<span>${new Date(s.ts).toLocaleString()}</span></div>` +
-              `<div class="winbtn hide" title="ลบ thread นี้">✕</div>`;
-            row.querySelector(".winbtn").onclick = () =>
+            const sub = isGroup
+              ? `${(s.agents || []).map(nameOf).join(" + ")} · ${new Date(s.ts).toLocaleString()}`
+              : new Date(s.ts).toLocaleString();
+            row.innerHTML = `<div class="meta"><b>${isGroup ? "🗣" : "🧵"} ${s.title || s.key}</b>` +
+              `<span>${sub}</span></div>` +
+              `<div class="winbtn hide" title="ลบ">✕</div>`;
+            if (isGroup) {
+              row.style.cursor = "pointer";
+              row.querySelector(".meta").onclick = () => { closeModal(); openGroupLog(s.key, s.title || s.key); };
+            } else row.style.cursor = "default";
+            row.querySelector(".winbtn").onclick = (e) => {
+              e.stopPropagation();
               api("/sessions/delete", { agent: aid, key: s.key }).then(() => openSettings("threads"));
+            };
             box.appendChild(row);
           }
         }
@@ -992,7 +1005,22 @@
   // ---- sessions (threads) ---------------------------------------------------
   const SESS = {};  // target -> "new" | session key | undefined (= latest)
   const CUR = {};   // target -> resolved current thread key (for filtering)
+  let groupView = null;  // meeting key while reading/watching a group session
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
+
+  // Meetings are group sessions: open one read-only in the chat pane.
+  async function openGroupLog(key, title) {
+    groupView = key;
+    setThreadLabel("🗣 " + title);
+    document.getElementById("inp").placeholder =
+      "บันทึกการประชุม (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย";
+    log.innerHTML = "";
+    try {
+      const r = await fetch(`/sessions/log?agent=${encodeURIComponent("@group")}&key=${encodeURIComponent(key)}`)
+        .then((x) => x.json());
+      for (const m of r.log || []) addMsg("agent", m.who, m.text);
+    } catch {}
+  }
 
   // The chat pane shows ONE conversation: the current thread of the current
   // agent — switching either reloads its history from the daemon.
@@ -1045,13 +1073,33 @@
     };
     mk("🆕 เริ่ม thread ใหม่", "ความจำใหม่ ไม่ต่อจากของเดิม", "new",
       SESS[target] === "new",
-      () => { SESS[target] = "new"; addChip(`🧵 เริ่ม thread ใหม่กับ <b>${nameOf(target)}</b>`); });
+      () => { groupView = null; SESS[target] = "new"; addChip(`🧵 เริ่ม thread ใหม่กับ <b>${nameOf(target)}</b>`); });
     for (const s of list)
       mk(`🧵 ${s.title || s.key}`, new Date(s.ts).toLocaleString(), s.key,
-        SESS[target] !== "new" && s.key === activeKey,
-        () => { SESS[target] = s.key; addChip(`🧵 สลับไป thread: <b>${(s.title || s.key).slice(0, 40)}</b>`); });
+        !groupView && SESS[target] !== "new" && s.key === activeKey,
+        () => { groupView = null; CUR[target] = null; SESS[target] = s.key;
+          addChip(`🧵 สลับไป thread: <b>${(s.title || s.key).slice(0, 40)}</b>`); });
     if (!list.length && SESS[target] !== "new")
       mk("(ยังไม่มี thread เก่า — คุยครั้งแรกจะสร้างให้เอง)", "", undefined, false, () => {});
+    // 🗣 group sessions: every meeting, readable any time
+    try {
+      const g = await fetch(`/sessions?agent=${encodeURIComponent("@group")}`).then((x) => x.json());
+      const meets = g.sessions || [];
+      if (meets.length) {
+        const hd = document.createElement("div");
+        hd.className = "opt";
+        hd.style.cursor = "default";
+        hd.style.color = "var(--dim)";
+        hd.style.fontSize = "10.5px";
+        hd.textContent = "—  🗣 การประชุม  —";
+        m.appendChild(hd);
+        for (const s of meets)
+          mk(`🗣 ${s.title || s.key}`,
+            `${(s.agents || []).map(nameOf).join(" + ")} · ${new Date(s.ts).toLocaleString()}`,
+            s.key, groupView === s.key,
+            () => openGroupLog(s.key, s.title || s.key));
+      }
+    } catch {}
     m.classList.add("open");
   };
   document.addEventListener("click", () => document.getElementById("sessMenu").classList.remove("open"));
@@ -1201,8 +1249,11 @@
 
     if (ev.type === "chat.message") {
       // The pane is per-conversation: bubble only for the current agent's
-      // current thread; history replays come from /sessions/log instead.
-      if (!ev.replay && ev.agent === target &&
+      // current thread (or the meeting being watched live); history replays
+      // come from /sessions/log instead.
+      if (!ev.replay && groupView && ev.session === groupView)
+        addMsg("agent", ev.agent, ev.text);
+      else if (!ev.replay && !groupView && ev.agent === target &&
           (!ev.session || !CUR[target] || ev.session === CUR[target]))
         addMsg("agent", ev.agent, ev.text);
     }
@@ -1273,6 +1324,10 @@
     const inp = document.getElementById("inp");
     const prompt = inp.value.trim();
     if (!prompt) return;
+    if (groupView) {
+      addChip("🗣 กำลังดูบันทึกการประชุม — คลิก agent ใน rail เพื่อกลับไปคุย");
+      return;
+    }
     inp.value = "";
     addMsg("you", null, prompt);
     const session = SESS[target];

@@ -403,7 +403,16 @@ let discussing = false;
 async function runDiscussion(ids, topic, rounds) {
   discussing = true;
   const task = "disc" + (Date.now() % 100000);
-  broadcast({ type: "collab.started", agents: ids, task, text: topic });
+  // Every meeting is a persistent GROUP session ("@group" bucket): topic,
+  // participants and the full transcript — readable later from the thread
+  // menu, and written to workspace/meetings/ so agents can grep it too.
+  const entry = { key: "g" + Date.now(), sid: null, ts: Date.now(),
+    title: String(topic).replace(/\s+/g, " ").slice(0, 60),
+    agents: ids.slice(), log: [] };
+  sess["@group"] = sess["@group"] || [];
+  sess["@group"].push(entry);
+  saveSess();
+  broadcast({ type: "collab.started", agents: ids, task, text: topic, session: entry.key });
   let transcript = "";
   try {
     for (let r = 0; r < rounds; r++) {
@@ -419,13 +428,25 @@ async function runDiscussion(ids, topic, rounds) {
         const line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
         if (line) {
           transcript += `${a.name}: ${line}\n`;
-          broadcast({ type: "chat.message", agent: id, task, text: line });
+          entry.log.push({ who: id, text: line, ts: Date.now() });
+          saveSess();
+          broadcast({ type: "chat.message", agent: id, task, text: line, session: entry.key });
         }
       }
     }
   } finally {
-    broadcast({ type: "collab.ended", agents: ids, task });
+    broadcast({ type: "collab.ended", agents: ids, task, session: entry.key });
     discussing = false;
+    // Markdown minutes inside the agents' workspace — searchable by them.
+    try {
+      const dir = path.join(WORKSPACE, "meetings");
+      fs.mkdirSync(dir, { recursive: true });
+      const names = ids.map((id) => (reg.agents[id] || { name: id }).name).join(", ");
+      const md = `# Meeting: ${entry.title}\n\n- Date: ${new Date(entry.ts).toISOString()}\n` +
+        `- Participants: ${names}\n\n## Transcript\n\n` +
+        entry.log.map((m) => `**${(reg.agents[m.who] || { name: m.who }).name}**: ${m.text}`).join("\n\n") + "\n";
+      fs.writeFileSync(path.join(dir, `${entry.key}.md`), md);
+    } catch {}
   }
 }
 

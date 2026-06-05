@@ -279,23 +279,33 @@ func wb_reset(header: String) -> void:
 	_wb_refresh()
 
 func wb_add(line: String) -> void:
-	_wb_lines.append(line.left(52))
-	while _wb_lines.size() > 7:
+	_wb_lines.append(line.left(150))
+	while _wb_lines.size() > 6:
 		# keep the header, trim the oldest body line
 		_wb_lines.remove_at(1 if _wb_lines.size() > 1 else 0)
 	_wb_refresh()
+	# A visible pulse on every new line — the meeting is clearly alive.
+	_wb_panel.modulate = Color(1.5, 1.4, 1.7)
+	var tw := create_tween()
+	tw.tween_property(_wb_panel, "modulate", Color.WHITE, 0.5)
 
 func _wb_refresh() -> void:
 	for c in _wb_box.get_children():
 		c.queue_free()
 	_wb_panel.visible = _wb_lines.size() > 0
 	for i in _wb_lines.size():
+		var last := i == _wb_lines.size() - 1 and i > 0
 		var l := Label.new()
-		l.text = _wb_lines[i]
+		# Older lines stay compact; the LATEST speaks in full, word-wrapped.
+		l.text = _wb_lines[i] if (last or i == 0) else _wb_lines[i].left(52)
+		if last:
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.custom_minimum_size = Vector2(260, 0)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		l.add_theme_font_size_override("font_size", 13 if i == 0 else 12)
+		l.add_theme_font_size_override("font_size", 13 if (i == 0 or last) else 11)
 		l.add_theme_color_override("font_color",
-			Color(0.85, 0.7, 1.0) if i == 0 else Color(0.88, 0.9, 0.97))
+			Color(0.85, 0.7, 1.0) if i == 0
+			else (Color(1.0, 1.0, 1.0) if last else Color(0.7, 0.73, 0.82)))
 		_wb_box.add_child(l)
 
 # ---------------------------------------------------------------- theater
