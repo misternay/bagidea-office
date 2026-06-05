@@ -324,6 +324,28 @@ function sweepProjects() {
   });
 }
 
+// Every agent knows the project map — say a project's name in chat and
+// they work its real directory, full authority, summary on finish.
+function projectNote() {
+  if (!projects.length && !Object.keys(reg.places).length) return "";
+  const list = projects.map((p) => `- ${p.name} → ${p.dir}`).join("\n") || "(ยังไม่มี)";
+  const places = Object.entries(reg.places)
+    .map(([n, f]) => `- "${n}" → ${f}`).join("\n") || "(ไม่มี)";
+  return `
+
+<office-projects>
+โปรเจคที่ลงทะเบียนในออฟฟิศ:
+${list}
+สถานที่เก็บโปรเจค (ชื่อย่อ):
+${places}
+เมื่อผู้ใช้อ้างถึงโปรเจคเหล่านี้ ให้ทำงานกับไฟล์ใน path ของมันโดยตรงทันที —
+คุณมีอำนาจตัดสินใจเต็มที่ในงานที่ได้รับมอบ ทำเสร็จแล้วต้องสรุปผลให้ผู้สั่งงานชัดเจน.
+การทดสอบใดๆ (เช่น เว็บ) ให้ใช้วิธีเบื้องหลังก่อนเสมอ (curl / headless / สคริปต์)
+อย่าเปิดหน้าต่างรบกวนผู้ใช้; ถ้าจำเป็นต้องเปิดจริงๆ จนไม่มีทางอื่น ให้รันคำสั่งเปิดตรงๆ
+แล้วระบบ Security จะขอ allow จากผู้ใช้ให้เอง.
+</office-projects>`;
+}
+
 function projectStatus() {
   return projects.map((p) => ({ ...p,
     open: p.id in projWin, visible: !!projWin[p.id],
@@ -515,7 +537,11 @@ function runClaude(agent, prompt, opts = {}) {
   }
 
   const args = ["-p", "--output-format", "stream-json", "--verbose",
-    "--allowedTools", tools];
+    "--allowedTools", tools,
+    // The permission-broker hooks live in the workspace settings; agents
+    // now run inside PROJECT directories, so the settings must travel
+    // explicitly or the Security Center goes silent.
+    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
   if (entry && entry.sid) args.push("--resume", entry.sid);
   const child = spawn("claude", args, {
@@ -523,9 +549,10 @@ function runClaude(agent, prompt, opts = {}) {
     shell: true,
     env: { ...process.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
   });
-  // The split capability rides on the wire only — never in the chat log.
+  // The split capability + project map ride on the wire only — never in
+  // the chat log.
   const canSplit = !opts.noSub && !agent.includes("#");
-  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : ""));
+  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + projectNote());
   child.stdin.end();
 
   let buf = "";
@@ -851,7 +878,8 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
   }
   const args = ["-p", "--output-format", "stream-json", "--verbose",
-    "--allowedTools", tools];
+    "--allowedTools", tools,
+    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
   // Ghosts work where their parent works (project-bound threads included).
   const subCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
@@ -1300,15 +1328,19 @@ const server = http.createServer((req, res) => {
         if (mode === "folder") {
           spawn("explorer", [dir], { detached: true });
         } else if (mode === "shell") {
-          spawn("cmd.exe", [`/c start "${path.basename(dir)}" /D "${dir}" cmd /k`],
+          // Plain PowerShell, no marker — not counted as "project open".
+          spawn("cmd.exe",
+            [`/c start "${path.basename(dir)}" /D "${dir}" conhost.exe powershell -NoLogo -NoExit`],
             { windowsVerbatimArguments: true, windowsHide: true, detached: true });
         } else {
           // conhost = a real classic console window we can HIDE and SHOW —
           // that's the tmux trick: hiding keeps claude running untouched.
+          // PowerShell host; the marker rides as a harmless comment so the
+          // process command line stays identifiable.
           const n = claudeSessionCount(dir);
           const cmd = n === 0 ? "claude" : n === 1 ? "claude -c" : "claude -r";
           spawn("cmd.exe",
-            [`/c start "BAGIDEA_PROJ_${id}" /D "${dir}" conhost.exe cmd /k "title BAGIDEA_PROJ_${id} && ${cmd}"`],
+            [`/c start "BAGIDEA_PROJ_${id}" /D "${dir}" conhost.exe powershell -NoLogo -NoExit -Command "${cmd} #BAGIDEA_PROJ_${id}"`],
             { windowsVerbatimArguments: true, windowsHide: true, detached: true });
           setTimeout(sweepProjects, 2500);
         }

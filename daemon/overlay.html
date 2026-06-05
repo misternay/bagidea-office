@@ -545,6 +545,8 @@
 <div id="feed">
   <div id="feedEmpty">— เงียบสงบ… รอความเคลื่อนไหวในออฟฟิศ —</div>
 </div>
+<!-- invisible landing strip for push-to-talk dictation in feed mode -->
+<input id="pttInp" style="position:fixed;left:-30px;top:-30px;width:10px;height:10px;opacity:0.01" tabindex="-1">
 
 <div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b></div>
 <footer>
@@ -598,7 +600,6 @@
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let PROJECTS_CACHE = [];
-  let ACTIVEPROJ = (() => { try { return localStorage.getItem("activeProj") || ""; } catch { return ""; } })();
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -877,6 +878,39 @@
   }
   wireMic(document.getElementById("micBtn"), document.getElementById("inp"));
 
+  // ---- global push-to-talk (shell hotkey): hold → dictate → release SENDS.
+  // In feed mode the command always goes to the Director (main).
+  let _pttFeed = false;
+  window.pttStart = () => {
+    _pttFeed = document.body.classList.contains("feedmode");
+    const box = _pttFeed ? document.getElementById("pttInp") : document.getElementById("inp");
+    if (box) { box.focus(); }
+  };
+  window.pttEnd = () => {
+    // Voice typing finalizes a beat after Esc — give it a moment.
+    setTimeout(async () => {
+      if (_pttFeed) {
+        const box = document.getElementById("pttInp");
+        const val = (box.value || "").trim();
+        box.value = "";
+        if (!val) return;
+        addFeed("ceo", "🎤 " + val, "", "");
+        await fetch("/chat", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ agent: "main", prompt: val }),
+        });
+      } else {
+        const inp = document.getElementById("inp");
+        if ((inp.value || "").trim()) send();  // release = auto-send
+      }
+    }, 750);
+  };
+  // Tell the shell which chord to listen for (persisted per machine).
+  function pttKey() {
+    try { return localStorage.getItem("pttKey") || "ctrl+space"; } catch { return "ctrl+space"; }
+  }
+  setTimeout(() => { if (shellPost) shellPost("hotkey:" + pttKey()); }, 1500);
+
   // ---- 📡 feed mode (streamer overlay) ------------------------------------
   const feedEl = document.getElementById("feed");
   window.setFeedMode = (on) => {
@@ -1022,6 +1056,14 @@
             <option value="30">ทุก 30 นาที</option>
             <option value="60">ทุก 1 ชั่วโมง</option>
           </select></div>
+        <div class="field" style="margin-top:8px"><label>🎤 PUSH-TO-TALK HOTKEY — กดค้างพูด ปล่อย = ส่งทันที (โหมด feed สั่งหา Director)</label>
+          <select id="pttSel">
+            <option value="ctrl+space">Ctrl + Space</option>
+            <option value="ctrl+shift+space">Ctrl + Shift + Space</option>
+            <option value="alt+space">Alt + Space</option>
+            <option value="f8">F8</option>
+            <option value="none">ปิดคีย์ลัด</option>
+          </select></div>
         <div id="alist"></div><button class="bigbtn" id="newAgent">＋ Hire a new agent</button>`;
     } else if (tab === "skills") {
       bodyHtml = `<div class="switch ${AUTOSKILLS ? "on" : ""}" id="autoSw">
@@ -1082,6 +1124,12 @@
       hbSel.onchange = async () => {
         HEARTBEAT = Number(hbSel.value);
         await api("/registry/heartbeat", { min: HEARTBEAT });
+      };
+      const pttSel = modalCard.querySelector("#pttSel");
+      pttSel.value = pttKey();
+      pttSel.onchange = () => {
+        try { localStorage.setItem("pttKey", pttSel.value); } catch {}
+        if (shellPost) shellPost("hotkey:" + pttSel.value);
       };
     } else if (tab === "skills") {
       modalCard.querySelector("#autoSw").onclick = async (e) => {
@@ -1502,8 +1550,8 @@
     const tabs = `<div class="tabs">${T("proj", "📁 PROJECTS")}${T("jobs", "📋 TASKS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}</div>`;
     let body = "";
     if (tab === "proj") {
-      body = `<div class="field"><label>ACTIVE PROJECT — thread ใหม่จะทำงานในโปรเจคนี้</label>
-          <select id="pActive"></select></div>
+      body = `<div style="font-size:11px;color:var(--dim);margin-bottom:6px">
+          💡 สั่งงานในแชทโดยพูดชื่อโปรเจคได้เลย — agents รู้จักทุกโปรเจคในรายการนี้และเข้าไปทำงานเอง</div>
         <div id="plist"></div>
         <div class="field" style="margin-top:10px"><label>＋ สร้างโปรเจคใหม่ / ลงทะเบียนของเดิม</label>
           <div class="assistrow">
@@ -1577,15 +1625,6 @@
     if (tab === "proj") {
       const r = await fetch("/projects").then((x) => x.json()).catch(() => ({ projects: [], places: {} }));
       PROJECTS_CACHE = r.projects || [];
-      // Active-project picker (sticky; applies to NEW threads).
-      const act = modalCard.querySelector("#pActive");
-      act.innerHTML = `<option value="">(ไม่ระบุ — workspace กลาง)</option>` +
-        PROJECTS_CACHE.map((p) => `<option value="${p.id}">${p.name} — ${p.dir}</option>`).join("");
-      act.value = ACTIVEPROJ && PROJECTS_CACHE.some((p) => p.id === ACTIVEPROJ) ? ACTIVEPROJ : "";
-      act.onchange = () => {
-        ACTIVEPROJ = act.value;
-        try { localStorage.setItem("activeProj", ACTIVEPROJ); } catch {}
-      };
       // Project rows with live status + actions, grouped by origin.
       const box = modalCard.querySelector("#plist");
       box.innerHTML = PROJECTS_CACHE.length ? "" :
@@ -2371,8 +2410,7 @@
     if (session === "new") SESS[target] = undefined;  // next sends continue it
     await fetch("/chat", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: target, prompt, session,
-        project: ACTIVEPROJ || undefined }),  // new threads adopt the project
+      body: JSON.stringify({ agent: target, prompt, session }),
     });
     refreshThreadBar();  // a fresh thread exists server-side immediately
   }

@@ -13,6 +13,7 @@ const Burst := preload("res://scripts/burst_factory.gd")
 var agents := {}  # id -> {node, state, desk, bed, id, tasks: {task_id: true}}
 var roster := {}  # id -> {name, role, avatar} — the daemon's persistent registry
 var ghosts := {}  # sub id ("pixel#s1") -> {node, desk: GHOST_DESKS index or -1}
+var meeting_ghosts := {}  # agent id -> stand-in clone (owner too busy to attend)
 var ghost_desks_free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 var ceo_hold_until := 0.0  # the boss stands still while giving/receiving work
 var _tv_watchers := 0
@@ -112,6 +113,12 @@ func handle(evt: Dictionary) -> void:
 		return
 	if type == "ui.sound":
 		Sfx.enabled = bool(evt.get("on", true))
+		return
+	if type == "ui.visibility":
+		# Office hidden: silence + crawl the renderer; agents keep WORKING.
+		var on := bool(evt.get("on", true))
+		Sfx.hidden = not on
+		Engine.max_fps = 30 if on else 2
 		return
 	if type.begins_with("ui."):
 		return  # overlay debug beacons aren't agents
@@ -314,34 +321,46 @@ func handle(evt: Dictionary) -> void:
 		"chat.message":
 			# Speech bubble: first line of what the agent actually said.
 			var text := str(evt.get("text", "")).split("\n")[0]
-			a.node.set_status("💬 " + text.left(28))
 			if not evt.get("replay", false):
 				_fx(a, "music")
 				if not theatrical:
 					Sfx.play("blip", 800)
-			# In a meeting, words land on the whiteboard (truth, not theater).
-			if a.state == "meeting":
+			# In a meeting, words land on the whiteboard (truth, not theater) —
+			# spoken by the agent, or by their stand-in clone.
+			if meeting_ghosts.has(id):
 				world.whiteboard_add(id, text)
+				if is_instance_valid(meeting_ghosts[id]):
+					meeting_ghosts[id].set_status("💬 " + text.left(28))
+			else:
+				a.node.set_status("💬 " + text.left(28))
+				if a.state == "meeting":
+					world.whiteboard_add(id, text)
 		"collab.started":
 			# Agents physically gather at the meeting table (design doc 4.7).
 			if not theatrical:
 				Sfx.play("blip2", 400)
 				_maybe_focus(a.node, 0.5, 8.0)
-			_set_state(a, "meeting")
-			a.node.set_status("meeting 🗣")
 			var seat: String = meeting_cycle.pop_front()
 			meeting_cycle.append(seat)
-			_walk(a.node, seat)
-		"collab.ended":
-			if a.state == "meeting":
-				world.whiteboard_add("", "— adjourned —")
-			if a.tasks.is_empty():
-				_finish(a, "done ✓")
+			if a.state == "working" and not a.tasks.is_empty():
+				# Too busy to leave the desk? A translucent stand-in attends.
+				_spawn_meeting_ghost(id, seat)
 			else:
-				_set_state(a, "working")
-				a.node.set_status("working…")
-				if a.desk != "":
-					_walk(a.node, a.desk)
+				_set_state(a, "meeting")
+				a.node.set_status("meeting 🗣")
+				_walk(a.node, seat)
+		"collab.ended":
+			if meeting_ghosts.has(id):
+				_dissolve_meeting_ghost(id)
+			elif a.state == "meeting":
+				world.whiteboard_add("", "— adjourned —")
+				if a.tasks.is_empty():
+					_finish(a, "done ✓")
+				else:
+					_set_state(a, "working")
+					a.node.set_status("working…")
+					if a.desk != "":
+						_walk(a.node, a.desk)
 
 # ---------------------------------------------------------------- roster
 
@@ -793,6 +812,44 @@ func _supervise(tgt: String, follower: Sprite3D) -> void:
 		_dissolve_supervisor(g)
 	elif is_main and agents.has("main") and agents["main"].tasks.is_empty():
 		_finish(agents["main"], "มอบหมายแล้ว ✓")
+
+## Too busy for the meeting? แยกร่างเข้าประชุมแทน — a translucent stand-in
+## walks to the table while the real one keeps working.
+func _spawn_meeting_ghost(id: String, seat: String) -> void:
+	if meeting_ghosts.has(id) or not agents.has(id):
+		return
+	var pnode: Sprite3D = agents[id].node
+	var g := _make_char(id)
+	g.npc_index = pnode.npc_index
+	g.suit_color = pnode.suit_color
+	g.hair_color = pnode.hair_color
+	g.skin_color = pnode.skin_color
+	g.rank = "ghost"
+	g.agent_name = str(pnode.agent_name) + " · ประชุม"
+	g.agent_role = "stand-in"
+	get_parent().add_child(g)
+	g.set_ghost()
+	g.position = pnode.position + Vector3(0.3, 0, 0.25)
+	g.set_state("meeting")
+	g.set_status("ประชุมแทนตัวจริง 🗣")
+	meeting_ghosts[id] = g
+	Burst.spawn(world, pnode.position, 0.65)
+	Sfx.play("split")
+	_walk(g, seat)
+
+func _dissolve_meeting_ghost(id: String) -> void:
+	var g: Sprite3D = meeting_ghosts.get(id)
+	meeting_ghosts.erase(id)
+	if g == null or not is_instance_valid(g):
+		return
+	var dur := 0.0
+	if agents.has(id) and is_instance_valid(agents[id].node):
+		dur = g.walk_to(world.path_between(g.position, agents[id].node.position))
+	await get_tree().create_timer(maxf(dur, 0.1) + 0.3).timeout
+	if is_instance_valid(g):
+		Burst.spawn(world, g.position, 0.65)
+		Sfx.play("whoosh")
+		g.ghost_dissolve()
 
 func _dissolve_supervisor(g: Sprite3D) -> void:
 	g.unfollow()

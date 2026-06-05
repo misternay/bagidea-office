@@ -15,6 +15,7 @@ wry = { version = "0.55.1", features = ["devtools"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 windows-sys = { version = "0.59", features = ["Win32_Graphics_Gdi", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_Security", "Win32_UI_Input_KeyboardAndMouse"] }
 tray-icon = "0.24.0"
+global-hotkey = "0.6"
 
 [build-dependencies]
 winres = "0.1"

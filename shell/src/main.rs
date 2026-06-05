@@ -29,8 +29,8 @@ use windows_sys::Win32::Graphics::Gdi::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     EnumWindows, FindWindowExW, FindWindowW, GetWindowLongW, GetWindowThreadProcessId,
     IsWindowVisible, SendMessageTimeoutW, SetLayeredWindowAttributes, SetParent,
-    SetWindowLongW, SystemParametersInfoW, GWL_EXSTYLE, LWA_ALPHA, SMTO_NORMAL,
-    SPI_SETDESKWALLPAPER, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    SetWindowLongW, ShowWindow, SystemParametersInfoW, GWL_EXSTYLE, LWA_ALPHA,
+    SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
 };
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -50,7 +50,28 @@ enum UserEvent {
     FeedToggle,
     MicDown,
     MicUp,
+    SetHotkey(String),
     WorldReady,
+}
+
+/// "ctrl+space" → a registered global push-to-talk chord.
+fn parse_hotkey(s: &str) -> Option<global_hotkey::hotkey::HotKey> {
+    use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+    let mut mods = Modifiers::empty();
+    let mut code = None;
+    for part in s.to_lowercase().split('+') {
+        match part.trim() {
+            "ctrl" | "control" => mods |= Modifiers::CONTROL,
+            "shift" => mods |= Modifiers::SHIFT,
+            "alt" => mods |= Modifiers::ALT,
+            "space" => code = Some(Code::Space),
+            "f8" => code = Some(Code::F8),
+            "f9" => code = Some(Code::F9),
+            "none" | "" => return None,
+            _ => {}
+        }
+    }
+    code.map(|c| HotKey::new(if mods.is_empty() { None } else { Some(mods) }, c))
 }
 
 /// Synthetic key chords. Voice input = push-to-talk over Windows Voice
@@ -201,6 +222,45 @@ unsafe extern "system" fn find_workerw_cb(top: HWND, out: windows_sys::Win32::Fo
 struct FindByPid {
     pid: u32,
     hwnd: HWND,
+}
+
+/// The wallpaper window is a CHILD of WorkerW after the attach — top-level
+/// enumeration can't see it. Walk WorkerW's children by pid instead.
+fn find_wallpaper_hwnd(pid: u32) -> HWND {
+    unsafe {
+        let progman_class = wide("Progman");
+        let progman = FindWindowW(progman_class.as_ptr(), std::ptr::null());
+        let mut workerw: HWND = 0 as HWND;
+        EnumWindows(Some(find_workerw_cb), &mut workerw as *mut HWND as _);
+        if workerw == 0 as HWND {
+            let worker_class = wide("WorkerW");
+            workerw = FindWindowExW(progman, 0 as HWND, worker_class.as_ptr(), std::ptr::null());
+            if workerw == 0 as HWND {
+                workerw = progman;
+            }
+        }
+        let mut child = FindWindowExW(workerw, 0 as HWND, std::ptr::null(), std::ptr::null());
+        while child != 0 as HWND {
+            let mut wpid = 0u32;
+            GetWindowThreadProcessId(child, &mut wpid);
+            if wpid == pid {
+                return child;
+            }
+            child = FindWindowExW(workerw, child, std::ptr::null(), std::ptr::null());
+        }
+        0 as HWND
+    }
+}
+
+/// Fire-and-forget visibility event to the daemon (curl ships with Win10+).
+fn post_visibility(on: bool) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("curl")
+        .args(["-s", "-X", "POST", "http://127.0.0.1:8787/event",
+            "-H", "content-type: application/json",
+            "-d", &format!("{{\"type\":\"ui.visibility\",\"on\":{}}}", on)])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
 }
 
 unsafe extern "system" fn find_by_pid_cb(h: HWND, lp: windows_sys::Win32::Foundation::LPARAM) -> i32 {
@@ -387,10 +447,12 @@ fn main() {
     // ---- system tray: the only true exit (the suite runs forever otherwise)
     let tray_menu = Menu::new();
     let open_item = MenuItem::new("Open Office Chat", true, None);
+    let hide_item = CheckMenuItem::new("Hide office (agents keep working)", true, false, None);
     let autostart_item = CheckMenuItem::new("Start with Windows", true, is_autostart(), None);
     let exit_item = MenuItem::new("Exit BagIdea Office", true, None);
     let _ = tray_menu.append_items(&[
         &open_item,
+        &hide_item,
         &autostart_item,
         &PredefinedMenuItem::separator(),
         &exit_item,
@@ -402,8 +464,19 @@ fn main() {
         .build()
         .expect("tray");
     let open_id = open_item.id().clone();
+    let hide_id = hide_item.id().clone();
     let autostart_id = autostart_item.id().clone();
     let exit_id = exit_item.id().clone();
+
+    // ---- global push-to-talk hotkey (default Ctrl+Space, overlay-config)
+    let hk_mgr = global_hotkey::GlobalHotKeyManager::new().ok();
+    let mut cur_hotkey = parse_hotkey("ctrl+space");
+    if let (Some(m), Some(hk)) = (hk_mgr.as_ref(), cur_hotkey) {
+        let _ = m.register(hk);
+    }
+
+    // Office pid for hide/show of the wallpaper window.
+    let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
 
     // ---- screen-aware default positions (inset, never sunk off-screen)
     let (screen_w, screen_h, sf) = event_loop
@@ -478,6 +551,8 @@ fn main() {
                 "mini" => p_overlay.send_event(UserEvent::MiniToggle),
                 "micdown" => p_overlay.send_event(UserEvent::MicDown),
                 "micup" => p_overlay.send_event(UserEvent::MicUp),
+                s if s.starts_with("hotkey:") =>
+                    p_overlay.send_event(UserEvent::SetHotkey(s[7..].to_string())),
                 _ => Ok(()),
             };
         })
@@ -545,9 +620,45 @@ fn main() {
                 shutdown = true;
             } else if ev.id == open_id {
                 toggle = true;
+            } else if ev.id == hide_id {
+                // Hide the whole office FACE — agents keep working underneath.
+                let hidden = hide_item.is_checked();
+                let g = find_wallpaper_hwnd(office_pid);
+                if g != 0 as HWND {
+                    unsafe { ShowWindow(g, if hidden { SW_HIDE } else { SW_SHOW }); }
+                }
+                if hidden {
+                    overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
+                } else {
+                    orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
+                    raise_orb(&orb);
+                }
+                post_visibility(!hidden);
             } else if ev.id == autostart_id {
                 // CheckMenuItem already flipped its own state on click.
                 set_autostart(autostart_item.is_checked());
+            }
+        }
+
+        // Global push-to-talk: hold the chord, dictate, release to send.
+        while let Ok(e) = global_hotkey::GlobalHotKeyEvent::receiver().try_recv() {
+            if let Some(hk) = cur_hotkey {
+                if e.id == hk.id() {
+                    match e.state {
+                        global_hotkey::HotKeyState::Pressed => {
+                            overlay.set_focus();
+                            let _ = overlay_view
+                                .evaluate_script("window.pttStart && pttStart()");
+                            send_win_h();
+                        }
+                        global_hotkey::HotKeyState::Released => {
+                            send_esc();
+                            let _ = overlay_view
+                                .evaluate_script("window.pttEnd && pttEnd()");
+                        }
+                    }
+                }
             }
         }
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
@@ -661,6 +772,17 @@ fn main() {
                     send_win_h();
                 }
                 UserEvent::MicUp => send_esc(),
+                UserEvent::SetHotkey(s) => {
+                    if let Some(m) = hk_mgr.as_ref() {
+                        if let Some(old) = cur_hotkey {
+                            let _ = m.unregister(old);
+                        }
+                        cur_hotkey = parse_hotkey(&s);
+                        if let Some(hk) = cur_hotkey {
+                            let _ = m.register(hk);
+                        }
+                    }
+                }
             },
             _ => {}
         }

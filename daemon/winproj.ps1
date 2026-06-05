@@ -11,12 +11,16 @@ param([string]$Action = "sweep", [string]$Id = "")
 
 Add-Type @"
 using System;
+using System.Text;
 using System.Runtime.InteropServices;
 public class WU {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+  public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
   public delegate bool EnumProc(IntPtr h, IntPtr l);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc p, IntPtr l);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -33,15 +37,19 @@ foreach ($p in $all) {
 }
 
 # Collect every top-level window once: pid -> best candidate. Processes
-# (conhost, claude, node) also own invisible helper windows — score real
-# consoles above ghosts: visible (+2) and titled (+1) wins.
+# (conhost, claude, node) also own invisible helper windows — a REAL
+# console (class ConsoleWindowClass) outranks everything, then visible,
+# then titled.
 $script:winByPid = @{}
 $cb = [WU+EnumProc]{ param($h, $l)
   $o = [uint32]0
   [void][WU]::GetWindowThreadProcessId($h, [ref]$o)
   $k = [string]$o
   $vis = [WU]::IsWindowVisible($h)
+  $sb = New-Object System.Text.StringBuilder 64
+  [void][WU]::GetClassName($h, $sb, 64)
   $score = 0
+  if ($sb.ToString() -eq "ConsoleWindowClass") { $score += 4 }
   if ($vis) { $score += 2 }
   if ([WU]::GetWindowTextLength($h) -gt 0) { $score += 1 }
   if (-not $script:winByPid.ContainsKey($k) -or $score -gt $script:winByPid[$k].score) {
@@ -51,11 +59,13 @@ $cb = [WU+EnumProc]{ param($h, $l)
 }
 [void][WU]::EnumWindows($cb, [IntPtr]::Zero)
 
-# The real session hosts: cmd /k carrying our marker (the transient
-# `cmd /c start …` launcher also contains the marker — skip it).
+# The real session hosts: the powershell (or legacy cmd /k) carrying our
+# marker — the transient `cmd /c start …` launcher also contains the
+# marker, so cmd.exe only counts with /k.
 $hosts = $all | Where-Object {
-  $_.Name -eq "cmd.exe" -and $_.CommandLine -match "BAGIDEA_PROJ_([\w-]+)" -and
-  $_.CommandLine -match "/k"
+  $_.CommandLine -match "BAGIDEA_PROJ_([\w-]+)" -and (
+    $_.Name -eq "powershell.exe" -or
+    ($_.Name -eq "cmd.exe" -and $_.CommandLine -match "/k"))
 }
 
 foreach ($p in $hosts) {
@@ -90,7 +100,9 @@ foreach ($p in $hosts) {
       "hide" { if ($win) { [void][WU]::ShowWindow($win.h, 0) } }
       "show" {
         if ($win) {
-          [void][WU]::ShowWindow($win.h, 9)
+          [void][WU]::ShowWindow($win.h, 5)   # SW_SHOW
+          [void][WU]::ShowWindow($win.h, 9)   # SW_RESTORE (un-minimize too)
+          [void][WU]::BringWindowToTop($win.h)
           [void][WU]::SetForegroundWindow($win.h)
         }
       }

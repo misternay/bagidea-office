@@ -22,6 +22,7 @@ const PACK_MAP := {
 }
 
 var enabled := true
+var hidden := false  # office hidden → everything stays silent (setting untouched)
 
 var _streams := {}
 var _pool: Array[AudioStreamPlayer] = []
@@ -59,7 +60,7 @@ func _ready() -> void:
 ## Fire-and-forget with a touch of pitch variance; per-sound rate limit so
 ## a chatty office never machine-guns the speakers.
 func play(p_name: String, min_gap_ms := 120) -> void:
-	if not enabled or not _streams.has(p_name):
+	if not enabled or hidden or not _streams.has(p_name):
 		return
 	var now := Time.get_ticks_msec()
 	if now - int(_last_play.get(p_name, -99999)) < min_gap_ms:
