@@ -5,14 +5,21 @@
 ## hour → [sun pitch°, sun energy, sun color, sky color, ambient energy].
 ## Ambient must follow the clock too — light surroundings (grass, mountains)
 ## glow unnaturally at night otherwise.
+## Tuned to a realistic tropical (Thailand) sun: first light ~5:45, sunrise
+## ~6:10, golden mornings, white overhead noon, golden hour from ~17:30,
+## sunset ~18:20 with a purple dusk, full night by ~19:10.
 const DAY_KEYS := [
-	[0.0,  -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],
-	[6.0,  -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],
-	[7.5,  -24.0, 2.1,  Color(1.0, 0.74, 0.5),  Color(0.85, 0.62, 0.45), 1.4],
-	[10.0, -42.0, 3.0,  Color(1.0, 0.93, 0.82), Color(0.55, 0.75, 1.0),  2.0],
-	[15.0, -46.0, 3.0,  Color(1.0, 0.95, 0.85), Color(0.55, 0.75, 1.0),  2.0],
-	[17.0, -26.0, 2.2,  Color(1.0, 0.66, 0.4),  Color(0.9, 0.55, 0.35),  1.5],
-	[18.0, -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.07, 0.09, 0.2),  0.8],
+	[0.0,  -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],   # deep night
+	[5.6,  -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.06, 0.08, 0.18), 0.8],   # pre-dawn
+	[6.1,  -11.0, 0.9,  Color(1.0, 0.52, 0.32), Color(0.5, 0.38, 0.52),  1.05],  # sunrise — red sun, mauve sky
+	[7.0,  -20.0, 1.9,  Color(1.0, 0.76, 0.5),  Color(0.82, 0.68, 0.58), 1.45],  # golden morning
+	[9.0,  -38.0, 2.7,  Color(1.0, 0.9, 0.78),  Color(0.58, 0.77, 1.0),  1.85],  # bright morning
+	[12.0, -50.0, 3.1,  Color(1.0, 0.97, 0.9),  Color(0.5, 0.74, 1.0),   2.05],  # noon — white, overhead
+	[15.0, -45.0, 2.9,  Color(1.0, 0.93, 0.82), Color(0.55, 0.75, 1.0),  1.95],  # afternoon
+	[17.0, -30.0, 2.3,  Color(1.0, 0.82, 0.56), Color(0.74, 0.72, 0.66), 1.6],   # late afternoon, warming
+	[18.0, -15.0, 1.5,  Color(1.0, 0.58, 0.32), Color(0.95, 0.55, 0.38), 1.2],   # golden hour
+	[18.4, -8.0,  0.7,  Color(1.0, 0.42, 0.3),  Color(0.45, 0.28, 0.42), 0.95],  # sunset — purple dusk
+	[19.1, -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.07, 0.09, 0.2),  0.8],   # night falls
 	[24.0, -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],
 ]
 
@@ -124,11 +131,11 @@ func _apply_daylight() -> void:
 	var world: Node3D = $World
 	# Roofline clock + phase icon + the day/night particle shift.
 	var phase := "day"
-	if hour < 6.0 or hour >= 18.5:
+	if hour < 5.8 or hour >= 19.0:
 		phase = "night"
-	elif hour < 9.0:
+	elif hour < 8.5:
 		phase = "dawn"
-	elif hour >= 16.5:
+	elif hour >= 17.3:
 		phase = "dusk"
 	var mins := int(round(fmod(hour, 1.0) * 60.0)) % 60
 	world.update_clock("%02d:%02d" % [int(hour) % 24, mins], phase)
