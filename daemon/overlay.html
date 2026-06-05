@@ -759,12 +759,14 @@
             const row = document.createElement("div");
             row.className = "arow";
             row.style.marginLeft = "18px";
-            const sub = isGroup
-              ? `${(s.agents || []).map(nameOf).join(" + ")} · ${new Date(s.ts).toLocaleString()}`
-              : new Date(s.ts).toLocaleString();
             row.innerHTML = `<div class="meta"><b>${isGroup ? "🗣" : "🧵"} ${s.title || s.key}</b>` +
-              `<span>${sub}</span></div>` +
+              `<span>${new Date(s.ts).toLocaleString()}</span></div>` +
               `<div class="winbtn hide" title="ลบ">✕</div>`;
+            if (isGroup) {
+              const strip = facesStrip(s.agents, 22);
+              strip.style.flex = "none";
+              row.insertBefore(strip, row.querySelector(".meta"));
+            }
             if (isGroup) {
               row.style.cursor = "pointer";
               row.querySelector(".meta").onclick = () => { closeModal(); openGroupLog(s.key, s.title || s.key); };
@@ -1008,6 +1010,31 @@
   let groupView = null;  // meeting key while reading/watching a group session
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
 
+  // Row of mini participant faces — hover a face for name + role.
+  function facesStrip(ids, size = 18) {
+    const wrap = document.createElement("span");
+    wrap.style.display = "inline-flex";
+    wrap.style.gap = "3px";
+    wrap.style.verticalAlign = "middle";
+    for (const id of ids || []) {
+      const f = document.createElement("span");
+      f.className = "px";
+      f.style.display = "inline-block";
+      f.style.width = size + "px";
+      f.style.height = size + "px";
+      f.style.borderRadius = "5px";
+      f.style.backgroundColor = "#1c2740";
+      f.style.outline = "1px solid rgba(255,255,255,0.15)";
+      const k = size / 36;
+      f.style.backgroundImage = `url(/char/npc${npcOf(id)}.png)`;
+      f.style.backgroundSize = `${256 * k}px ${512 * k}px`;
+      f.style.backgroundPosition = `${-14 * k}px ${-14 * k}px`;
+      f.title = `${nameOf(id)} — ${roleOf(id)}`;
+      wrap.appendChild(f);
+    }
+    return wrap;
+  }
+
   // Meetings are group sessions: open one read-only in the chat pane.
   async function openGroupLog(key, title) {
     groupView = key;
@@ -1093,11 +1120,25 @@
         hd.style.fontSize = "10.5px";
         hd.textContent = "—  🗣 การประชุม  —";
         m.appendChild(hd);
-        for (const s of meets)
-          mk(`🗣 ${s.title || s.key}`,
-            `${(s.agents || []).map(nameOf).join(" + ")} · ${new Date(s.ts).toLocaleString()}`,
-            s.key, groupView === s.key,
-            () => openGroupLog(s.key, s.title || s.key));
+        for (const s of meets) {
+          const o = document.createElement("div");
+          o.className = "opt" + (groupView === s.key ? " active" : "");
+          o.style.display = "block";
+          const top = document.createElement("div");
+          top.style.display = "flex";
+          top.style.alignItems = "center";
+          top.style.gap = "7px";
+          top.appendChild(facesStrip(s.agents, 20));
+          top.appendChild(document.createTextNode(`🗣 ${s.title || s.key}`));
+          const sub = document.createElement("small");
+          sub.style.display = "block";
+          sub.style.color = "var(--dim)";
+          sub.style.fontSize = "10px";
+          sub.textContent = new Date(s.ts).toLocaleString();
+          o.append(top, sub);
+          o.onclick = () => { m.classList.remove("open"); openGroupLog(s.key, s.title || s.key); };
+          m.appendChild(o);
+        }
       }
     } catch {}
     m.classList.add("open");
