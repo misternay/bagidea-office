@@ -28,8 +28,9 @@ use windows_sys::Win32::Graphics::Gdi::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     EnumWindows, FindWindowExW, FindWindowW, GetWindowLongW, GetWindowThreadProcessId,
-    IsWindowVisible, SendMessageTimeoutW, SetParent, SetWindowLongW, SystemParametersInfoW,
-    GWL_EXSTYLE, SMTO_NORMAL, SPI_SETDESKWALLPAPER, WS_EX_NOACTIVATE,
+    IsWindowVisible, SendMessageTimeoutW, SetLayeredWindowAttributes, SetParent,
+    SetWindowLongW, SystemParametersInfoW, GWL_EXSTYLE, LWA_ALPHA, SMTO_NORMAL,
+    SPI_SETDESKWALLPAPER, WS_EX_LAYERED, WS_EX_NOACTIVATE,
 };
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -382,10 +383,11 @@ fn main() {
     let orb_y = ORB_SIZE;
     let overlay_x = (logical_w - FULL.0 - ORB_SIZE * 2.2).max(20.0);
     let overlay_y = 90.0;
-    // 📡 feed mode: a tall quiet strip hugging the right screen edge.
-    let feed_h = (logical_h - 80.0).max(400.0);
+    // 📡 feed mode: a quiet half-height strip in the bottom-right corner —
+    // a true overlay (click-through + translucent), not another window.
+    let feed_h = (logical_h * 0.5).clamp(320.0, 560.0);
     let feed_x = logical_w - FEED_W - 8.0;
-    let feed_y = 44.0;
+    let feed_y = logical_h - feed_h - 64.0;
 
     // ---- boot splash: a pulsing circular logo, centered — visible while
     // the Godot window is cloaked and the world builds.
@@ -590,6 +592,21 @@ fn main() {
                     feed = !feed;
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
+                    // A REAL overlay: mouse passes straight through, and the
+                    // whole strip is translucent (uniform layered alpha — the
+                    // one WebView2-safe transparency on this machine).
+                    let _ = overlay.set_ignore_cursor_events(feed);
+                    unsafe {
+                        let hwnd = overlay.hwnd() as HWND;
+                        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+                        if feed {
+                            SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
+                            SetLayeredWindowAttributes(hwnd, 0, 196, LWA_ALPHA);
+                        } else {
+                            SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+                            SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
+                        }
+                    }
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));

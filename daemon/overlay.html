@@ -49,7 +49,16 @@
   header .logo { color: var(--accent); }
   #conn { width: 8px; height: 8px; border-radius: 50%; background: #ff5448; flex: none; }
   #conn.on { background: #4ade80; box-shadow: 0 0 8px #4ade8088; }
-  #theater { display: none; color: #ff5448; font-weight: 700; font-size: 12px; }
+  /* Replay indicator floats as its own pill — inline in the header it used
+     to shove the buttons into a wrapped, broken layout. */
+  #theater {
+    display: none; position: fixed; top: 44px; left: 50%;
+    transform: translateX(-50%); z-index: 170;
+    color: #ffb3ab; background: rgba(110, 22, 18, 0.88);
+    border: 1px solid rgba(255, 90, 77, 0.8); border-radius: 14px;
+    padding: 3px 14px; font-weight: 700; font-size: 11px; letter-spacing: 2px;
+    animation: chipIn 0.3s ease both;
+  }
   header button {
     margin-left: auto; font-size: 12px; padding: 4px 7px; cursor: pointer;
     color: var(--accent); background: rgba(255,255,255,0.05);
@@ -227,16 +236,18 @@
   #activity .act b { color: #cfe3ff; font-weight: 600; }
   #activity .act .t { color: rgba(160,170,190,0.55); font-size: 10px; margin-right: 5px; }
 
-  /* ---- 📡 feed mode ------------------------------------------------------ */
+  /* ---- 📡 feed mode: a pure overlay — no chrome, no buttons, no input ---- */
   #feed { display: none; }
   body.feedmode main, body.feedmode footer, body.feedmode #rail,
-  body.feedmode #threadBar, body.feedmode #sideTab { display: none !important; }
-  body.feedmode header button { display: none !important; }
-  body.feedmode #miniBtn, body.feedmode #hideBtn { display: inline-flex !important; }
+  body.feedmode #threadBar, body.feedmode #sideTab,
+  body.feedmode header { display: none !important; }
+  body.feedmode { background: rgba(4, 7, 13, 0.92); }
   body.feedmode #feed {
-    display: flex; flex-direction: column; gap: 6px;
-    position: fixed; top: 42px; bottom: 8px; left: 6px; right: 6px;
-    overflow-y: auto; padding: 4px;
+    display: flex; flex-direction: column; gap: 5px;
+    position: fixed; top: 6px; bottom: 6px; left: 6px; right: 6px;
+    overflow-y: hidden; padding: 2px;
+    justify-content: flex-end;  /* newest at the bottom, like stream chat */
+    mask-image: linear-gradient(to bottom, transparent, black 14%);
   }
   .fitem {
     display: flex; gap: 8px; align-items: flex-start; flex: none;
@@ -1665,11 +1676,25 @@
   }
   document.getElementById("send").onclick = send;
   document.getElementById("inp").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
-  document.getElementById("replayBtn").onclick = () =>
-    fetch("/replay", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ minutes: 15, speed: 10 }),
-    });
+  document.getElementById("replayBtn").onclick = async () => {
+    let r = {};
+    try {
+      r = await fetch("/replay", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ minutes: 15, speed: 10 }),
+      }).then((x) => x.json());
+    } catch {}
+    addChip(r.replaying
+      ? "⏪ กำลังฉายเหตุการณ์ 15 นาทีย้อนหลัง — โลกจะกลายเป็นโทนซีเปียจนจบเรื่อง"
+      : "⏪ มี replay ฉายอยู่แล้ว — รอให้จบก่อนนะครับ");
+  };
+
+  // Top-bar popups (menus, modals, the map…) live where the sidebar slides
+  // in — opening any of them tucks the panel away first.
+  for (const bid of ["replayBtn", "discussBtn", "mapBtn", "dayBtn", "setBtn", "sessBtn"]) {
+    const el = document.getElementById(bid);
+    if (el) el.addEventListener("click", () => setSide(false), true);
+  }
 
   // ---- custom window chrome (only inside the native shell) ----------------
   // NB: wry injects a global named `ipc` — never shadow it with const/let!
