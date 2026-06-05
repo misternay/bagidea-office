@@ -334,7 +334,15 @@
   /* ---------- MINI MODE: shrink the window → compact chat HUD ----------
      Secondary header buttons hide so ◱ (restore) and — never fall off. */
   @media (max-width: 480px), (max-height: 460px) {
-    aside, #companion { display: none; }
+    #companion { display: none; }
+    /* Mini mode: the sidebar becomes a slide-over panel instead of dying —
+       the 🛡 toggle (and an arriving approval) must still work here. */
+    aside {
+      position: fixed; top: 34px; right: 0; bottom: 0; z-index: 150;
+      width: min(250px, 82vw);
+      box-shadow: -14px 0 34px rgba(0,0,0,0.5);
+    }
+    aside.closed { display: none; }
     #rail { padding: 5px 10px; }
     .seat .nm { display: none; }
     .seat .face { width: 30px; height: 30px; }
@@ -1448,6 +1456,12 @@
       if (!ev.replay) {
         addLog(`📋 <b>${nameOf("main")}</b> มอบหมายงานให้ <b>${nameOf(ev.target)}</b>`);
         if (target === "ceo") addChip(`📋 มอบหมายงานให้ <b>${nameOf(ev.target)}</b>`);
+      }
+    }
+    else if (ev.type === "ceo.report") {
+      if (!ev.replay) {
+        addLog(`📨 <b>${nameOf("main")}</b> ส่งสรุปงานให้ CEO`);
+        if (target === "ceo") addChip(`📨 <b>${nameOf("main")}</b> เดินมาส่งสรุปงานแล้ว ↑`);
       }
     }
     else if (ev.type === "collab.started") {

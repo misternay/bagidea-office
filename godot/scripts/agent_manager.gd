@@ -222,6 +222,13 @@ func handle(evt: Dictionary) -> void:
 				var t: Dictionary = agents[tgt]
 				a.node.walk_to([t.node.position + Vector3(0.6, 0, 0.4)])
 				t.node.set_status("รับงานใหม่ ✏")
+		"ceo.report":
+			# The round trip closes: the Director walks the summary to the boss.
+			a.node.set_status("ส่งสรุปงานให้ CEO 📋")
+			if is_instance_valid(ceo):
+				a.node.walk_to([ceo.position + Vector3(-0.7, 0, 0.45)])
+				Fx.spawn(ceo, "heart", Vector3(0, 1.3, 0))
+			_clear_status_later(a, 9.0)
 		"subagent.split":
 			# The parent stays at its desk awaiting its clones' reports.
 			_to_desk(a)
@@ -349,11 +356,8 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 	g.set_state("working")
 	g.set_status("👻 " + job.replace("\n", " ").left(26))
 	Fx.spawn(pnode, "warp_in", Vector3(0, -0.2, 0), 0.022)
-	# Materialize…
-	g.modulate.a = 0.0
-	var tw := create_tween()
-	tw.tween_property(g, "modulate:a", 0.55, 0.7)
-	# …rise straight out of the office, then glide onto the deck.
+	# Materialize (set_ghost fades itself in), rise straight out of the
+	# office, then glide onto the deck.
 	g.walk_to([g.position + Vector3(0, 3.6, 0), target])
 
 func _despawn_ghost(sub: String, ok: bool) -> void:
@@ -380,9 +384,7 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 	await get_tree().create_timer(maxf(dur, 0.1) + 0.5).timeout
 	if is_instance_valid(g):
 		Fx.spawn(world, "warp_out", g.position + Vector3(0, -0.2, 0), 0.022)
-		var tw := create_tween()
-		tw.tween_property(g, "modulate:a", 0.0, 0.6)
-		tw.tween_callback(g.queue_free)
+		g.ghost_dissolve()
 
 func _route_hook_to_ghost(id: String, type: String, evt: Dictionary) -> void:
 	if not ghosts.has(id) or not is_instance_valid(ghosts[id].node):

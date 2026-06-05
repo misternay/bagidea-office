@@ -329,6 +329,14 @@ function runClaude(agent, prompt, opts = {}) {
   const acts = [];      // tool trail — feeds the auto-skill reflection
   const subTasks = [];  // SUB: lines collected from the reply
   let lastText = "";
+  // opts.onDone(finalText, ok) fires exactly once when this run truly ends —
+  // if the agent splits, ownership passes to the synthesis run instead.
+  let doneFired = false;
+  const fireDone = (text, ok) => {
+    if (doneFired) return;
+    doneFired = true;
+    if (opts.onDone) try { opts.onDone(text, ok); } catch (e) { console.error("[onDone]", e); }
+  };
   child.stdout.on("data", (c) => {
     buf += c;
     let i;
@@ -381,9 +389,13 @@ function runClaude(agent, prompt, opts = {}) {
         }
         broadcast({ type: m.is_error ? "task.failed" : "task.completed",
           agent, task, session: entry.key });
-        if (!m.is_error && subTasks.length)
-          runSubAgents(agent, entry, subTasks.slice(0, 4));
-        else if (!m.is_error) maybeLearnSkill(agent, task, prompt, acts, lastText);
+        if (!m.is_error && subTasks.length) {
+          doneFired = true;  // the synthesis run inherits the callback
+          runSubAgents(agent, entry, subTasks.slice(0, 4), opts.onDone);
+        } else {
+          fireDone(lastText, !m.is_error);
+          if (!m.is_error) maybeLearnSkill(agent, task, prompt, acts, lastText);
+        }
       }
     }
   });
@@ -391,7 +403,9 @@ function runClaude(agent, prompt, opts = {}) {
   child.on("error", (e) => {
     broadcast({ type: "task.failed", agent, task });
     broadcast({ type: "chat.message", agent, task, text: "adapter error: " + e.message });
+    fireDone("", false);
   });
+  child.on("close", () => fireDone(lastText, !!lastText));
   return task;
 }
 
@@ -413,23 +427,86 @@ function ceoFlow(prompt, session) {
     `Your team:\n${team}\n\n` +
     `Decide how to execute. For anything a team member should own, include a line:\n` +
     `DELEGATE: <agent_id> :: <clear instruction for them>\n` +
-    `(exact format, one per assignment — these are dispatched automatically). ` +
+    `(exact format, one per assignment — these are dispatched automatically, and ` +
+    `each member's result will be REPORTED BACK to you when they finish). ` +
     `Anything not delegated you handle yourself. Reply to the owner with a short ` +
     `plan in the language they used.`;
   return runClaude("main", wrapped, {
     session,
     logPrompt: "👑 (CEO) " + prompt,
-    filterText: (text) => {
-      const keep = [];
-      for (const ln of String(text).split("\n")) {
-        const m = ln.match(/^\s*DELEGATE:\s*([\w฀-๿-]+)\s*::\s*(.+)$/);
-        if (m && reg.agents[m[1]] && m[1] !== "ceo") {
-          broadcast({ type: "task.delegated", agent: "main", target: m[1] });
-          setTimeout(() => runClaude(m[1], m[2]), 4500);  // after the walk
-        } else keep.push(ln);
-      }
-      return keep.join("\n").trim();
-    },
+    filterText: makeDelegateFilter(0, session),
+  });
+}
+
+// ---------------------------------------------------------------- report-back
+// Delegation is a ROUND TRIP: when a delegate finishes (or asks something
+// back), its final text is fed to the Director, who may answer / follow up
+// via more DELEGATE lines (bounded depth), and finally writes the summary
+// the CEO actually reads. Director turns are serialized — two parallel
+// --resume forks of one thread would race its history.
+
+const dirQueue = [];
+let dirBusy = false;
+function queueDirectorTurn(start) {
+  dirQueue.push(start);
+  pumpDirector();
+}
+function pumpDirector() {
+  if (dirBusy || !dirQueue.length) return;
+  dirBusy = true;
+  dirQueue.shift()(() => { dirBusy = false; pumpDirector(); });
+}
+
+// DELEGATE:-line parser shared by the CEO order and every report-back turn.
+// onHit fires per dispatched assignment ("did he hand off more work?").
+function makeDelegateFilter(depth, session, onHit) {
+  return (text) => {
+    const keep = [];
+    for (const ln of String(text).split("\n")) {
+      const m = ln.match(/^\s*DELEGATE:\s*([\w฀-๿-]+)\s*::\s*(.+)$/);
+      if (m && reg.agents[m[1]] && m[1] !== "ceo" && m[1] !== "main") {
+        broadcast({ type: "task.delegated", agent: "main", target: m[1] });
+        if (onHit) onHit();
+        const tgt = m[1], inst = m[2];
+        setTimeout(() => runClaude(tgt, inst, {   // after the hand-over walk
+          onDone: (out, ok) => reportToMain(tgt, out, ok, depth, session),
+        }), 4500);
+      } else keep.push(ln);
+    }
+    return keep.join("\n").trim();
+  };
+}
+
+function reportToMain(fromId, text, ok, depth, session) {
+  const a = reg.agents[fromId] || { name: fromId };
+  const wrapped =
+    `Report back from your team member ${a.name} (${fromId})` +
+    (ok ? "" : " — THE TASK FAILED") + `:\n` +
+    `"""${String(text || "(no result)").slice(0, 6000)}"""\n\n` +
+    (depth < 2
+      ? `If they asked you a question or something is missing, answer / follow ` +
+        `up with a line: DELEGATE: ${fromId} :: <your answer or next instruction> ` +
+        `(exact format — it resumes their session with full context). ` +
+        `If the work is complete, write the final summary for the owner (CEO): ` +
+        `clear, concrete, in the language of the original order.`
+      : `Write the final summary for the owner (CEO) now — clear, concrete, in ` +
+        `the language of the original order. Do not delegate further.`);
+  queueDirectorTurn((release) => {
+    let delegatedMore = false;
+    runClaude("main", wrapped, {
+      session,
+      noSub: true,
+      logPrompt: `📨 รายงานผลจาก ${a.name}`,
+      filterText: depth < 2
+        ? makeDelegateFilter(depth + 1, session, () => { delegatedMore = true; })
+        : undefined,
+      onDone: (_finalText, fOk) => {
+        release();
+        // No further hand-offs → that WAS the summary: walk it to the boss.
+        if (!delegatedMore && fOk)
+          broadcast({ type: "ceo.report", agent: "main" });
+      },
+    });
   });
 }
 
@@ -438,7 +515,7 @@ function ceoFlow(prompt, session) {
 // Each ghost gets its own labeled session in the "@sub" bucket; when the
 // last one reports back, the parent thread is resumed for a synthesis turn.
 
-function runSubAgents(parentId, parentEntry, tasks) {
+function runSubAgents(parentId, parentEntry, tasks, onDone) {
   const stamp = Date.now();
   broadcast({ type: "subagent.split", agent: parentId, count: tasks.length,
     session: parentEntry.key });
@@ -474,7 +551,7 @@ function runSubAgents(parentId, parentEntry, tasks) {
       `All your sub-agents have reported back:\n\n${report}\n\n` +
       `Now synthesize the FINAL answer to the user's original request (earlier ` +
       `in this conversation), in the user's language. Complete but concise.`,
-      { session: parentEntry.key, noSub: true,
+      { session: parentEntry.key, noSub: true, onDone,
         logPrompt: `👻 sub-agents ${tasks.length} ตัวรายงานผลครบแล้ว — สรุปผล` });
   }
 }

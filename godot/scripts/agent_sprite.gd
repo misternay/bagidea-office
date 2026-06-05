@@ -117,15 +117,86 @@ func _exit_tree() -> void:
 var _aura_node: Node3D
 var aura := ""
 var is_ghost := false
+var _ghost_pulse := false
+var _trail_t := 0.0
 
-## Spectral mode for sub-agent clones: translucent, unshaded (self-lit),
-## shadowless, hovering. Call after the node has entered the tree.
+## Spectral mode for sub-agent clones: REALLY ghostly — deeply translucent
+## with a breathing alpha pulse, cool self-lit tint, rising soul-wisp
+## particles and an afterimage trail while gliding. Call after the node has
+## entered the tree.
 func set_ghost() -> void:
 	is_ghost = true
 	shaded = false
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	modulate = Color(0.75, 0.92, 1.2, 0.55)
 	_bob_speed = 1.8
+	modulate = Color(0.66, 0.95, 1.3, 0.0)
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.42, 0.8)
+	tw.tween_callback(func() -> void: _ghost_pulse = true)
+	_add_ghost_wisps()
+
+## The way out: stop pulsing, fade to nothing, free.
+func ghost_dissolve() -> void:
+	_ghost_pulse = false
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(queue_free)
+
+## Soft cyan motes drifting up through the body — the soul is leaking.
+func _add_ghost_wisps() -> void:
+	var p := GPUParticles3D.new()
+	p.amount = 10
+	p.lifetime = 1.7
+	p.preprocess = 1.7
+	p.layers = 2
+	var m := ParticleProcessMaterial.new()
+	m.direction = Vector3(0, 1, 0)
+	m.spread = 20.0
+	m.gravity = Vector3.ZERO
+	m.initial_velocity_min = 0.28
+	m.initial_velocity_max = 0.55
+	m.scale_min = 0.4
+	m.scale_max = 1.0
+	m.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	m.emission_sphere_radius = 0.28
+	m.color = Color(0.6, 0.92, 1.0, 0.5)
+	p.process_material = m
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.09, 0.09)
+	var qm := StandardMaterial3D.new()
+	qm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	qm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	qm.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	qm.vertex_color_use_as_albedo = true
+	qm.emission_enabled = true
+	qm.emission = Color(0.5, 0.85, 1.0)
+	qm.emission_energy_multiplier = 1.4
+	quad.material = qm
+	p.draw_pass_1 = quad
+	p.position = Vector3(0, -0.35, 0)
+	add_child(p)
+
+## A fading copy of the current sprite frame, left behind while moving.
+func _drop_afterimage() -> void:
+	var img := Sprite3D.new()
+	img.texture = texture
+	img.hframes = hframes
+	img.vframes = vframes
+	img.frame = frame
+	img.pixel_size = pixel_size
+	img.billboard = billboard
+	img.shaded = false
+	img.offset = offset
+	img.alpha_cut = alpha_cut
+	img.texture_filter = texture_filter
+	img.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	img.layers = 2
+	img.modulate = Color(0.55, 0.85, 1.25, 0.2)
+	get_parent().add_child(img)
+	img.global_position = global_position
+	var tw := img.create_tween()
+	tw.tween_property(img, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(img.queue_free)
 
 ## Equippable cosmetic aura (elemental ground ring) — picked in the editor.
 func set_aura(element: String) -> void:
@@ -240,6 +311,15 @@ func _process(delta: float) -> void:
 
 	# Idle bob (procedural only — sheet anims carry their own life).
 	_t += delta * _bob_speed
+
+	if _ghost_pulse:
+		# Breathing translucency — never fully there.
+		modulate.a = 0.42 + sin(_t * 1.7) * 0.09
+	if is_ghost and _walking:
+		_trail_t -= delta
+		if _trail_t <= 0.0:
+			_trail_t = 0.15
+			_drop_afterimage()
 	# Sheet art: feet sit 31 px below cell center; node stands at y 0.86
 	# (0.86 / 0.032 ≈ 27 px) → lift by 4 px so feet land exactly on the floor.
 	if _mode == "procedural":
