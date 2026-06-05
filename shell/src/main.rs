@@ -48,32 +48,40 @@ enum UserEvent {
     HideOverlay,
     MiniToggle,
     FeedToggle,
-    Mic,
+    MicDown,
+    MicUp,
     WorldReady,
 }
 
-/// Pop Windows Voice Typing (Win+H) over the focused input — built-in,
-/// offline-capable, speaks Thai. The honest mic on this stack: WebView2
-/// has no Web Speech backend and we have no STT API keys.
-fn send_win_h() {
+/// Synthetic key chords. Voice input = push-to-talk over Windows Voice
+/// Typing: press opens Win+H over the focused input (built-in, offline-
+/// capable, speaks Thai — WebView2 has no Web Speech backend and we have
+/// no STT API keys); release sends Esc to close the panel.
+fn send_keys(keys: &[(u16, bool)]) {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_LWIN,
+        SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_KEYUP,
     };
     unsafe {
-        let mut inputs: [INPUT; 4] = std::mem::zeroed();
-        let keys: [(u16, KEYBD_EVENT_FLAGS); 4] = [
-            (VK_LWIN, 0),
-            (0x48, 0),               // 'H'
-            (0x48, KEYEVENTF_KEYUP),
-            (VK_LWIN, KEYEVENTF_KEYUP),
-        ];
-        for (i, (vk, flags)) in keys.iter().enumerate() {
-            inputs[i].r#type = INPUT_KEYBOARD;
-            inputs[i].Anonymous.ki.wVk = *vk;
-            inputs[i].Anonymous.ki.dwFlags = *flags;
+        let mut inputs: Vec<INPUT> = Vec::with_capacity(keys.len());
+        for (vk, up) in keys {
+            let mut inp: INPUT = std::mem::zeroed();
+            inp.r#type = INPUT_KEYBOARD;
+            inp.Anonymous.ki.wVk = *vk;
+            inp.Anonymous.ki.dwFlags = if *up { KEYEVENTF_KEYUP } else { 0 };
+            inputs.push(inp);
         }
-        SendInput(4, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+        SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32);
     }
+}
+
+fn send_win_h() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_LWIN;
+    send_keys(&[(VK_LWIN, false), (0x48, false), (0x48, true), (VK_LWIN, true)]);
+}
+
+fn send_esc() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
+    send_keys(&[(VK_ESCAPE, false), (VK_ESCAPE, true)]);
 }
 
 const SPLASH_SIZE: f64 = 210.0;
@@ -468,7 +476,8 @@ fn main() {
                 "drag-overlay" => p_overlay.send_event(UserEvent::DragOverlay),
                 "hide" => p_overlay.send_event(UserEvent::HideOverlay),
                 "mini" => p_overlay.send_event(UserEvent::MiniToggle),
-                "mic" => p_overlay.send_event(UserEvent::Mic),
+                "micdown" => p_overlay.send_event(UserEvent::MicDown),
+                "micup" => p_overlay.send_event(UserEvent::MicUp),
                 _ => Ok(()),
             };
         })
@@ -647,10 +656,11 @@ fn main() {
                 }
                 UserEvent::DragOrb => { let _ = orb.drag_window(); }
                 UserEvent::DragOverlay => { let _ = overlay.drag_window(); }
-                UserEvent::Mic => {
+                UserEvent::MicDown => {
                     overlay.set_focus();  // voice typing lands in the focused box
                     send_win_h();
                 }
+                UserEvent::MicUp => send_esc(),
             },
             _ => {}
         }

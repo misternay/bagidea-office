@@ -139,6 +139,10 @@ func set_ghost() -> void:
 	is_ghost = true
 	shaded = false
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# CRITICAL: the default ALPHA_CUT_DISCARD throws away every pixel below
+	# ~0.5 alpha — a 0.45-alpha ghost rendered as NOTHING (and the old pulse
+	# blinked by crossing the cutoff). Real alpha blending for spirits.
+	alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 	_bob_speed = 1.8
 	modulate = Color(0.66, 0.95, 1.3, 0.0)
 	var tw := create_tween()

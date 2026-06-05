@@ -158,6 +158,17 @@
     align-self: flex-start; font-size: 10px; color: rgba(150,165,195,0.65);
     padding: 0 0 0 30px; animation: chipIn 0.25s ease both;
   }
+  .seat .editbtn {
+    position: absolute; top: -5px; right: -5px; width: 17px; height: 17px;
+    border-radius: 50%; background: #28364f; border: 1px solid var(--line);
+    font-size: 9px; line-height: 17px; text-align: center; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s, transform 0.15s; z-index: 3;
+  }
+  .seat:hover .editbtn { opacity: 1; }
+  .seat .editbtn:hover { transform: scale(1.25); background: #3a4f72; }
+  button.rec { background: rgba(255,70,60,0.35) !important; animation: recPulse 0.9s ease infinite; }
+  @keyframes recPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,80,70,0.5); }
+    50% { box-shadow: 0 0 0 7px rgba(255,80,70,0); } }
 
   /* ---- micro-animations: the UI breathes -------------------------------- */
   @keyframes msgIn { from { opacity: 0; transform: translateY(9px) scale(0.985); } }
@@ -526,6 +537,8 @@
   // Live registry from the daemon (roster.sync) — identity source of truth.
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
+  let PROJECTS_CACHE = [];
+  let ACTIVEPROJ = (() => { try { return localStorage.getItem("activeProj") || ""; } catch { return ""; } })();
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -607,6 +620,14 @@
       }
       seat.onclick = () => setTarget(id);
       seat.ondblclick = () => openCard(id);   // ID card: who is this?
+      // Discoverable editing: a pencil appears on hover (double-click is a
+      // secret nobody finds).
+      const ed = document.createElement("div");
+      ed.className = "editbtn";
+      ed.textContent = "✏";
+      ed.title = "แก้ไข " + nameOf(id);
+      ed.onclick = (e) => { e.stopPropagation(); openEditor(id); };
+      seat.appendChild(ed);
       seat.title = id === "ceo"
         ? `${nameOf(id)} — นี่คือคุณเอง สั่งงานที่นี่แล้ว Director จะมารับคำสั่ง`
         : `${nameOf(id)} — ${roleOf(id)} (double-click: ID card)`;
@@ -763,17 +784,36 @@
       uiSnd("click");
   }, true);
 
-  // ---- 🎤 voice typing: any mic button pops Win+H into its input ---------
-  // (Windows' built-in dictation — offline-capable, speaks Thai. WebView2
-  // has no Web Speech backend, so this is the honest path.)
+  // ---- 🎤 push-to-talk: HOLD to dictate, release to stop ------------------
+  // Engine = Windows Voice Typing (offline-capable, speaks Thai): press
+  // opens it over the focused input, release closes it. WebView2 has no
+  // Web Speech backend and we have no STT keys, so this is the honest path.
   function wireMic(btn, input) {
     if (!btn) return;
-    btn.addEventListener("mousedown", (e) => e.preventDefault());  // keep focus flow
-    btn.onclick = () => {
+    btn.title = "🎤 กดค้างเพื่อพูด — ปล่อยเพื่อหยุด";
+    let talking = false;
+    const start = (e) => {
+      e.preventDefault();
+      if (talking) return;
+      talking = true;
+      btn.classList.add("rec");
       if (input) input.focus();
-      if (shellPost) shellPost("mic");
+      if (shellPost) shellPost("micdown");
       else addChip("🎤 ใช้ได้เฉพาะในแอป BagIdea Office (กด Win+H แทนได้)");
     };
+    const stop = () => {
+      if (!talking) return;
+      talking = false;
+      btn.classList.remove("rec");
+      if (shellPost) shellPost("micup");
+      if (input) input.focus();
+    };
+    btn.addEventListener("mousedown", start);
+    btn.addEventListener("touchstart", start);
+    btn.addEventListener("mouseup", stop);
+    btn.addEventListener("mouseleave", stop);
+    btn.addEventListener("touchend", stop);
+    btn.onclick = (e) => e.preventDefault();
   }
   wireMic(document.getElementById("micBtn"), document.getElementById("inp"));
 
@@ -1334,9 +1374,27 @@
   async function openOps(tab) {
     modal.classList.add("open");
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
-    const tabs = `<div class="tabs">${T("jobs", "📋 TASKS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}</div>`;
+    const tabs = `<div class="tabs">${T("proj", "📁 PROJECTS")}${T("jobs", "📋 TASKS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}</div>`;
     let body = "";
-    if (tab === "jobs") {
+    if (tab === "proj") {
+      body = `<div class="field"><label>ACTIVE PROJECT — thread ใหม่จะทำงานในโปรเจคนี้</label>
+          <select id="pActive"></select></div>
+        <div id="plist"></div>
+        <div class="field" style="margin-top:10px"><label>＋ สร้าง / ลงทะเบียนโปรเจค</label>
+          <input id="pName" placeholder="ชื่อโปรเจค" maxlength="60">
+          <div class="assistrow" style="margin-top:6px">
+            <select id="pPlace" style="flex:1"></select>
+          </div>
+          <input id="pPath" placeholder="หรือใส่ full path เอง เช่น D:\\Works\\my-app" style="margin-top:6px;display:none">
+          <button class="bigbtn" id="pAdd" style="margin-top:8px">📁 สร้างโปรเจค</button></div>
+        <div class="field" style="margin-top:10px"><label>📍 PLACES — ชื่อย่อสถานที่เก็บโปรเจค (AI เข้าใจชื่อพวกนี้)</label>
+          <div id="pllist"></div>
+          <div class="assistrow" style="margin-top:6px">
+            <input id="plName" placeholder="ชื่อย่อ เช่น ห้องสมุด" style="width:120px">
+            <input id="plFolder" placeholder="โฟลเดอร์ เช่น D:\\Library" style="flex:1">
+            <button class="primary" id="plAdd">＋</button>
+          </div></div>`;
+    } else if (tab === "jobs") {
       body = `<div id="jlist"></div>
         <div class="field" style="margin-top:10px"><label>＋ สั่งงานใหม่</label>
           <select id="jAgent"></select>
@@ -1384,7 +1442,80 @@
     modalCard.innerHTML = hdr("🗂 OFFICE OPS") + tabs + body;
     modalCard.querySelectorAll(".tab").forEach((t) => (t.onclick = () => openOps(t.dataset.t)));
 
-    if (tab === "jobs") {
+    if (tab === "proj") {
+      const r = await fetch("/projects").then((x) => x.json()).catch(() => ({ projects: [], places: {} }));
+      PROJECTS_CACHE = r.projects || [];
+      // Active-project picker (sticky; applies to NEW threads).
+      const act = modalCard.querySelector("#pActive");
+      act.innerHTML = `<option value="">(ไม่ระบุ — workspace กลาง)</option>` +
+        PROJECTS_CACHE.map((p) => `<option value="${p.id}">${p.name} — ${p.dir}</option>`).join("");
+      act.value = ACTIVEPROJ && PROJECTS_CACHE.some((p) => p.id === ACTIVEPROJ) ? ACTIVEPROJ : "";
+      act.onchange = () => {
+        ACTIVEPROJ = act.value;
+        try { localStorage.setItem("activeProj", ACTIVEPROJ); } catch {}
+      };
+      // Project rows with live status + actions.
+      const box = modalCard.querySelector("#plist");
+      box.innerHTML = PROJECTS_CACHE.length ? "" :
+        `<div style="font-size:11.5px;color:var(--dim)">ยังไม่มีโปรเจค — สร้างข้างล่าง หรือสั่ง Director ว่า "สร้างโปรเจค X ที่ &lt;ชื่อย่อ&gt;"</div>`;
+      for (const p of PROJECTS_CACHE) {
+        const row = document.createElement("div");
+        row.className = "arow";
+        const st = p.open ? `<span style="color:#4ade80">🖥 เปิดอยู่</span>`
+          : p.ai ? `<span style="color:#5ec8ff">🤖 AI กำลังทำงาน</span>`
+          : `<span style="color:var(--dim)">⚪ ปิด</span>`;
+        row.innerHTML = `<div class="meta"><b>📁 ${p.name.replace(/</g, "&lt;")}</b>
+            <span>${p.dir.replace(/</g, "&lt;")} · ${st}</span></div>
+          <div class="winbtn" title="เปิดทำงานต่อ (claude -c)">▶</div>
+          <div class="winbtn" title="เปิดเทอร์มินัลเปล่า">🖥</div>
+          <div class="winbtn" title="เปิดโฟลเดอร์">📂</div>
+          <div class="winbtn hide" title="เอาออกจากรายการ (ไม่ลบไฟล์)">✕</div>`;
+        const b = row.querySelectorAll(".winbtn");
+        b[0].onclick = () => api("/projects/open", { id: p.id, mode: "continue" }).then(() => setTimeout(() => openOps("proj"), 3200));
+        b[1].onclick = () => api("/projects/open", { id: p.id, mode: "shell" }).then(() => setTimeout(() => openOps("proj"), 3200));
+        b[2].onclick = () => api("/projects/open", { id: p.id, mode: "folder" });
+        b[3].onclick = () => api("/projects", { remove: p.id }).then(() => openOps("proj"));
+        box.appendChild(row);
+      }
+      // Create form: place shorthand or manual path.
+      const placeSel = modalCard.querySelector("#pPlace");
+      const placeNames = Object.keys(r.places || {});
+      placeSel.innerHTML = placeNames.map((n) =>
+        `<option value="${n}">📍 ${n} — ${r.places[n]}</option>`).join("") +
+        `<option value="__path">⌨ กำหนด path เอง…</option>`;
+      const pathInp = modalCard.querySelector("#pPath");
+      if (!placeNames.length) { placeSel.value = "__path"; pathInp.style.display = "block"; }
+      placeSel.onchange = () => {
+        pathInp.style.display = placeSel.value === "__path" ? "block" : "none";
+      };
+      modalCard.querySelector("#pAdd").onclick = async () => {
+        const name = modalCard.querySelector("#pName").value.trim();
+        if (!name) return;
+        const payload = { name };
+        if (placeSel.value === "__path") payload.path = pathInp.value.trim();
+        else payload.place = placeSel.value;
+        await api("/projects", payload);
+        openOps("proj");
+      };
+      // Places manager.
+      const pl = modalCard.querySelector("#pllist");
+      pl.innerHTML = placeNames.length ? "" :
+        `<div style="font-size:11px;color:var(--dim)">เช่น "ห้องสมุด" → D:\\Library แล้วสั่งงานว่า "สร้างโปรเจคใหม่ที่ห้องสมุด" ได้เลย</div>`;
+      for (const n of placeNames) {
+        const row = document.createElement("div");
+        row.className = "arow";
+        row.innerHTML = `<div class="meta"><b>📍 ${n}</b><span>${r.places[n].replace(/</g, "&lt;")}</span></div>
+          <div class="winbtn hide" title="ลบชื่อย่อ">✕</div>`;
+        row.querySelector(".winbtn").onclick = () =>
+          api("/places", { name: n, remove: true }).then(() => openOps("proj"));
+        pl.appendChild(row);
+      }
+      modalCard.querySelector("#plAdd").onclick = async () => {
+        const n = modalCard.querySelector("#plName").value.trim();
+        const f = modalCard.querySelector("#plFolder").value.trim();
+        if (n && f) { await api("/places", { name: n, folder: f }); openOps("proj"); }
+      };
+    } else if (tab === "jobs") {
       const sel = modalCard.querySelector("#jAgent");
       for (const aid of Object.keys(ROSTER).filter((x) => x !== "ceo")) {
         const o = document.createElement("option");
@@ -1616,7 +1747,8 @@
       const list = r.sessions || [];
       let cur = SESS[target] ? list.find((s) => s.key === SESS[target]) : null;
       if (!cur) cur = list[0];
-      setThreadLabel(cur ? cur.title : "ยังไม่มี — จะสร้างให้เองเมื่อคุยครั้งแรก");
+      setThreadLabel((cur ? cur.title : "ยังไม่มี — จะสร้างให้เองเมื่อคุยครั้งแรก") +
+        (cur && cur.proj ? " · 📁" : ""));
       const key = cur ? cur.key : null;
       if (CUR[target] !== key || force) {
         CUR[target] = key;
@@ -2021,7 +2153,8 @@
     if (session === "new") SESS[target] = undefined;  // next sends continue it
     await fetch("/chat", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: target, prompt, session }),
+      body: JSON.stringify({ agent: target, prompt, session,
+        project: ACTIVEPROJ || undefined }),  // new threads adopt the project
     });
     refreshThreadBar();  // a fresh thread exists server-side immediately
   }

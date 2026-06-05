@@ -18,6 +18,7 @@ const PACK_MAP := {
 	"door_in": "Door Open 4-1.wav",         # someone walks in / wakes
 	"door_out": "Door Close 4-1.wav",       # off to the bunks
 	"page": "Book Page 1-2.wav",            # notes & paperwork
+	"split": "Fire Whoosh 2-15.wav",        # 💥 the clone burst
 }
 
 var enabled := true
@@ -40,6 +41,7 @@ func _ready() -> void:
 		"door_in": _tone(330.0, 0.12, 14.0),
 		"door_out": _tone(262.0, 0.12, 14.0),
 		"page": _tone(0.0, 0.08, 26.0, "noise"),
+		"split": _tone(0.0, 0.4, 7.0, "noise"),
 	}
 	for key in PACK_MAP:
 		var path := ProjectSettings.globalize_path(PACK + PACK_MAP[key])

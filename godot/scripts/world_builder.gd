@@ -1142,7 +1142,7 @@ func _build_geometry() -> void:
 			_mat(Color(0.16, 0.19, 0.27), 0.45))
 		_box(Vector3(-3.8, 0.3, -8.75), Vector3(0.12, 0.6, 0.6), _mat(Color(0.1, 0.12, 0.18)))
 		_box(Vector3(-2.6, 0.3, -8.75), Vector3(0.12, 0.6, 0.6), _mat(Color(0.1, 0.12, 0.18)))
-		_kit("Large_Monitor_Blue", Vector3(-3.2, 0.66, -8.85), 180.0, 0.3)
+		_kit("Large_Monitor_Blue", Vector3(-3.2, 0.66, -8.85), 0.0, 0.3)
 		_kit("Chair_1", Vector3(-3.2, 0, -7.85), 180.0, 0.6)
 		_kit("Plant_1", Vector3(-2.25, 0, -9.3), 40.0, 1.4)
 	else:

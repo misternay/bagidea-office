@@ -6,6 +6,7 @@ extends Node
 
 const AgentScript := preload("res://scripts/agent_sprite.gd")
 const Fx := preload("res://scripts/fx_factory.gd")
+const Burst := preload("res://scripts/burst_factory.gd")
 
 @onready var world: Node3D = get_node("../World")
 
@@ -406,7 +407,8 @@ func _handle_sub(type: String, evt: Dictionary) -> void:
 				var text := str(evt.get("text", "")).split("\n")[0]
 				ghosts[sub].node.set_status("💬 " + text.left(28))
 		"subagent.done":
-			Sfx.play("whoosh")
+			# Success or failure deserves the RIGHT sound, not a generic woosh.
+			Sfx.play("chime" if bool(evt.get("ok", true)) else "buzz")
 			_despawn_ghost(sub, bool(evt.get("ok", true)))
 
 func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
@@ -436,7 +438,8 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 	ghosts[sub] = {"node": g, "desk": di, "spot": target}
 	g.set_state("working")
 	g.set_status("👻 " + job.replace("\n", " ").left(26))
-	Fx.spawn(pnode, "warp_in", Vector3(0, -0.2, 0), 0.022)
+	Burst.spawn(world, pnode.position)  # 💥 the split moment earns a show
+	Sfx.play("split")
 	# Materialize (set_ghost fades itself in) and HURRY to the deck — on the
 	# walkable graph like everyone else, just much faster, via the glass
 	# stairs in the server room.
@@ -817,8 +820,8 @@ func _spawn_supervisor(tgt: String) -> void:
 	g.set_ghost()
 	g.position = mnode.position + Vector3(0.3, 0, 0.25)
 	g.set_status("คุมงาน → " + str(agents[tgt].node.agent_name) + " 👀")
-	Fx.spawn(mnode, "warp_in", Vector3(0, -0.2, 0), 0.022)
-	Sfx.play("whoosh")
+	Burst.spawn(world, mnode.position)
+	Sfx.play("split")
 	supervising[tgt] = {"ghost": g}
 	_supervise(tgt, g)
 

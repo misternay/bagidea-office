@@ -16,6 +16,7 @@ daemon/mcp_*.json
 daemon/jobs.json
 daemon/notes.json
 daemon/calendar.json
+daemon/projects.json
 
 # Adapter session workspace (keep only the permission-hook config)
 workspace/*

@@ -58,6 +58,7 @@ function loadReg() {
   reg.skills = reg.skills || {};
   reg.tools = Object.keys(BUILTIN_TOOLS);
   reg.mcpServers = reg.mcpServers || {};
+  reg.places = reg.places || {};  // shorthand locations: "ห้องสมุด" → folder
   if (!reg.agents.main) reg.agents.main = {
     name: "Claude", role: "Director", avatar: 7, protected: true,
     prompt: "You are Claude, the Director of this AI agents office. You run " +
@@ -266,6 +267,43 @@ fs.watchFile(NOTES_MD, { interval: 3000 }, () => {
   } catch {}
 });
 
+// ---- 📁 projects: real workspaces agents (and you) actually work in.
+// A project = name + directory. Agents run with cwd there when a thread is
+// bound to it; you can pop a terminal (claude -c) in it yourself, and the
+// daemon detects whether that window is still open via a marker the
+// launcher bakes into the process command line.
+
+const PROJECTS_FILE = path.join(__dirname, "projects.json");
+let projects = loadJson(PROJECTS_FILE, []);  // {id, name, dir, ts}
+const saveProjects = () => fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2));
+let projOpen = new Set();   // project ids with a live terminal window
+const projRuns = {};        // project id -> active AI runs
+
+function projectDir(id) {
+  const p = projects.find((x) => x.id === id);
+  return p ? p.dir : null;
+}
+
+// Terminal liveness: every spawned window carries BAGIDEA_PROJ_<id> in its
+// command line — one WMI sweep finds the survivors.
+function sweepProjects() {
+  const { execFile } = require("child_process");
+  execFile("powershell", ["-NoProfile", "-Command",
+    "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | Select-Object -ExpandProperty CommandLine"],
+    { timeout: 15000 }, (e, out) => {
+      const found = new Set();
+      for (const m of String(out || "").matchAll(/BAGIDEA_PROJ_([\w-]+)/g)) found.add(m[1]);
+      const changed = found.size !== projOpen.size || [...found].some((x) => !projOpen.has(x));
+      projOpen = found;
+      if (changed) broadcast({ type: "projects.changed" }, false);
+    });
+}
+
+function projectStatus() {
+  return projects.map((p) => ({ ...p,
+    open: projOpen.has(p.id), ai: (projRuns[p.id] || 0) > 0 }));
+}
+
 // ---- job runner: per-agent queue + a global cap so the machine breathes.
 const agentBusy = new Set();
 const jobQueue = [];
@@ -353,7 +391,9 @@ setInterval(() => {
   const hb = Number(reg.heartbeatMin || 0);
   if (hb > 0 && now - lastHeartbeat >= hb * 60000 && agentBusy.size === 0)
     heartbeat();
+  sweepProjects();
 }, 30000);
+sweepProjects();
 
 // ---------------------------------------------------------------- adapter
 
@@ -393,6 +433,12 @@ function runClaude(agent, prompt, opts = {}) {
     sess[agent].push(entry);
     isNew = true;
   }
+  // Project binding: a NEW thread adopts the requested project; an existing
+  // thread keeps living in the project it was born in.
+  if (isNew && opts.project && projectDir(opts.project)) entry.proj = opts.project;
+  const projId = entry.proj && projectDir(entry.proj) ? entry.proj : null;
+  const cwd = projId ? projectDir(projId) : WORKSPACE;
+  if (projId) projRuns[projId] = (projRuns[projId] || 0) + 1;
   entry.log = entry.log || [];
   entry.log.push({ who: "you", text: String(opts.logPrompt || prompt).slice(0, 4000), ts: Date.now() });
   while (entry.log.length > 200) entry.log.shift();
@@ -438,7 +484,7 @@ function runClaude(agent, prompt, opts = {}) {
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
   if (entry && entry.sid) args.push("--resume", entry.sid);
   const child = spawn("claude", args, {
-    cwd: WORKSPACE,
+    cwd,
     shell: true,
     env: { ...process.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
   });
@@ -457,6 +503,7 @@ function runClaude(agent, prompt, opts = {}) {
   const fireDone = (text, ok) => {
     if (doneFired) return;
     doneFired = true;
+    if (projId) projRuns[projId] = Math.max(0, (projRuns[projId] || 1) - 1);
     if (opts.onDone) try { opts.onDone(text, ok); } catch (e) { console.error("[onDone]", e); }
   };
   child.stdout.on("data", (c) => {
@@ -519,6 +566,7 @@ function runClaude(agent, prompt, opts = {}) {
           agent, task, session: entry.key });
         if (!m.is_error && subTasks.length) {
           doneFired = true;  // the synthesis run inherits the callback
+          if (projId) projRuns[projId] = Math.max(0, (projRuns[projId] || 1) - 1);
           runSubAgents(agent, entry, subTasks.slice(0, 4), opts.onDone);
         } else {
           fireDone(lastText, !m.is_error);
@@ -553,6 +601,10 @@ function teamList() {
 // The Director can delegate from ANY conversation — talking to him directly
 // in his own pane works exactly like an order through the CEO.
 function directorNote() {
+  const places = Object.entries(reg.places)
+    .map(([n, f]) => `  - "${n}" → ${f}`).join("\n") || "  (ยังไม่มี — ผู้ใช้ตั้งได้ใน 🗂)";
+  const projList = projects.slice(-8)
+    .map((p) => `  - ${p.name} → ${p.dir}`).join("\n") || "  (ยังไม่มี)";
   return `
 
 <system-capability>
@@ -562,12 +614,21 @@ To hand work to a member, include a line EXACTLY in this format:
 DELEGATE: <agent_id> :: <clear, self-contained instruction>
 (one line per assignment — dispatched automatically; their result is reported
 back to you when they finish, so you can answer questions or follow up).
-IMPORTANT: prose like "I'll assign this to X" does NOTHING — only the
+IMPORTANT: prose like assigning work in words does NOTHING — only the
 DELEGATE line dispatches work.
+
+PROJECT SYSTEM — registered places (ชื่อย่อ → โฟลเดอร์):
+${places}
+Existing projects:
+${projList}
+เมื่อผู้ใช้สั่งสร้างโปรเจคใหม่ (เช่น "สร้างโปรเจค test ที่ห้องสมุด") ให้รันคำสั่ง:
+curl -s -X POST http://127.0.0.1:8787/projects -H "content-type: application/json" -d "{\\"name\\":\\"NAME\\",\\"place\\":\\"PLACE\\"}"
+(ใช้ "path" แทน "place" เมื่อผู้ใช้ให้ full path) — แล้วทำงานกับไฟล์ในโฟลเดอร์ของโปรเจคนั้นตรงๆ ได้เลย
+ห้ามสร้างโปรเจคเองโดยผู้ใช้ไม่ได้สั่ง
 </system-capability>`;
 }
 
-function ceoFlow(prompt, session) {
+function ceoFlow(prompt, session, project) {
   broadcast({ type: "ceo.summon", agent: "main" });
   const wrapped =
     `The owner (CEO) has called you over and given this order in person:\n` +
@@ -582,6 +643,7 @@ function ceoFlow(prompt, session) {
     `plan in the language they used.`;
   return runClaude("main", wrapped, {
     session,
+    project,
     logPrompt: "👑 (CEO) " + prompt,
     filterText: makeDelegateFilter(0, session),
   });
@@ -626,7 +688,17 @@ function makeDelegateFilter(depth, session, onHit) {
         if (onHit) onHit();
         const inst = m[2];
         const t = tgt;
+        // Delegates inherit the Director's project workspace: if the
+        // target's latest thread lives elsewhere, give them a fresh one.
+        const ml = sess["main"] || [];
+        const me = session ? ml.find((x) => x.key === session)
+          : (ml.length ? ml.reduce((a, b) => (a.ts > b.ts ? a : b)) : null);
+        const proj = me && me.proj;
+        const tl = sess[t] || [];
+        const te = tl.length ? tl.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
         setTimeout(() => runClaude(t, inst, {   // after the hand-over walk
+          project: proj,
+          session: proj && (!te || te.proj !== proj) ? "new" : undefined,
           onDone: (out, ok) => reportToMain(t, out, ok, depth, session),
         }), 4500);
       } else keep.push(ln);
@@ -683,6 +755,7 @@ function runSubAgents(parentId, parentEntry, tasks, onDone) {
     const subId = parentId + "#s" + (i + 1);
     const entry = { key: "u" + stamp + "_" + i, sid: null, ts: Date.now(),
       title: t.replace(/\s+/g, " ").slice(0, 60), sub: true, parent: parentId,
+      proj: parentEntry.proj,
       log: [{ who: "you", text: "👻 " + t, ts: Date.now() }] };
     sess["@sub"] = sess["@sub"] || [];
     sess["@sub"].push(entry);
@@ -737,8 +810,10 @@ function runSub(parentId, subId, taskText, entry, onDone) {
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
+  // Ghosts work where their parent works (project-bound threads included).
+  const subCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
   const child = spawn("claude", args, {
-    cwd: WORKSPACE, shell: true,
+    cwd: subCwd, shell: true,
     env: { ...process.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: subId, OFFICE_TASK: entry.key },
   });
   child.stdin.write(
@@ -911,16 +986,17 @@ const server = http.createServer((req, res) => {
   } else if (req.method === "POST" && req.url === "/chat") {
     readBody(req, (body) => {
       try {
-        const { agent = "main", prompt, session } = JSON.parse(body);
+        const { agent = "main", prompt, session, project } = JSON.parse(body);
         if (!prompt) throw new Error("no prompt");
-        // Orders to the CEO route through the Director — chain of command.
         // CEO orders route through the Director; talking to the Director
-        // directly gives him the same dispatch power.
-        const task = agent === "ceo" ? ceoFlow(prompt, session)
+        // directly gives him the same dispatch power. New threads adopt the
+        // requested project workspace.
+        const task = agent === "ceo" ? ceoFlow(prompt, session, project)
           : agent === "main"
             ? runClaude("main", prompt + directorNote(),
-                { session, logPrompt: prompt, filterText: makeDelegateFilter(0, session) })
-            : runClaude(agent, prompt, { session });
+                { session, project, logPrompt: prompt,
+                  filterText: makeDelegateFilter(0, session) })
+            : runClaude(agent, prompt, { session, project });
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ task }));
       } catch (e) {
@@ -1120,6 +1196,74 @@ const server = http.createServer((req, res) => {
         res.writeHead(400);
         res.end(String(e.message));
       }
+    });
+
+  } else if (req.method === "GET" && req.url === "/projects") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ projects: projectStatus(), places: reg.places }));
+
+  } else if (req.method === "POST" && req.url === "/projects") {
+    // Register/create a project: name + (place shorthand | full path).
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (p.remove) {
+          projects = projects.filter((x) => x.id !== p.remove);  // unregister only
+          saveProjects();
+          res.writeHead(200); return res.end("ok");
+        }
+        const name = String(p.name || "").trim().slice(0, 60);
+        if (!name) throw new Error("no name");
+        let dir = String(p.path || "").trim();
+        if (!dir && p.place && reg.places[p.place])
+          dir = path.join(reg.places[p.place], name);
+        if (!dir) throw new Error("need place or path");
+        fs.mkdirSync(dir, { recursive: true });
+        const proj = { id: "p" + Date.now(), name, dir, ts: Date.now() };
+        projects.push(proj);
+        saveProjects();
+        broadcast({ type: "projects.changed" }, false);
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(proj));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/projects/open") {
+    // Pop a real window in the project: claude -c / fresh claude / plain
+    // shell / explorer. The window title carries a liveness marker.
+    readBody(req, (body) => {
+      try {
+        const { id, mode = "continue" } = JSON.parse(body);
+        const dir = projectDir(id);
+        if (!dir) { res.writeHead(404); return res.end("unknown project"); }
+        if (mode === "folder") {
+          spawn("explorer", [dir], { detached: true });
+        } else {
+          const inner = mode === "shell" ? "" :
+            mode === "new" ? " && claude" : " && claude -c";
+          spawn("cmd.exe",
+            [`/c start "BAGIDEA_PROJ_${id}" /D "${dir}" cmd /k "title BAGIDEA_PROJ_${id}${inner}"`],
+            { windowsVerbatimArguments: true, windowsHide: true, detached: true });
+          setTimeout(sweepProjects, 2500);
+        }
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/places") {
+    readBody(req, (body) => {
+      try {
+        const { name, folder, remove } = JSON.parse(body);
+        const n = String(name || "").trim().slice(0, 40);
+        if (!n) throw new Error("no name");
+        if (remove) delete reg.places[n];
+        else {
+          if (!folder) throw new Error("no folder");
+          reg.places[n] = String(folder).trim();
+        }
+        saveReg();
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
 
   } else if (req.method === "GET" && req.url === "/jobs") {
