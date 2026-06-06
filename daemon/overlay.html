@@ -290,6 +290,10 @@
   body.feedmode main, body.feedmode footer, body.feedmode #rail,
   body.feedmode #threadBar, body.feedmode #sideTab,
   body.feedmode header { display: none !important; }
+  /* Belt + braces: popups can NEVER haunt the feed strip, whatever JS state
+     they were left in (the "modal stuck in feed mode" report). */
+  body.feedmode #modal, body.feedmode #fsPick, body.feedmode #sessMenu,
+  body.feedmode #dayMenu { display: none !important; }
   /* Mouse-over = reading: the glass turns near-solid so text pops. */
   body.feedmode { background: rgba(4, 7, 13, 0.92); transition: background 0.3s; }
   body.feedmode:hover { background: rgba(4, 7, 13, 0.985); }
@@ -322,6 +326,38 @@
   }
   .fitem .fpbtns .ok { color: #4ade80; border-color: #4ade8055; }
   .fitem .fpbtns .no { color: #ff8a7a; border-color: #ff584855; }
+
+  /* ---- 🔵 NOW WORKING — what every agent is doing, impossible to miss ---- */
+  #nowStrip {
+    display: none; flex-wrap: wrap; gap: 4px; padding: 5px 10px 1px;
+    border-bottom: 1px solid var(--line); background: rgba(94,200,255,0.045);
+  }
+  #nowStrip.on { display: flex; }
+  body.feedmode #nowStrip { display: none !important; }
+  .nowchip {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+    font-size: 10.5px; color: #cfe3ff; padding: 3px 9px 3px 6px;
+    background: rgba(94,200,255,0.1); border: 1px solid rgba(94,200,255,0.35);
+    border-radius: 999px; cursor: pointer; margin-bottom: 4px;
+    animation: chipIn 0.25s ease both;
+  }
+  .nowchip:hover { border-color: var(--accent); }
+  .nowchip .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #5ec8ff; flex: none;
+    animation: nowpulse 1.1s ease-in-out infinite;
+  }
+  .nowchip b { color: #8fd4ff; font-weight: 700; }
+  .nowchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @keyframes nowpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  /* feed mode: same chips in a slim strip under the head bar */
+  #feedTasks { display: none; }
+  body.feedmode #feedTasks {
+    display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;
+    position: fixed; top: 32px; left: 6px; right: 6px; padding: 3px 2px 0;
+    max-height: 84px; overflow-y: auto; z-index: 3;
+  }
+  body.feedmode.hastasks #feed { top: 64px; }
+  @media (max-width: 480px), (max-height: 460px) { #nowStrip { display: none !important; } }
   #feedEmpty {
     color: rgba(140, 158, 188, 0.55); font-size: 11px; text-align: center;
     padding: 10px 0;
@@ -535,6 +571,9 @@
   <div class="winbtn hide" id="hideBtn" title="Hide (chat head brings it back)">—</div>
 </header>
 
+<!-- 🔵 live work strip: every running task, front and center -->
+<div id="nowStrip"></div>
+
 <div id="rail"></div>
 
 <main>
@@ -563,6 +602,7 @@
   <span>📡 OFFICE FEED</span>
   <button id="feedClear" title="ล้างรายการ log">🧹 ล้าง</button><span id="feedConn"></span>
 </div>
+<div id="feedTasks"></div>
 <div id="feed">
   <div id="feedEmpty">— เงียบสงบ… รอความเคลื่อนไหวในออฟฟิศ —</div>
 </div>
@@ -1028,6 +1068,41 @@
     }
     el.classList.remove("alert");
     return true;
+  }
+
+  // ---- 🔵 NOW WORKING: live map of every running task ----------------------
+  // Built from task.started/completed/failed (replays too, so a reloaded
+  // overlay rebuilds it); entries older than 30 min are assumed orphaned.
+  const RUNNING = new Map();   // task -> {agent, title, session, ts}
+  function trackRunning(ev) {
+    if (ev.theater || String(ev.agent || "").includes("#")) return;
+    if (ev.type === "task.started")
+      RUNNING.set(ev.task, { agent: ev.agent, title: ev.title || "",
+        session: ev.session || "", ts: ev.ts || Date.now() });
+    else if (ev.type === "task.completed" || ev.type === "task.failed")
+      RUNNING.delete(ev.task);
+    else return;
+    renderRunning();
+  }
+  function renderRunning() {
+    const now = Date.now();
+    for (const [k, v] of RUNNING) if (now - v.ts > 30 * 60000) RUNNING.delete(k);
+    const strip = document.getElementById("nowStrip");
+    const ftask = document.getElementById("feedTasks");
+    strip.classList.toggle("on", RUNNING.size > 0);
+    document.body.classList.toggle("hastasks", RUNNING.size > 0);
+    for (const box of [strip, ftask]) {
+      box.innerHTML = "";
+      for (const [task, v] of RUNNING) {
+        const c = document.createElement("div");
+        c.className = "nowchip";
+        c.title = v.title || task;
+        c.innerHTML = `<span class="dot"></span><b>${nameOf(v.agent)}</b>` +
+          `<span>${(v.title || "กำลังทำงาน…").replace(/</g, "&lt;").slice(0, 64)}</span>`;
+        if (box === strip) c.onclick = () => { setTarget(v.agent); };
+        box.appendChild(c);
+      }
+    }
   }
   // One mirror for everything worth glancing at while streaming/debugging.
   function feedRoute(ev) {
@@ -2394,6 +2469,7 @@
     // Replay Theater is gone — ignore any stale theater frames from old
     // journals so they can never animate anything.
     if (ev.theater || String(ev.type).startsWith("theater.")) return;
+    trackRunning(ev);  // 🔵 the NOW-WORKING strips (replays rebuild state)
     feedRoute(ev);  // the 📡 feed mirrors everything glanceable
 
     // Ghost traffic peels off before anything can mint a rail seat for it.

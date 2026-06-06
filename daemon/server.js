@@ -285,6 +285,7 @@ let projWin = {};           // project id -> visible (true) / hidden (false)
 const projRuns = {};        // project id -> active AI run count
 const projAgents = {};      // project id -> {agentId: run count} (who's working)
 const WINPROJ = path.join(__dirname, "winproj.ps1");
+const LIVEVIEW = path.join(__dirname, "liveview.ps1");
 
 function winproj(action, id, cb) {
   const { execFile } = require("child_process");
@@ -441,8 +442,8 @@ function projectStatus() {
     agents: Object.keys(projAgents[p.id] || {}) }));
 }
 
-// Snappier liveness: the window sweep runs every 10 seconds.
-setInterval(sweepProjects, 10000);
+// Serious window watching: sweep every 5s, plus on every /projects read.
+setInterval(sweepProjects, 5000);
 
 // ---- job runner: per-agent queue + a global cap so the machine breathes.
 const agentBusy = new Set();
@@ -578,6 +579,16 @@ function runClaude(agent, prompt, opts = {}) {
   // A stale binding (project unregistered/recreated) heals instead of
   // silently dropping the run back into the workspace.
   if (entry.proj && !projectDir(entry.proj)) entry.proj = null;
+  // Mentioning a DIFFERENT project than this thread's home forks a fresh
+  // thread there — the work must genuinely run inside the named project
+  // (same rule delegates already follow), never cross-write from afar.
+  if (!isNew && opts.project && projectDir(opts.project) &&
+      entry.proj && entry.proj !== opts.project) {
+    entry = { key: "s" + Date.now(), sid: null, ts: Date.now(),
+      title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 48), log: [] };
+    sess[agent].push(entry);
+    isNew = true;
+  }
   if (opts.project && projectDir(opts.project) && (isNew || !entry.proj))
     entry.proj = opts.project;
   const projId = entry.proj && projectDir(entry.proj) ? entry.proj : null;
@@ -605,7 +616,9 @@ function runClaude(agent, prompt, opts = {}) {
   saveSess();
   if (opts.onEntry) try { opts.onEntry(entry.key); } catch {}
 
-  broadcast({ type: "task.started", agent, task, session: entry.key });
+  broadcast({ type: "task.started", agent, task, session: entry.key,
+    // The overlay's NOW-WORKING strip needs to SAY what the work is.
+    title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 90) });
 
   // Persona + assigned skills ride in a stdin preamble (robust across
   // Windows shell quoting); resumed sessions already carry it in context.
@@ -1410,6 +1423,7 @@ const server = http.createServer((req, res) => {
     });
 
   } else if (req.method === "GET" && req.url === "/projects") {
+    sweepProjects();  // freshen window truth in the background for next read
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ projects: projectStatus(), places: reg.places }));
 
@@ -1481,8 +1495,8 @@ const server = http.createServer((req, res) => {
           // finds exactly OUR window — WT shares one process across every
           // window, so titles are the only safe handle.
           const line = HAS_WT
-            ? `/c start "" "${WT_EXE}" -w new new-tab --title "${title}" --suppressApplicationTitle -d "${dir}" powershell -NoLogo -NoExit ${psCmd}`
-            : `/c start "${title}" /D "${dir}" conhost.exe powershell -NoLogo -NoExit ${psCmd}`;
+            ? `/c start "" "${WT_EXE}" -w new new-tab --title "${title}" --suppressApplicationTitle -d "${dir}" powershell -NoLogo -NoExit -ExecutionPolicy Bypass ${psCmd}`
+            : `/c start "${title}" /D "${dir}" conhost.exe powershell -NoLogo -NoExit -ExecutionPolicy Bypass ${psCmd}`;
           spawn("cmd.exe", [line],
             { windowsVerbatimArguments: true, windowsHide: true, detached: true });
         };
@@ -1491,15 +1505,29 @@ const server = http.createServer((req, res) => {
         } else if (mode === "shell") {
           // Plain shell, no marker — not counted as "project open".
           launch("", path.basename(dir));
+        } else if (id in projWin) {
+          // ONE window per project, always: if it exists (even hidden),
+          // surface THAT — never spawn a second one on top of it.
+          winproj("show", id, () => sweepProjects());
         } else {
           ensureTrusted(dir);  // no trust dialog ambush in the new window
-          // Smart entry: resume the NEWEST session explicitly — straight into
-          // where the work happened (claude -c ignores headless-born sessions
-          // and -r dumps a picker nobody asked for). Fresh claude only when
-          // the project has no sessions yet.
-          const sid = newestSid(dir);
-          const cmd = sid ? `claude --resume ${sid}` : "claude";
-          launch(`-Command "${cmd} #BAGIDEA_PROJ_${id}"`, `BAGIDEA_PROJ_${id}`);
+          if ((projRuns[id] || 0) > 0) {
+            // An agent is working RIGHT NOW. Resuming its session mid-run
+            // would fork the thread — instead the window opens as a LIVE
+            // VIEW of the agent's session, and the moment the run ends it
+            // hands the SAME session over to the user (claude --resume).
+            const sd = claudeSessionDir(dir).replace(/'/g, "''");
+            launch(`-Command "& '${LIVEVIEW.replace(/'/g, "''")}' -Dir '${sd}' -Proj '${id}' #BAGIDEA_PROJ_${id}"`,
+              `BAGIDEA_PROJ_${id}`);
+          } else {
+            // Smart entry: resume the NEWEST session explicitly — straight
+            // into where the work happened (claude -c ignores headless-born
+            // sessions and -r dumps a picker nobody asked for). Fresh claude
+            // only when the project has no sessions yet.
+            const sid = newestSid(dir);
+            const cmd = sid ? `claude --resume ${sid}` : "claude";
+            launch(`-Command "${cmd} #BAGIDEA_PROJ_${id}"`, `BAGIDEA_PROJ_${id}`);
+          }
           setTimeout(sweepProjects, 2500);
         }
         res.writeHead(200); res.end("ok");

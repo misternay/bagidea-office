@@ -100,6 +100,19 @@ fn send_win_h() {
     send_keys(&[(VK_LWIN, false), (0x48, false), (0x48, true), (VK_LWIN, true)]);
 }
 
+/// Voice typing lands wherever the FOREGROUND focus is — and plain
+/// set_focus loses to the Windows foreground lock when we're a background
+/// process. A synthetic ALT tap counts as "recent user input" and unlocks
+/// SetForegroundWindow (the classic, documented escape hatch).
+fn force_foreground(hwnd: HWND) {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_MENU;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+    send_keys(&[(VK_MENU, false), (VK_MENU, true)]);
+    unsafe {
+        SetForegroundWindow(hwnd);
+    }
+}
+
 fn send_esc() {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
     send_keys(&[(VK_ESCAPE, false), (VK_ESCAPE, true)]);
@@ -647,9 +660,28 @@ fn main() {
                 if e.id == hk.id() {
                     match e.state {
                         global_hotkey::HotKeyState::Pressed => {
+                            // Summon the overlay if it's parked off-screen —
+                            // dictation needs a real, visible, FOREGROUND box.
+                            let hidden = overlay
+                                .outer_position()
+                                .map(|p| p.x < -2000)
+                                .unwrap_or(true);
+                            if hidden {
+                                let (px, py) = if feed {
+                                    (feed_x, feed_y)
+                                } else {
+                                    (overlay_x, overlay_y)
+                                };
+                                overlay.set_outer_position(LogicalPosition::new(px, py));
+                                raise_orb(&orb);
+                            }
                             overlay.set_focus();
+                            force_foreground(overlay.hwnd() as HWND);
                             let _ = overlay_view
                                 .evaluate_script("window.pttStart && pttStart()");
+                            // Let focus actually land before Win+H opens the
+                            // panel, or it attaches to the wrong window.
+                            std::thread::sleep(std::time::Duration::from_millis(230));
                             send_win_h();
                         }
                         global_hotkey::HotKeyState::Released => {
@@ -738,10 +770,11 @@ fn main() {
                     feed = !feed;
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
-                    // A REAL overlay: mouse passes straight through, and the
-                    // whole strip is translucent (uniform layered alpha — the
-                    // one WebView2-safe transparency on this machine).
-                    let _ = overlay.set_ignore_cursor_events(feed);
+                    // The strip is translucent (uniform layered alpha — the
+                    // one WebView2-safe transparency on this machine) but it
+                    // STAYS interactive: scrollback, the clear button and the
+                    // allow/deny cards all need real mouse events.
+                    let _ = overlay.set_ignore_cursor_events(false);
                     unsafe {
                         let hwnd = overlay.hwnd() as HWND;
                         let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
@@ -769,6 +802,8 @@ fn main() {
                 UserEvent::DragOverlay => { let _ = overlay.drag_window(); }
                 UserEvent::MicDown => {
                     overlay.set_focus();  // voice typing lands in the focused box
+                    force_foreground(overlay.hwnd() as HWND);
+                    std::thread::sleep(std::time::Duration::from_millis(160));
                     send_win_h();
                 }
                 UserEvent::MicUp => send_esc(),
