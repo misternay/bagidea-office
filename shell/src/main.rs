@@ -117,11 +117,6 @@ fn force_foreground(hwnd: HWND) {
     }
 }
 
-fn send_esc() {
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
-    send_keys(&[(VK_ESCAPE, false), (VK_ESCAPE, true)]);
-}
-
 const SPLASH_SIZE: f64 = 210.0;
 
 // Boot splash: a floating circular logo card (same region trick as the chat
@@ -697,7 +692,11 @@ fn main() {
                         }
                         global_hotkey::HotKeyState::Released => {
                             ptt_held = false;
-                            send_esc();
+                            // Win+H TOGGLES voice typing — closing with the
+                            // same chord works from anywhere, while Esc only
+                            // works when the panel itself has focus (it kept
+                            // getting stranded open).
+                            send_win_h();
                             let _ = overlay_view
                                 .evaluate_script("window.pttEnd && pttEnd()");
                         }
@@ -818,7 +817,7 @@ fn main() {
                     std::thread::sleep(std::time::Duration::from_millis(160));
                     send_win_h();
                 }
-                UserEvent::MicUp => send_esc(),
+                UserEvent::MicUp => send_win_h(),  // toggle the panel closed
                 UserEvent::SetHotkey(s) => {
                     if let Some(m) = hk_mgr.as_ref() {
                         if let Some(old) = cur_hotkey {

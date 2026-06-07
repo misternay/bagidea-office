@@ -478,12 +478,16 @@
   }
   #modalCard h3 { font-size: 13px; letter-spacing: 2px; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
   #modalCard h3 .x { margin-left: auto; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  /* Tabs share the row evenly — one line ALWAYS, scrollbar or not. */
+  .tabs { display: flex; gap: 5px; margin-bottom: 12px; }
   .tabs .tab {
-    font-size: 11.5px; padding: 5px 12px; border-radius: 8px; cursor: pointer;
+    flex: 1 1 0; min-width: 0; text-align: center;
+    font-size: 11px; padding: 5px 2px; border-radius: 8px; cursor: pointer;
     border: 1px solid var(--line); color: var(--dim); background: rgba(255,255,255,0.03);
-    white-space: nowrap;  /* a tab never wraps into a taller pill */
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  /* Edge's native password-reveal eye is black-on-black on our theme. */
+  input::-ms-reveal { filter: invert(0.85); }
   .tabs .tab.on { color: var(--accent); border-color: var(--accent); background: rgba(94,200,255,0.1); }
   .arow {
     display: flex; gap: 10px; align-items: center; padding: 7px 9px;
