@@ -5,6 +5,8 @@
 
 Not a dashboard. Not a chat window. A **world** that renders the true state of your AI agents — Claude Code sessions, headless agent runs, custom scripts — as living pixel-art employees, behind your desktop icons.
 
+🌐 **Website:** the landing page + browsable docs live in [`web/`](web/) (deployable to any static host).
+
 ![The office, alive on a real desktop — night shift, Ghost Deck glowing](docs/img/world.png)
 *A real desktop, captured live: agents at their desks at 4 AM, the floating Ghost Deck glowing top-right, garden lamps on, desktop icons rendering on top — this is a real wallpaper.*
 
@@ -49,6 +51,12 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 - The idle **Director makes rounds** through the office instead of standing still; the CEO paces the executive floor (that's you)
 - **Mission Control board** in-world: one card per running task, colored by state; lobby status totem shows daemon connectivity (truth, not decoration)
 - Branded boot: a transparent floating logo splash + a pulsing circular logo card — never a black box
+
+### 🧩 Extensibility & customization (2026-06)
+- **Plugins**: a real extension host — a plugin folder adds UI panels, server routes, and **commands agents can drive**. Ships with a **🎵 Music Player** (control from the panel or by asking an agent); write your own per [the guide](docs/guide/plugins.md)
+- **🎨 Office Editor**: place furniture / walls / decor on a top-down grid and **import your own models (.glb/.gltf/.fbx) and images** — spawned on top of the world, atmosphere intact
+- **🌐 Multi-language UI**: English default, Thai included, picker in settings (per-machine default)
+- **🌍 Official website** in [`web/`](web/) — landing page + browsable docs, deployable to any static host
 
 ### 🎤 Voice, channels, memory & media (2026-06)
 - **Voice in / out**: hold-to-record in the webview → **OpenAI Whisper / Gemini** transcription (no Windows dictation panel); **F6** speaks a command straight to the CEO; agents can be given **anime-style Gemini TTS voices** (8 presets, per-agent, gimmick `SPEAK:` announcements); **📞 realtime voice chat** bridges your mic to **Gemini Live** with the office's own knowledge in context
@@ -398,7 +406,10 @@ bagidea version               current build
 | `GET /features` · `GET /stats` | feature gates · dashboard data |
 | `GET/POST /office-md` | shared OFFICE.md memory |
 | `GET /proposals` · `POST /proposals/respond` | team project pitches |
-| `POST /registry/tts` · `/registry/social` | voice + social toggles |
+| `POST /registry/tts` · `/registry/social` · `/registry/lang` | voice · social · language |
+| `POST /registry/key/test` | verify a main key works |
+| `GET /plugins` · `POST /plugins/reload` · `/plugin/<id>/...` | plugin host |
+| `GET/POST /layout` | Office Editor layout (→ `layout.changed`) |
 | `GET /health` | liveness (`{clients, pendingPerms, wt}`) |
 
 ## Event protocol (OEP)
@@ -446,6 +457,8 @@ remain (FSR scale, grass density, cinema pass) if you want it leaner.
 | [Projects](docs/guide/projects.md) | places · สร้าง/เปิด/ดูงานสด/ลบโปรเจค |
 | [AI features](docs/guide/ai-features.md) | main keys · เสียง/TTS/realtime · รูปภาพ · ความจำ · social |
 | [เสียง & Feed mode](docs/guide/voice-feed.md) | F6 push-to-talk · feed mode · NOW WORKING |
+| [Office Editor](docs/guide/editor.md) | จัดเฟอร์นิเจอร์/กำแพง · import โมเดล/รูป |
+| [Plugins](docs/guide/plugins.md) | ระบบส่วนขยาย · music player · เขียน plugin เอง |
 | [Office Ops](docs/guide/office-ops.md) | งานตั้งเวลา · ปฏิทิน · กระดานโน้ต · ผังองค์กร |
 | [Channels](docs/guide/channels.md) | ต่อ Telegram / Discord / LINE ทีละขั้น |
 | [CLI](docs/guide/cli.md) | ทุกคำสั่ง `bagidea` พร้อมตัวอย่าง |
@@ -485,6 +498,7 @@ this makes them employable"*).
 - [x] Hermes-style memory (OFFICE.md + per-agent), main keys + feature gates
 - [x] Attachments & inline media, AI image generation system tool
 - [x] Social office + project proposals, dashboard, CLI v2
+- [x] **Plugins** (host + music player + SDK), **Office Editor** (place/import), **i18n**, official **website**
 - [ ] Wake word; channel round-trip reports (delegate results back to the channel)
 - [ ] macOS/Linux wallpaper backends
 - [ ] Signed binary releases (skip the Rust build on install)
