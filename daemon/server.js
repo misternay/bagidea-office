@@ -103,7 +103,8 @@ function rosterEvt() {
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
-    features: featuresMap() };
+    features: featuresMap(), tts: reg.tts !== false,
+    socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60) };
 }
 
 // Structured persona → one compiled system prompt (editor v2 fields).
@@ -131,22 +132,29 @@ function slugId(name) {
 async function maybeLearnSkill(agent, task, prompt, acts, finalText) {
   if (reg.autoSkills === false || acts.length < 3) return;
   const existing = Object.values(reg.skills).map((s) => s.name).join(", ") || "(none)";
+  // ONE reflection call distills both: a reusable skill AND durable memory
+  // facts (Hermes-style growth without doubling the token bill).
   const out = await claudeText(
     `An AI office agent "${agent}" just completed a task.\n` +
     `Task prompt: ${String(prompt).slice(0, 600)}\n` +
     `Tools used in order: ${acts.join(" -> ")}\n` +
     `Final report: ${String(finalText).slice(0, 800)}\n\n` +
     `Existing skills: ${existing}\n\n` +
-    `If this work contains a REUSABLE, GENERALIZABLE procedure not already ` +
-    `covered by an existing skill, distill it. Output STRICT JSON only:\n` +
-    `{"name":"short-kebab-name","description":"one line","content":"imperative ` +
-    `step-by-step instructions, max 12 lines"}\n` +
-    `If nothing is worth saving, output exactly: NONE`);
+    `Two reflections, output STRICT JSON only:\n` +
+    `{"skill": {"name":"short-kebab-name","description":"one line",` +
+    `"content":"imperative step-by-step instructions, max 12 lines"} | null,\n` +
+    ` "memory": ["short durable fact about the owner/projects/preferences ` +
+    `worth remembering across conversations (Thai)", ...max 2] | null}\n` +
+    `skill = null unless this contains a REUSABLE, GENERALIZABLE procedure ` +
+    `not covered by an existing skill. memory = null unless something is ` +
+    `genuinely worth remembering forever. Be strict; most tasks yield null/null.`);
   const m = out.match(/\{[\s\S]*\}/);
   if (!m) return;
   try {
-    const sk = JSON.parse(m[0]);
-    if (!sk.name || !sk.content) return;
+    const j = JSON.parse(m[0]);
+    if (Array.isArray(j.memory)) memAppend(agent, j.memory.slice(0, 2));
+    const sk = j.skill;
+    if (!sk || !sk.name || !sk.content) return;
     const id = slugId(sk.name);
     if (reg.skills[id]) return;
     reg.skills[id] = {
@@ -253,6 +261,58 @@ const NOTES_MD = path.join(WORKSPACE, "notes.md");
 function loadJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return fallback; }
 }
+// ---- 🧠 office memory (Hermes-style, token-lean) --------------------------
+// Two layers, both PLAIN FILES the agents can read and grep themselves:
+//   workspace/OFFICE.md        — shared knowledge about the owner/org
+//   workspace/memory/<id>.md   — what each agent has learned, one bullet
+//                                per fact, auto-distilled after real work
+// Injection stays TINY: fresh sessions get only the last few bullets plus
+// pointers — full recall is on-demand (Read/Grep), never preloaded.
+const OFFICE_MD = path.join(WORKSPACE, "OFFICE.md");
+const MEM_DIR = path.join(WORKSPACE, "memory");
+fs.mkdirSync(MEM_DIR, { recursive: true });
+if (!fs.existsSync(OFFICE_MD)) {
+  fs.writeFileSync(OFFICE_MD,
+    "# OFFICE.md — ข้อมูลกลางของออฟฟิศ\n\n" +
+    "(เจ้าของแก้ไฟล์นี้ได้จากหน้า 🗂 NOTES — agents ทุกตัวรู้ว่าไฟล์นี้อยู่ที่ไหน " +
+    "และจะเปิดอ่านเมื่อเกี่ยวข้องกับงานเท่านั้น)\n\n" +
+    "## เกี่ยวกับเจ้าของ\n- \n\n## กฎของออฟฟิศ\n- \n");
+}
+function memFile(agent) {
+  return path.join(MEM_DIR, String(agent).replace(/[^\w-]/g, "_") + ".md");
+}
+function memTail(agent, n) {
+  try {
+    const lines = fs.readFileSync(memFile(agent), "utf8").split("\n")
+      .filter((l) => l.trim().startsWith("- "));
+    return lines.slice(-n);
+  } catch { return []; }
+}
+function memAppend(agent, facts) {
+  if (!facts || !facts.length) return;
+  const file = memFile(agent);
+  let cur = "";
+  try { cur = fs.readFileSync(file, "utf8"); } catch {}
+  const fresh = facts
+    .map((f) => String(f).replace(/\s+/g, " ").trim().slice(0, 200))
+    .filter((f) => f && !cur.includes(f));
+  if (!fresh.length) return;
+  if (!cur) cur = `# ความจำของ ${agent}\n\n`;
+  fs.appendFileSync(file, fresh.map((f) => `- ${f}`).join("\n") + "\n");
+  broadcast({ type: "memory.learned", agent, count: fresh.length }, false);
+}
+// The note every fresh session carries — pointers + a short tail, never the
+// whole archive.
+function memoryNote(agent) {
+  const tail = memTail(agent, 8);
+  return `\n<office-memory>\n` +
+    `ข้อมูลกลางออฟฟิศ: workspace/OFFICE.md (เปิดอ่านเฉพาะเมื่อเกี่ยวกับงาน)\n` +
+    `สมุดความจำถาวรของคุณ: workspace/memory/${String(agent).replace(/[^\w-]/g, "_")}.md ` +
+    `— พบข้อเท็จจริงสำคัญเกี่ยวกับเจ้าของ/งานที่ควรจำข้ามบทสนทนา ให้เติมบรรทัด "- ..." สั้นๆ เอง\n` +
+    (tail.length ? `ความจำล่าสุดของคุณ:\n${tail.join("\n")}\n` : "") +
+    `</office-memory>\n`;
+}
+
 // ---- 📊 office stats: per-day run counts + spend, for the dashboard.
 const STATS = path.join(__dirname, "stats.json");
 let stats = loadJson(STATS, {});
@@ -448,10 +508,14 @@ function sweepProjects() {
 // they work its real directory, full authority, summary on finish.
 function projectNote() {
   if (!projects.length && !Object.keys(reg.places).length &&
-      !Object.keys(reg.apiKeys || {}).length) return "";
+      !Object.keys(reg.apiKeys || {}).length && !featuresMap().image) return "";
   const keysLine = Object.keys(reg.apiKeys || {}).length
     ? `\nAPI keys ที่ตั้งค่าไว้ใน env ของคุณแล้ว (เรียกใช้ได้ทันที): ${Object.keys(reg.apiKeys).join(", ")}`
     : "";
+  const sysTools = featuresMap().image ? `
+เครื่องมือกลางของออฟฟิศ (เรียกผ่าน Bash ได้เลย):
+- 🖼 สร้างภาพ AI: curl -s -X POST http://127.0.0.1:8787/gen/image -H "content-type: application/json" -d "{\\"prompt\\":\\"<english prompt>\\"}"
+  → ได้ {"path": "..."} — ใส่ path นั้นในคำตอบ แชทของเจ้าของจะแสดงรูปอัตโนมัติ` : "";
   const list = projects.map((p) => `- ${p.name} → ${p.dir}`).join("\n") || "(ยังไม่มี)";
   const places = Object.entries(reg.places)
     .map(([n, f]) => `- "${n}" → ${f}`).join("\n") || "(ไม่มี)";
@@ -471,7 +535,7 @@ ${places}
 อย่าเปิดหน้าต่างรบกวนผู้ใช้; ถ้าจำเป็นต้องเปิดจริงๆ จนไม่มีทางอื่น ให้รันคำสั่งเปิดตรงๆ
 แล้วระบบ Security จะขอ allow จากผู้ใช้ให้เอง.
 กฎเหล็ก: server/process ทุกตัวที่คุณเปิดเพื่อทดสอบ (dev server, next start, ฯลฯ)
-ต้องปิดให้หมดก่อนจบงาน — ห้ามทิ้งโปรเซสค้างไว้ในเครื่องผู้ใช้เด็ดขาด.${keysLine}
+ต้องปิดให้หมดก่อนจบงาน — ห้ามทิ้งโปรเซสค้างไว้ในเครื่องผู้ใช้เด็ดขาด.${keysLine}${sysTools}
 </office-projects>`;
 }
 
@@ -572,6 +636,7 @@ setInterval(() => {
   const hb = Number(reg.heartbeatMin || 0);
   if (hb > 0 && now - lastHeartbeat >= hb * 60000 && agentBusy.size === 0)
     heartbeat();
+  socialTick(now);
   sweepProjects();
 }, 30000);
 sweepProjects();
@@ -690,6 +755,7 @@ function runClaude(agent, prompt, opts = {}) {
     }
     preamble += `\nกระดานโน้ตกลางของออฟฟิศ: ไฟล์ notes.md ใน workspace — ` +
       `อ่านได้ และเพิ่มบรรทัด "- ข้อความ" เพื่อฝากโน้ตถึง CEO ได้\n`;
+    preamble += memoryNote(agent);
     preamble += "</persona>\n\n";
   }
 
@@ -709,7 +775,19 @@ function runClaude(agent, prompt, opts = {}) {
   // The split capability + project map ride on the wire only — never in
   // the chat log.
   const canSplit = !opts.noSub && !agent.includes("#");
-  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + projectNote());
+  // 🗣 a voiced agent may SPEAK — rarely, as a gimmick, never every message.
+  const canSpeak = reg.tts !== false && a && a.voice &&
+    featuresMap().tts && !agent.includes("#");
+  const VOICE_NOTE = canSpeak ? `
+
+<voice-capability>
+คุณมีเสียงพูดจริงในออฟฟิศ. เฉพาะเมื่อ "ควรประกาศ" จริงๆ (งานสำคัญเสร็จ, มีเรื่องเด่น
+ต้องบอกเจ้าของ) ให้จบคำตอบด้วยบรรทัด:
+SPEAK: <ประโยคพูดสั้นๆ เป็นธรรมชาติ ภาษาเดียวกับเจ้าของ>
+ส่วนใหญ่ของข้อความ "ไม่ต้องพูด" — นี่คือสีสัน ไม่ใช่การอ่านทุกอย่าง.
+ข้อยกเว้น: ถ้าเจ้าของขอให้อ่าน/เล่าด้วยเสียง ใส่เนื้อหาที่อ่านทั้งหมดใน SPEAK ได้เลย.
+</voice-capability>` : "";
+  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + VOICE_NOTE + projectNote());
   child.stdin.end();
 
   let buf = "";
@@ -757,6 +835,21 @@ function runClaude(agent, prompt, opts = {}) {
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             let raw = b.text;
+            // `SPEAK:` lines become actual spoken audio (TTS) — strip from
+            // the chat and let the overlay voice them.
+            if (canSpeak && /(^|\n)\s*SPEAK:/.test(raw)) {
+              const kept = [], say = [];
+              for (const ln of raw.split("\n")) {
+                const sm = ln.match(/^\s*SPEAK:\s*(.+)$/);
+                if (sm && sm[1].trim()) say.push(sm[1].trim());
+                else kept.push(ln);
+              }
+              if (say.length) {
+                raw = kept.join("\n").trim();
+                broadcast({ type: "voice.say", agent, task,
+                  text: say.join(" ").slice(0, 1200), session: entry.key });
+              }
+            }
             // `SUB:` lines are protocol, not prose — strip them and show a
             // friendly split announcement instead.
             if (canSplit && /(^|\n)\s*SUB:/.test(raw)) {
@@ -1220,6 +1313,138 @@ function voiceTranscribe(buf) {
   });
 }
 
+// ---------------------------------------------------------------- tts
+// Agent voices (Gemini TTS): anime-flavored presets the owner assigns per
+// agent. Agents speak RARELY — a SPEAK: protocol line they add only when a
+// short spoken announcement genuinely fits (or the owner asked to be read
+// to). Global toggle: reg.tts.
+const VOICE_PRESETS = {
+  sunny:   { voice: "Aoede",  label: "🌞 สาวสดใสร่าเริง",  style: "พูดภาษาไทยด้วยน้ำเสียงสดใสร่าเริงแบบสาวอนิเมะ" },
+  sweet:   { voice: "Leda",   label: "🍬 สาวหวานนุ่มนวล",  style: "พูดภาษาไทยด้วยน้ำเสียงหวาน นุ่มนวล อ่อนโยน" },
+  cool:    { voice: "Kore",   label: "❄️ สาวนิ่งเท่",       style: "พูดภาษาไทยด้วยน้ำเสียงนิ่ง เท่ มั่นใจ" },
+  genki:   { voice: "Zephyr", label: "⚡ สาวพลังล้นเหลือ",  style: "พูดภาษาไทยเร็วๆ ตื่นเต้น พลังงานล้นเหลือ" },
+  boyish:  { voice: "Puck",   label: "🎈 หนุ่มขี้เล่น",      style: "พูดภาษาไทยแบบหนุ่มขี้เล่น อารมณ์ดี" },
+  warm:    { voice: "Charon", label: "☕ ชายทุ้มอบอุ่น",    style: "พูดภาษาไทยเสียงทุ้ม อบอุ่น ใจเย็น" },
+  serious: { voice: "Fenrir", label: "🗡 ชายเข้มจริงจัง",   style: "พูดภาษาไทยเสียงเข้ม จริงจัง หนักแน่น" },
+  polite:  { voice: "Orus",   label: "🎩 ชายสุภาพ",         style: "พูดภาษาไทยอย่างสุภาพ ชัดถ้อยชัดคำ" },
+};
+
+function pcmToWav(pcm, rate) {
+  const hdr = Buffer.alloc(44);
+  hdr.write("RIFF", 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write("WAVE", 8);
+  hdr.write("fmt ", 12); hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20);
+  hdr.writeUInt16LE(1, 22); hdr.writeUInt32LE(rate, 24); hdr.writeUInt32LE(rate * 2, 28);
+  hdr.writeUInt16LE(2, 32); hdr.writeUInt16LE(16, 34);
+  hdr.write("data", 36); hdr.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([hdr, pcm]);
+}
+
+function ttsSpeak(presetId, text) {
+  return new Promise((resolve, reject) => {
+    const gm = (reg.apiKeys || {}).GEMINI_API_KEY;
+    if (!gm) return reject(new Error("ต้องมี GEMINI_API_KEY (⚙ CONNECT) สำหรับเสียงพูด"));
+    const p = VOICE_PRESETS[presetId];
+    if (!p) return reject(new Error("ไม่รู้จักเสียง: " + presetId));
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: `${p.style}: "${String(text).slice(0, 900)}"` }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: p.voice } } },
+      },
+    });
+    const rq = require("https").request({
+      method: "POST", host: "generativelanguage.googleapis.com",
+      path: "/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=" + gm,
+      headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) },
+    }, (rs) => {
+      let o = "";
+      rs.on("data", (c) => (o += c));
+      rs.on("end", () => {
+        try {
+          const j = JSON.parse(o);
+          const part = j.candidates && j.candidates[0] &&
+            j.candidates[0].content.parts.find((x) => x.inlineData);
+          if (!part) return reject(new Error((j.error && j.error.message) || "tts: no audio"));
+          // inlineData = raw 16-bit PCM @24kHz — wrap as WAV for the browser.
+          resolve(pcmToWav(Buffer.from(part.inlineData.data, "base64"), 24000));
+        } catch (e) { reject(e); }
+      });
+    });
+    rq.setTimeout(45000, () => rq.destroy(new Error("tts timeout")));
+    rq.on("error", reject);
+    rq.write(body);
+    rq.end();
+  });
+}
+
+// ---------------------------------------------------------------- image gen
+// 🖼 a SYSTEM TOOL any agent (or the owner) can call: text → PNG on disk.
+// OpenAI gpt-image-1 first, Gemini image generation as the fallback.
+function genImage(prompt) {
+  return new Promise((resolve, reject) => {
+    const k = reg.apiKeys || {};
+    const https = require("https");
+    const save = (b64) => {
+      const dir = path.join(WORKSPACE, "uploads");
+      fs.mkdirSync(dir, { recursive: true });
+      const name = "gen_" + Date.now() + ".png";
+      const full = path.join(dir, name);
+      fs.writeFileSync(full, Buffer.from(b64, "base64"));
+      resolve({ path: full, url: "/uploads/" + name });
+    };
+    const tryGemini = (err) => {
+      if (!k.GEMINI_API_KEY) return reject(err || new Error("ต้องมี OPENAI_API_KEY หรือ GEMINI_API_KEY (⚙ CONNECT)"));
+      const body = JSON.stringify({
+        contents: [{ parts: [{ text: "Generate an image: " + String(prompt).slice(0, 2000) }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+      });
+      const rq = https.request({
+        method: "POST", host: "generativelanguage.googleapis.com",
+        path: "/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=" + k.GEMINI_API_KEY,
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) },
+      }, (rs) => {
+        let o = "";
+        rs.on("data", (c) => (o += c));
+        rs.on("end", () => {
+          try {
+            const j = JSON.parse(o);
+            const part = j.candidates && j.candidates[0] &&
+              j.candidates[0].content.parts.find((x) => x.inlineData);
+            if (part) save(part.inlineData.data);
+            else reject(new Error((j.error && j.error.message) || "gemini image: empty"));
+          } catch (e) { reject(e); }
+        });
+      });
+      rq.setTimeout(120000, () => rq.destroy(new Error("gemini image timeout")));
+      rq.on("error", reject);
+      rq.write(body);
+      rq.end();
+    };
+    if (!k.OPENAI_API_KEY) return tryGemini(null);
+    const body = JSON.stringify({ model: "gpt-image-1",
+      prompt: String(prompt).slice(0, 4000), size: "1024x1024" });
+    const rq = https.request({
+      method: "POST", host: "api.openai.com", path: "/v1/images/generations",
+      headers: { authorization: "Bearer " + k.OPENAI_API_KEY,
+        "content-type": "application/json", "content-length": Buffer.byteLength(body) },
+    }, (rs) => {
+      let o = "";
+      rs.on("data", (c) => (o += c));
+      rs.on("end", () => {
+        try {
+          const j = JSON.parse(o);
+          if (j.data && j.data[0] && j.data[0].b64_json) save(j.data[0].b64_json);
+          else tryGemini(new Error((j.error && j.error.message) || "openai image: empty"));
+        } catch (e) { tryGemini(e); }
+      });
+    });
+    rq.setTimeout(180000, () => rq.destroy(new Error("openai image timeout")));
+    rq.on("error", (e) => tryGemini(e));
+    rq.write(body);
+    rq.end();
+  });
+}
+
 // ---------------------------------------------------------------- updates
 // Quietly compare local HEAD with GitHub main; when they differ the office
 // shows a 🔄 banner and `bagidea update` / POST /update runs the updater.
@@ -1283,12 +1508,72 @@ const channels = require("./channels")({
 });
 channels.restart();
 
+// ---------------------------------------------------------------- social
+// The office has a SOUL: idle agents occasionally hang out — usually a
+// token-free canned banter scene in the meeting corner, sometimes a real
+// AI-to-AI chat (which may even end in a project PROPOSAL the owner can
+// approve). Cadence: reg.socialMin minutes (0 = off).
+const PROPOSALS = path.join(__dirname, "proposals.json");
+let proposals = loadJson(PROPOSALS, []);
+const saveProposals = () => fs.writeFileSync(PROPOSALS, JSON.stringify(proposals, null, 2));
+
+const BANTER = [
+  ["{a}: เห็นเจ้าเหมียวงีบบนโซฟาอีกแล้ว อิจฉาชีวิตมัน 🐱", "{b}: อย่าไปทักนะ เดี๋ยวตื่นมาเหยียบคีย์บอร์ดผม", "{a}: ครั้งก่อนมันพิมพ์ ggggggg ลงรายงานผมไป 555"],
+  ["{a}: เมื่อกี้เตะบอลข้ามตึกไปเลยนะ เห็นป่ะ ⚽", "{b}: เห็น… มันลอยผ่านหัว CEO ไปเฉียดมาก", "{a}: งั้นทำเงียบๆ ไว้นะ 🤫"],
+  ["{a}: กาแฟในแคนทีนหมดอีกแล้ว ☕", "{b}: ก็ {a} ชงทีเดียวครึ่งโถ!", "{a}: ข้อกล่าวหาที่ปฏิเสธไม่ได้ 😅"],
+  ["{a}: โต๊ะ Ghost Deck ข้างบนวิวดีมากนะ ลอยได้ด้วย", "{b}: ผมขึ้นไปทีไรเวียนหัวทุกที ร่างโปร่งแสงไม่ช่วยอะไรเลย", "{a}: มือใหม่ก็งี้แหละ 👻"],
+  ["{a}: คืนนี้ไฟสวนสวยเป็นพิเศษว่าไหม", "{b}: จริง เหมาะกับนั่งคิดงานเงียบๆ", "{a}: หรือนั่งไม่คิดอะไรเลยก็ดี 🌙"],
+  ["{a}: เห็นข่าว AI วันนี้ยัง ตลกมาก", "{b}: เราก็คือข่าว AI เดินได้นะรู้ตัวไหม", "{a}: …ลึกซึ้งจนขำไม่ออก 🤖"],
+];
+
+let lastSocial = Date.now();
+function socialTick(now) {
+  const min = Number(reg.socialMin !== undefined ? reg.socialMin : 60);
+  if (!min || discussing || agentBusy.size > 0) return;
+  if (now - lastSocial < min * 60000) return;
+  const staff = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main");
+  const pool = staff.length >= 2 ? staff : [...staff, "main"];
+  if (pool.length < 2) return;
+  lastSocial = now;
+  const pick = pool.sort(() => Math.random() - 0.5).slice(0, 2);
+  if (Math.random() < 0.7) {
+    // canned banter — zero tokens, pure life.
+    const lines = BANTER[Math.floor(Math.random() * BANTER.length)];
+    const nameOf = (id) => (reg.agents[id] || { name: id }).name;
+    const task = "soc" + (now % 100000);
+    broadcast({ type: "collab.started", agents: pick, task, text: "พักเบรก ☕" });
+    lines.forEach((tpl, i) => {
+      const who = tpl.startsWith("{a}") ? pick[0] : pick[1];
+      const text = tpl.replace(/\{a\}:\s*/, "").replace(/\{b\}:\s*/, "")
+        .replace(/\{a\}/g, nameOf(pick[0])).replace(/\{b\}/g, nameOf(pick[1]));
+      setTimeout(() => broadcast({ type: "chat.message", agent: who, task, text, social: true }), 2500 + i * 3600);
+    });
+    setTimeout(() => broadcast({ type: "collab.ended", agents: pick, task }),
+      2500 + lines.length * 3600 + 2500);
+  } else {
+    // a REAL conversation between AIs — they may pitch a project.
+    const topics = ["คุยเล่นเรื่องงานช่วงนี้ แลกเปลี่ยนว่าใครทำอะไรอยู่ หยอกล้อกันได้",
+      "ระดมไอเดียสนุกๆ ว่าอยากสร้างอะไรเป็นโปรเจคเล่นๆ ของทีม",
+      "แชร์เทคนิคการทำงานที่เพิ่งค้นพบ"];
+    runDiscussion(pick, topics[Math.floor(Math.random() * topics.length)], 1, true);
+  }
+}
+
+function addProposal(by, agents, name, detail) {
+  const p = { id: "pr" + Date.now(), by, agents, name: String(name).slice(0, 60),
+    detail: String(detail).slice(0, 500), ts: Date.now(), status: "pending" };
+  proposals.push(p);
+  saveProposals();
+  broadcast({ type: "proposal.created", agent: by, name: p.name, proposal: p.id });
+  return p;
+}
+
 // ---------------------------------------------------------------- discussion
 // Agents talk to each other: round-robin claude calls sharing a transcript,
 // staged in the meeting room (collab.* events drive seats + whiteboard).
 let discussing = false;
 
-async function runDiscussion(ids, topic, rounds) {
+async function runDiscussion(ids, topic, rounds, social) {
   discussing = true;
   const task = "disc" + (Date.now() % 100000);
   // Every meeting is a persistent GROUP session ("@group" bucket): topic,
@@ -1307,13 +1592,22 @@ async function runDiscussion(ids, topic, rounds) {
       for (const id of ids) {
         const a = reg.agents[id] || { name: id, role: "Staff", prompt: "" };
         const text = await claudeText(
-          `You are "${a.name}" (${a.role}) in a team meeting at the office.\n` +
+          `You are "${a.name}" (${a.role}) in a ${social ? "casual break-room chat" : "team meeting"} at the office.\n` +
           (a.prompt ? `Your persona: ${a.prompt}\n` : "") +
           `Meeting topic: ${topic}\n` +
           (transcript ? `Discussion so far:\n${transcript}\n` : "You open the meeting.\n") +
           `Give YOUR next contribution as ${a.name}: concrete, build on the others, ` +
-          `max 3 sentences, plain text only, in the same language as the topic.`);
-        const line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
+          `max 3 sentences, plain text only, in the same language as the topic.` +
+          (social ? `\nถ้าการคุยตกผลึกเป็นไอเดียโปรเจคที่ทีมอยากสร้างจริง ให้เพิ่มบรรทัดสุดท้าย:\n` +
+            `PROPOSAL: <ชื่อโปรเจค> :: <ทำอะไร สั้นๆ>\n(ใช้เฉพาะเมื่อไอเดียชัดและคุ้มจริง — ` +
+            `เจ้าของจะเป็นคนอนุมัติ)` : ""));
+        let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
+        // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
+        const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
+        if (pm) {
+          line = line.replace(/PROPOSAL:.*$/, "").trim();
+          addProposal(id, ids, pm[1], pm[2]);
+        }
         if (line) {
           transcript += `${a.name}: ${line}\n`;
           entry.log.push({ who: id, text: line, ts: Date.now() });
@@ -1561,6 +1855,7 @@ const server = http.createServer((req, res) => {
             rules: String(px.rules || "").slice(0, 2000),
           },
           tier: Math.min(Math.max(Number(p.tier !== undefined ? p.tier : cur.tier) || 3, 1), 3),
+          voice: String(p.voice !== undefined ? p.voice : cur.voice || "").slice(0, 20),
           skills: Array.isArray(p.skills) ? p.skills : cur.skills || [],
           tools: Array.isArray(p.tools) ? p.tools : cur.tools || [],
         };
@@ -1867,6 +2162,19 @@ const server = http.createServer((req, res) => {
         if (p.remove) jobs = jobs.filter((j) => j.id !== p.id);
         else if (p.enabled !== undefined) job.enabled = !!p.enabled;
         saveJobs();
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/office-md") {
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    try { res.end(fs.readFileSync(OFFICE_MD, "utf8")); } catch { res.end(""); }
+
+  } else if (req.method === "POST" && req.url === "/office-md") {
+    readBody(req, (body) => {
+      try {
+        const { text } = JSON.parse(body);
+        fs.writeFileSync(OFFICE_MD, String(text || "").slice(0, 64000));
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
@@ -2194,6 +2502,105 @@ const server = http.createServer((req, res) => {
         res.writeHead(400);
         res.end("bad json");
       }
+    });
+
+  } else if (req.method === "POST" && req.url === "/gen/image") {
+    // 🖼 system tool: prompt → PNG path (+ /uploads url for chat rendering).
+    readBody(req, (body) => {
+      try {
+        const { prompt } = JSON.parse(body);
+        if (!prompt) throw new Error("no prompt");
+        genImage(prompt).then((out) => {
+          broadcast({ type: "image.generated", url: out.url }, false);
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify(out));
+        }).catch((e) => {
+          res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          res.end(String(e.message));
+        });
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/proposals") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ proposals: proposals.slice(-30).reverse() }));
+
+  } else if (req.method === "POST" && req.url === "/proposals/respond") {
+    // CEO verdict on a team pitch: approve → a real project is born in the
+    // playground and the Director staffs it; reject/hold are remembered.
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const { id, decision } = JSON.parse(body);
+        const p = proposals.find((x) => x.id === id);
+        if (!p) { res.writeHead(404); return res.end("unknown proposal"); }
+        p.status = decision === "approve" ? "approved"
+          : decision === "reject" ? "rejected" : "pending";
+        saveProposals();
+        if (decision === "approve") {
+          let proj = null;
+          try {
+            const playDir = String(reg.playground || path.join(WORKSPACE, "playground"));
+            proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
+          } catch (e) { /* duplicate name → Director routes to the existing one */ }
+          queueDirectorTurn((release) => {
+            runClaude("main",
+              `CEO อนุมัติข้อเสนอโปรเจคของทีมแล้ว 🎉\n` +
+              `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` +
+              (proj ? `โปรเจคถูกสร้างไว้แล้วที่ ${proj.dir}\n` : "") +
+              `จัดทีมเลย: DELEGATE: <agent> @ ${p.name} :: <งานชิ้นแรกที่ชัดเจน> ` +
+              `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ`,
+              { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
+                filterText: makeDelegateFilter(0, undefined),
+                onDone: () => release() });
+          });
+        }
+        broadcast({ type: "proposal." + p.status, agent: p.by, name: p.name, proposal: p.id });
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/social") {
+    readBody(req, (body) => {
+      try {
+        reg.socialMin = Math.max(0, Number(JSON.parse(body).min) || 0);
+        saveReg();
+        pushRoster();
+        res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/tts/presets") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(Object.fromEntries(
+      Object.entries(VOICE_PRESETS).map(([id, p]) => [id, p.label]))));
+
+  } else if (req.method === "POST" && req.url === "/tts") {
+    // 🗣 speak: {text, preset} or {text, agent} (uses the agent's voice).
+    readBody(req, (body) => {
+      try {
+        const { text, preset, agent } = JSON.parse(body);
+        if (!text) throw new Error("no text");
+        const pid = preset || (reg.agents[agent] && reg.agents[agent].voice);
+        if (!pid) throw new Error("agent นี้ยังไม่ได้ตั้งเสียง");
+        ttsSpeak(pid, text).then((wav) => {
+          res.writeHead(200, { "content-type": "audio/wav", "cache-control": "no-store" });
+          res.end(wav);
+        }).catch((e) => {
+          res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          res.end(String(e.message));
+        });
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/tts") {
+    readBody(req, (body) => {
+      try {
+        reg.tts = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
     });
 
   } else if (req.method === "POST" && req.url === "/voice/transcribe") {

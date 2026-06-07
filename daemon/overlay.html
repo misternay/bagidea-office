@@ -782,6 +782,7 @@
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
+  let TTSON = true, SOCIALMIN = 60;
   let PROJECTS_CACHE = [];
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
@@ -1150,6 +1151,30 @@
     if (msg) { pillShow(msg, "", false); setTimeout(pillHide, 2500); } else pillHide();
   }
 
+  // 🗣 agent speech playback — one voice at a time, in order.
+  const _sayQ = [];
+  let _saying = false;
+  function speakQueue(agent, text) {
+    if (!text) return;
+    _sayQ.push({ agent, text });
+    if (!_saying) speakNext();
+  }
+  async function speakNext() {
+    const item = _sayQ.shift();
+    if (!item) { _saying = false; return; }
+    _saying = true;
+    try {
+      const r = await fetch("/tts", { method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agent: item.agent, text: item.text }) });
+      if (!r.ok) throw new Error(await r.text());
+      const audio = new Audio(URL.createObjectURL(await r.blob()));
+      audio.onended = speakNext;
+      audio.onerror = speakNext;
+      audio.play().catch(speakNext);
+    } catch { speakNext(); }
+  }
+
   // Mic buttons: click = record (red), click again = transcribe → the text
   // lands in the button's input box for you to review and send yourself.
   function wireMic(btn, input) {
@@ -1392,6 +1417,10 @@
     else if (ev.type === "skill.created") addFeed(ev.agent, "📚 เรียนรู้สกิลใหม่: " + ev.skill, sess);
     else if (ev.type === "channel.message")
       addFeed("ceo", `📨 [${ev.channel}] ${ev.from}: ${ev.text}`, "", "alert");
+    else if (ev.type === "proposal.created")
+      addFeed(ev.agent, "💡 ทีมเสนอโปรเจคใหม่: " + ev.name + " — รออนุมัติใน 🗂 TASKS", "", "alert");
+    else if (ev.type === "memory.learned")
+      addFeed(ev.agent, "🧠 จดความจำใหม่ " + ev.count + " ข้อ", "");
   }
 
   function addPermCard(ev) {
@@ -1596,12 +1625,21 @@
     if (tab === "agents") {
       bodyHtml = `<div class="switch ${SOUND ? "on" : ""}" id="sndSw">
           <div class="knob"><\/div> 🔊 Sound effects — เสียงประกอบในโลก office</div>
+        <div class="switch ${TTSON ? "on" : ""}" id="ttsSw" style="margin-top:6px">
+          <div class="knob"></div> 🗣 Agent voices — เสียงพูดของ agents (ต้องมี Gemini key)</div>
         <div class="field" style="margin-top:8px"><label>💓 DIRECTOR HEARTBEAT — รอบตรวจภาพรวม/ตารางงาน (แจ้งเฉพาะที่ควรรู้)</label>
           <select id="hbSel">
             <option value="0">ปิด</option>
             <option value="15">ทุก 15 นาที</option>
             <option value="30">ทุก 30 นาที</option>
             <option value="60">ทุก 1 ชั่วโมง</option>
+          </select></div>
+        <div class="field" style="margin-top:8px"><label>☕ SOCIAL — agents ว่างๆ จับกลุ่มคุย/หยอกล้อกันเอง (อาจเสนอโปรเจคให้คุณอนุมัติ)</label>
+          <select id="socSel">
+            <option value="0">ปิด</option>
+            <option value="30">~ทุก 30 นาที</option>
+            <option value="60">~ทุก 1 ชั่วโมง</option>
+            <option value="120">~ทุก 2 ชั่วโมง</option>
           </select></div>
         <div class="field" style="margin-top:8px"><label>🎤 HOTKEY สั่งงานด้วยเสียง — กด = เริ่มอัด · กดอีกครั้ง = ถอดเสียง + ส่งหา Director (ถอดด้วย Whisper/Gemini จาก key ใน CONNECT)</label>
           <select id="pttSel">
@@ -1622,6 +1660,8 @@
         <div id="slist" class="biglist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
       bodyHtml = `<input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
+        <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
+          <div id="systools"></div></div>
         <div class="field"><label>🔧 BUILT-IN — เครื่องมือมาตรฐานของ Claude (ลบไม่ได้ · เปิด/ปิดรายตัวในหน้าแก้ไข agent)</label>
           <div id="tlist" class="biglist"></div></div>
         <div class="field"><label>🔌 MCP SERVERS — เพิ่มความสามารถใหม่ตามมาตรฐาน MCP</label>
@@ -1684,6 +1724,14 @@
         await api("/registry/sound", { enabled: SOUND });
         e.currentTarget.classList.toggle("on", SOUND);
       };
+      modalCard.querySelector("#ttsSw").onclick = async (e) => {
+        TTSON = !TTSON;
+        await api("/registry/tts", { enabled: TTSON });
+        e.currentTarget.classList.toggle("on", TTSON);
+      };
+      const socSel = modalCard.querySelector("#socSel");
+      socSel.value = String(SOCIALMIN);
+      socSel.onchange = () => api("/registry/social", { min: Number(socSel.value) });
       const hbSel = modalCard.querySelector("#hbSel");
       hbSel.value = String(HEARTBEAT);
       hbSel.onchange = async () => {
@@ -1715,6 +1763,23 @@
       modalCard.querySelector("#newSkill").onclick = () => openSkillEditor(null);
       wireFilter(modalCard.querySelector("#sFilter"), list);
     } else if (tab === "tools") {
+      // ⚡ system tools — capability + which MAIN key unlocks it.
+      const SYS = [
+        ["🎤 ถอดเสียงพูด (voice → text)", "ปุ่มไมค์ / F6", FEATURES.stt, "OPENAI หรือ GEMINI"],
+        ["🗣 เสียงพูดของ agents (TTS)", "SPEAK: protocol + พรีวิวใน editor", FEATURES.tts, "GEMINI"],
+        ["🖼 สร้างภาพ AI", "agents เรียก /gen/image เองได้ · ภาพโชว์ในแชท", FEATURES.image, "OPENAI หรือ GEMINI"],
+        ["📞 Realtime voice chat", "คุยเสียงสดกับออฟฟิศ", FEATURES.live, "GEMINI"],
+      ];
+      const sysBox = modalCard.querySelector("#systools");
+      for (const [name, desc, on, need] of SYS) {
+        const row = document.createElement("div");
+        row.className = "arow";
+        row.style.cursor = on ? "default" : "pointer";
+        row.innerHTML = `<div class="meta"><b>${on ? "✅" : "🔒"} ${name}</b>
+          <span>${on ? desc : "ต้องมี main key: " + need + " — คลิกเพื่อไปตั้งค่า"}</span></div>`;
+        if (!on) row.onclick = () => openSettings("connect");
+        sysBox.appendChild(row);
+      }
       const list = modalCard.querySelector("#tlist");
       for (const t of REGTOOLS) {
         const row = document.createElement("div");
@@ -1880,6 +1945,11 @@
          <input id="eLanguage" maxlength="80" placeholder='เช่น "ไทย" / "English" / "ตามภาษาของผู้ใช้"'></div>
        <div class="field"><label>📏 กฎการทำงาน (do / don't — บรรทัดละข้อ)</label>
          <textarea id="eRules" style="min-height:54px" placeholder="เช่น ตรวจข้อมูลจากแหล่งจริงก่อนตอบเสมอ&#10;ห้ามเดาตัวเลข"></textarea></div>
+       <div class="field"><label>🗣 เสียงพูด (TTS) — กิมมิคประกาศงานสำคัญ · ▶ ฟังตัวอย่างก่อนเลือกได้</label>
+         <div class="assistrow">
+           <select id="eVoice" style="flex:1"></select>
+           <button class="send" id="eVoicePlay" title="ฟังตัวอย่างเสียงนี้">▶</button>
+         </div></div>
        <div class="field"><label>🎯 SKILLS</label><div class="checks" id="eSkills"></div></div>
        <div class="field"><label>🔧 TOOLS (ว่าง = ชุดอ่านอย่างเดียว Read/Glob/Grep)</label><div class="checks" id="eTools"></div></div>`;
     modalCard.innerHTML = hdr(isUser ? "👑 YOUR AVATAR" : (id ? "✏ EDIT AGENT" : "＋ HIRE AGENT")) +
@@ -1913,6 +1983,35 @@
         });
       };
       auBox.appendChild(c);
+    }
+    // 🗣 voice preset picker + sample playback
+    const vSel = modalCard.querySelector("#eVoice");
+    if (vSel) {
+      vSel.innerHTML = `<option value="">🔇 ไม่มีเสียง</option>`;
+      fetch("/tts/presets").then((x) => x.json()).then((ps) => {
+        for (const [pid, label] of Object.entries(ps)) {
+          const o = document.createElement("option");
+          o.value = pid; o.textContent = label;
+          vSel.appendChild(o);
+        }
+        vSel.value = a.voice || "";
+      });
+      modalCard.querySelector("#eVoicePlay").onclick = async (e) => {
+        const pid = vSel.value;
+        if (!pid) return addChip("เลือกเสียงก่อนนะ");
+        if (!FEATURES.tts) return addChip("🗣 เสียงพูดต้องมี GEMINI_API_KEY — ตั้งใน ⚙ CONNECT");
+        const btn = e.currentTarget;
+        btn.textContent = "⏳";
+        try {
+          const r = await fetch("/tts", { method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ preset: pid,
+              text: "สวัสดีค่ะ ฉันคือเสียงใหม่ของ agent ในออฟฟิศนะคะ ฝากตัวด้วยนะ!" }) });
+          if (!r.ok) throw new Error(await r.text());
+          new Audio(URL.createObjectURL(await r.blob())).play();
+        } catch (err) { addChip("✗ " + String(err.message).slice(0, 80)); }
+        btn.textContent = "▶";
+      };
     }
     // skill / tool assignment chips
     const skBox = modalCard.querySelector("#eSkills");
@@ -1999,6 +2098,7 @@
         : { id, name, role: roleSel.value, avatar, aura: myAura,
             prompt: modalCard.querySelector("#ePrompt").value,
             tier: Number(modalCard.querySelector("#eTier").value) || 3,
+            voice: (modalCard.querySelector("#eVoice") || {}).value || "",
             persona: {
               expertise: modalCard.querySelector("#eExpertise").value,
               personality: modalCard.querySelector("#ePersonality").value,
@@ -2189,7 +2289,7 @@
             <button class="primary" id="plAdd">＋</button>
           </div></div>`;
     } else if (tab === "jobs") {
-      body = `<div id="jlist"></div>
+      body = `<div id="prBox"></div><div id="jlist"></div>
         <div class="field" style="margin-top:10px"><label>＋ สั่งงานใหม่</label>
           <select id="jAgent"></select>
           <div class="assistrow" style="margin-top:6px">
@@ -2227,6 +2327,11 @@
           <input id="nText" placeholder="จดโน้ต… (agents อ่าน/เขียนผ่าน notes.md ได้ด้วย)" maxlength="500">
           <button class="send" id="nMic" title="พูดแทนพิมพ์">🎤</button>
           <button class="primary" id="nAdd">📝</button>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>🏛 OFFICE.md — ข้อมูลกลางที่ agents ทุกตัวรู้จัก (เปิดอ่านเมื่อเกี่ยวข้อง)</label>
+          <textarea id="officeMd" style="min-height:140px;font-size:11.5px" spellcheck="false"></textarea>
+          <button class="bigbtn" id="officeSave" style="margin-top:6px">💾 บันทึก OFFICE.md</button>
         </div>`;
     } else {
       body = `<div id="orgBox"></div>
@@ -2408,6 +2513,30 @@
         if (n && f) { await api("/places", { name: n, folder: f }); openOps("proj"); }
       };
     } else if (tab === "jobs") {
+      // 💡 team project proposals waiting for the CEO's verdict.
+      fetch("/proposals").then((x) => x.json()).then((r) => {
+        const box = modalCard.querySelector("#prBox");
+        if (!box) return;
+        const pending = (r.proposals || []).filter((p) => p.status === "pending");
+        if (!pending.length) return;
+        box.innerHTML = `<div class="field"><label>💡 ข้อเสนอโปรเจคจากทีม — รอคุณตัดสิน</label></div>`;
+        for (const p of pending) {
+          const card = document.createElement("div");
+          card.className = "arow";
+          card.style.cursor = "default";
+          card.innerHTML =
+            `<div class="meta"><b>💡 ${p.name.replace(/</g, "&lt;")}</b>
+              <span>${p.detail.replace(/</g, "&lt;")} — เสนอโดย ${(p.agents || []).map(nameOf).join(", ")}</span></div>
+             <div class="winbtn" title="อนุมัติ — สร้างโปรเจคให้ทีมทำเลย">✅</div>
+             <div class="winbtn hide" title="ปฏิเสธ">✕</div>`;
+          const b = card.querySelectorAll(".winbtn");
+          b[0].onclick = () => api("/proposals/respond", { id: p.id, decision: "approve" })
+            .then(() => { addChip("✅ อนุมัติแล้ว — Director กำลังจัดทีม"); openOps("jobs"); });
+          b[1].onclick = () => api("/proposals/respond", { id: p.id, decision: "reject" })
+            .then(() => openOps("jobs"));
+          box.appendChild(card);
+        }
+      });
       const sel = modalCard.querySelector("#jAgent");
       for (const aid of Object.keys(ROSTER).filter((x) => x !== "ceo")) {
         const o = document.createElement("option");
@@ -2528,6 +2657,14 @@
           api("/notes", { remove: n.id }).then(() => openOps("notes"));
         box.appendChild(row);
       }
+      // 🏛 shared office knowledge — the file every agent knows about.
+      const ta = modalCard.querySelector("#officeMd");
+      fetch("/office-md").then((x) => x.text()).then((t) => { if (ta) ta.value = t; });
+      modalCard.querySelector("#officeSave").onclick = async () => {
+        await api("/office-md", { text: ta.value });
+        addChip("🏛 บันทึก OFFICE.md แล้ว — agents เห็นเวอร์ชันใหม่ใน session ถัดไป");
+        closeModal();
+      };
     } else {
       // 🏢 the company, as a tree: CEO → Director → leads → staff.
       const box = modalCard.querySelector("#orgBox");
@@ -2892,6 +3029,8 @@
       SOUND = ev.sound !== false;
       HEARTBEAT = Number(ev.heartbeatMin || 0);
       if (ev.features) FEATURES = ev.features;
+      TTSON = ev.tts !== false;
+      SOCIALMIN = Number(ev.socialMin !== undefined ? ev.socialMin : 60);
       gateVoiceUI();
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();
@@ -2916,6 +3055,15 @@
       if (modal.classList.contains("open") && modalCard.querySelector("#plist") &&
           !fsPick.classList.contains("open") && !typing)
         openOps("proj");
+      return;
+    }
+    if (ev.type === "voice.say") {
+      // 🗣 an agent chose to speak — fetch its voice and play (queued).
+      // Never on journal replay: restarted clients must stay silent.
+      if (!ev.replay && TTSON) {
+        speakQueue(ev.agent, ev.text);
+        addFeed(ev.agent, "🗣 " + String(ev.text).slice(0, 120), ev.session || "");
+      }
       return;
     }
     if (ev.type === "update.available") {
