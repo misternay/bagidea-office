@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BagIdea AI Agents Office — your wallpaper goes to work</title>
+<meta name="description" content="A living HD-2D AI agent office that runs as your Windows wallpaper. Every character is a real Claude agent — delegate work, watch them work, talk by voice.">
+<meta property="og:title" content="BagIdea AI Agents Office">
+<meta property="og:description" content="Your desktop wallpaper is a living office of real AI agents.">
+<meta property="og:image" content="img/world.png">
+<link rel="icon" href="img/logo.png">
+<style>
+  :root {
+    --bg:#070b13; --bg2:#0c1322; --card:#111c30; --line:rgba(255,255,255,0.09);
+    --accent:#5ec8ff; --accent2:#a882ff; --text:#e6edf7; --dim:#8a99b3;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { scroll-behavior:smooth; }
+  body { font-family:'Segoe UI',system-ui,'Noto Sans Thai',sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.6; overflow-x:hidden; }
+  a { color:var(--accent); text-decoration:none; }
+  .wrap { max-width:1100px; margin:0 auto; padding:0 22px; }
+  .btn { display:inline-block; padding:12px 24px; border-radius:12px; font-weight:600;
+    cursor:pointer; transition:transform .15s, filter .15s; border:1px solid var(--line); }
+  .btn:hover { transform:translateY(-2px); filter:brightness(1.15); }
+  .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#05101f; border:none; }
+  .btn.ghost { background:rgba(255,255,255,0.04); color:var(--text); }
+
+  /* nav */
+  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
+    background:rgba(7,11,19,0.75); border-bottom:1px solid var(--line); }
+  nav .wrap { display:flex; align-items:center; gap:10px; height:60px; }
+  nav img { width:30px; height:30px; border-radius:7px; }
+  nav b { font-size:16px; letter-spacing:0.5px; }
+  nav b span { color:var(--accent); }
+  nav .links { margin-left:auto; display:flex; gap:22px; align-items:center; font-size:14px; }
+  nav .links a { color:var(--dim); } nav .links a:hover { color:var(--text); }
+  @media(max-width:640px){ nav .links a:not(.btn){ display:none; } }
+
+  /* hero */
+  .hero { position:relative; padding:80px 0 40px; text-align:center; overflow:hidden; }
+  .hero::before { content:""; position:absolute; inset:0; z-index:-1;
+    background:radial-gradient(900px 400px at 50% -10%, rgba(94,200,255,0.18), transparent 70%),
+               radial-gradient(700px 360px at 80% 10%, rgba(168,130,255,0.14), transparent 70%); }
+  .hero h1 { font-size:clamp(34px,6vw,60px); line-height:1.1; font-weight:800; letter-spacing:-0.5px; }
+  .hero h1 .grad { background:linear-gradient(120deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero p.sub { font-size:clamp(16px,2.4vw,21px); color:var(--dim); max-width:680px; margin:18px auto 0; }
+  .hero .cta { margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .shot { margin:46px auto 0; max-width:960px; border-radius:16px; overflow:hidden;
+    border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,0.6); }
+  .shot img { width:100%; display:block; }
+  .badges { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:22px;
+    color:var(--dim); font-size:13px; }
+  .badges span { background:rgba(255,255,255,0.04); border:1px solid var(--line);
+    padding:5px 12px; border-radius:999px; }
+
+  /* sections */
+  section { padding:70px 0; }
+  h2.title { font-size:clamp(26px,4vw,38px); font-weight:800; text-align:center; }
+  h2.title + .lead { text-align:center; color:var(--dim); max-width:600px; margin:12px auto 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; margin-top:46px; }
+  .feat { background:linear-gradient(160deg,var(--card),var(--bg2)); border:1px solid var(--line);
+    border-radius:16px; padding:24px; transition:transform .18s, border-color .18s; }
+  .feat:hover { transform:translateY(-4px); border-color:var(--accent); }
+  .feat .ic { font-size:30px; }
+  .feat h3 { font-size:17px; margin:12px 0 7px; }
+  .feat p { color:var(--dim); font-size:14px; }
+
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; }
+  @media(max-width:760px){ .split{ grid-template-columns:1fr; } }
+  .split img { width:100%; border-radius:14px; border:1px solid var(--line); box-shadow:0 20px 50px rgba(0,0,0,0.5); }
+  .split h3 { font-size:24px; margin-bottom:12px; }
+  .split ul { list-style:none; color:var(--dim); }
+  .split li { padding:6px 0 6px 26px; position:relative; }
+  .split li::before { content:"✦"; position:absolute; left:0; color:var(--accent); }
+
+  /* install */
+  .install { background:linear-gradient(160deg,#0e1830,#0a1120); border:1px solid var(--line);
+    border-radius:18px; padding:34px; text-align:center; }
+  .code { display:block; margin:18px auto; max-width:760px; background:#060a12; border:1px solid var(--line);
+    border-radius:10px; padding:16px 18px; font-family:'Cascadia Code',Consolas,monospace; font-size:13.5px;
+    color:#bfe4ff; text-align:left; overflow-x:auto; }
+  .steps { display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:24px; color:var(--dim); font-size:13px; }
+  .steps div { max-width:200px; }
+  .steps b { color:var(--text); }
+
+  footer { border-top:1px solid var(--line); padding:34px 0; color:var(--dim); font-size:13px; text-align:center; }
+  footer a { color:var(--dim); margin:0 8px; }
+  .reveal { opacity:0; transform:translateY(20px); transition:opacity .6s, transform .6s; }
+  .reveal.in { opacity:1; transform:none; }
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <img src="img/logo.png" alt="logo"><b>BAG<span>IDEA</span> Office</b>
+  <div class="links">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="docs.html">Docs</a>
+    <a href="https://github.com/bagidea/bagidea-ai-agents-office">GitHub</a>
+    <a class="btn primary" href="#install">Get it</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <h1>Your wallpaper just<br><span class="grad">went to work.</span></h1>
+  <p class="sub">A living HD-2D office that runs behind your desktop icons — and every
+    character in it is a <b>real AI agent</b>. Delegate work, watch them do it, talk by voice.</p>
+  <div class="cta">
+    <a class="btn primary" href="#install">⬇ Install</a>
+    <a class="btn ghost" href="docs.html">📖 Read the docs</a>
+  </div>
+  <div class="badges">
+    <span>🖼 Live Windows wallpaper</span><span>🤖 Real Claude agents</span>
+    <span>🎤 Voice & realtime</span><span>🧩 Plugins</span><span>🎨 Editable office</span>
+  </div>
+  <div class="shot reveal"><img src="img/world.png" alt="The office, alive on a real desktop"></div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <h2 class="title">An office that actually works</h2>
+  <p class="lead">Not a dashboard. Not a chat box. A world that renders the real state of your AI agents.</p>
+  <div class="grid">
+    <div class="feat reveal"><div class="ic">👑</div><h3>Chain of command</h3><p>Talk to the Director — he plans, delegates to the team, and walks the summary back to you.</p></div>
+    <div class="feat reveal"><div class="ic">👻</div><h3>Sub-agent ghosts</h3><p>Big jobs split into parallel translucent clones on a floating Ghost Deck, then merge.</p></div>
+    <div class="feat reveal"><div class="ic">📁</div><h3>Real projects</h3><p>Agents work inside real folders with resumable Claude sessions. Press ▶ to watch live.</p></div>
+    <div class="feat reveal"><div class="ic">🎤</div><h3>Voice & realtime</h3><p>Speak commands (Whisper/Gemini), give agents anime voices, or hold a live voice call.</p></div>
+    <div class="feat reveal"><div class="ic">📨</div><h3>Channels</h3><p>Run your office from Telegram, Discord or LINE — replies come back on the same channel.</p></div>
+    <div class="feat reveal"><div class="ic">🧠</div><h3>Memory that grows</h3><p>A shared office brain + per-agent memory, distilled automatically, kept token-lean.</p></div>
+    <div class="feat reveal"><div class="ic">🧩</div><h3>Plugins</h3><p>Extend the office — a built-in music player agents control, and an SDK to write your own.</p></div>
+    <div class="feat reveal"><div class="ic">🎨</div><h3>Editable office</h3><p>Place furniture, walls and decor; import your own models and images.</p></div>
+    <div class="feat reveal"><div class="ic">📊</div><h3>Dashboard</h3><p>Runs, cost, a 7-day chart, busiest agents — the whole office at a glance.</p></div>
+  </div>
+</div></section>
+
+<section id="how" style="background:var(--bg2)"><div class="wrap">
+  <h2 class="title">How it works</h2>
+  <div class="split reveal" style="margin-top:46px">
+    <img src="img/overlay.png" alt="chat overlay">
+    <div>
+      <h3>Talk like a boss</h3>
+      <ul>
+        <li>Type or speak into the CEO seat — that's you</li>
+        <li>The Director walks over, plans, and dispatches the team</li>
+        <li>Watch the hand-offs happen on the wallpaper in real time</li>
+        <li>Results report back; the final summary comes to you in person</li>
+      </ul>
+    </div>
+  </div>
+  <div class="split reveal" style="margin-top:50px">
+    <div>
+      <h3>Three layers, one exe</h3>
+      <ul>
+        <li>A zero-dependency Node daemon — the event hub + Claude adapter</li>
+        <li>A Godot 4 world embedded behind your desktop icons</li>
+        <li>A Rust shell with the chat head, overlay and tray</li>
+        <li>Agents are real headless <code>claude</code> sessions</li>
+      </ul>
+    </div>
+    <img src="img/world.png" alt="the world">
+  </div>
+</div></div></section>
+
+<section id="install"><div class="wrap">
+  <div class="install reveal">
+    <h2 class="title" style="font-size:28px">Install in one line</h2>
+    <p class="lead">Windows 11 · the installer sets up every dependency for you.</p>
+    <code class="code">irm https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/installer/install.ps1 | iex</code>
+    <div class="steps">
+      <div><b>1.</b> Run the one-liner in PowerShell — it installs Git, Node, Rust, Godot &amp; the Claude CLI</div>
+      <div><b>2.</b> Run <b>claude</b> once to log in</div>
+      <div><b>3.</b> <b>bagidea start</b> — your wallpaper goes to work 🏢</div>
+    </div>
+    <div class="cta" style="justify-content:center;margin-top:26px">
+      <a class="btn primary" href="https://github.com/bagidea/bagidea-ai-agents-office">⭐ Star on GitHub</a>
+      <a class="btn ghost" href="docs.html">📖 Full documentation</a>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <p>Built with 🩵 by <a href="https://github.com/bagidea">BAG IDEA</a> · powered by
+    <a href="https://claude.com/claude-code">Claude</a></p>
+  <p style="margin-top:8px">
+    <a href="docs.html">Docs</a>·<a href="https://github.com/bagidea/bagidea-ai-agents-office">GitHub</a>·<a href="https://github.com/bagidea/bagidea-ai-agents-office/blob/main/REQUIREMENT.md">Roadmap</a>
+  </p>
+</div></footer>
+
+<script>
+  // reveal-on-scroll
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+  }), { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+</script>
+</body>
+</html>

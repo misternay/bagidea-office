@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs — BagIdea AI Agents Office</title>
+<link rel="icon" href="img/logo.png">
+<style>
+  :root { --bg:#070b13; --bg2:#0c1322; --line:rgba(255,255,255,0.09);
+    --accent:#5ec8ff; --text:#e6edf7; --dim:#8a99b3; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,'Noto Sans Thai',sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.7; }
+  a { color:var(--accent); text-decoration:none; }
+  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
+    background:rgba(7,11,19,0.8); border-bottom:1px solid var(--line); }
+  nav .in { display:flex; align-items:center; gap:10px; height:56px; padding:0 18px; }
+  nav img { width:26px; height:26px; border-radius:6px; }
+  nav b span { color:var(--accent); }
+  nav a.home { margin-left:auto; color:var(--dim); font-size:14px; }
+  .layout { display:grid; grid-template-columns:250px 1fr; min-height:calc(100vh - 56px); }
+  @media(max-width:780px){ .layout{ grid-template-columns:1fr; } aside{ display:none; } }
+  aside { border-right:1px solid var(--line); padding:24px 14px; background:var(--bg2); }
+  aside h4 { font-size:11px; letter-spacing:1.5px; color:var(--dim); margin:0 0 10px 8px; }
+  aside a { display:block; padding:8px 12px; border-radius:8px; color:var(--text); font-size:14px; }
+  aside a:hover { background:rgba(255,255,255,0.05); }
+  aside a.on { background:rgba(94,200,255,0.13); color:var(--accent); }
+  main { padding:40px 6vw; max-width:860px; }
+  main h1 { font-size:30px; margin:0 0 18px; }
+  main h2 { font-size:22px; margin:30px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  main h3 { font-size:17px; margin:22px 0 8px; color:#cfe3ff; }
+  main p, main li { color:#cdd7e6; }
+  main ul, main ol { margin:10px 0 10px 22px; }
+  main li { margin:4px 0; }
+  main code { background:#0a1120; border:1px solid var(--line); border-radius:5px;
+    padding:1px 6px; font-family:Consolas,monospace; font-size:13px; color:#bfe4ff; }
+  main pre { background:#060a12; border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; overflow-x:auto; margin:14px 0; }
+  main pre code { background:none; border:none; padding:0; color:#bfe4ff; }
+  main table { border-collapse:collapse; margin:14px 0; width:100%; font-size:14px; }
+  main th, main td { border:1px solid var(--line); padding:7px 11px; text-align:left; }
+  main th { background:rgba(255,255,255,0.04); }
+  main blockquote { border-left:3px solid var(--accent); padding:4px 14px; margin:12px 0;
+    color:var(--dim); background:rgba(94,200,255,0.05); }
+  main a { border-bottom:1px dotted var(--accent); }
+  main img { max-width:100%; border-radius:10px; border:1px solid var(--line); margin:12px 0; }
+  #loading { color:var(--dim); }
+</style>
+</head>
+<body>
+<nav><div class="in">
+  <img src="img/logo.png"><b>BAG<span>IDEA</span> Docs</b>
+  <a class="home" href="index.html">← Home</a>
+</div></nav>
+<div class="layout">
+  <aside id="side"><h4>GUIDES</h4></aside>
+  <main id="doc"><p id="loading">Loading…</p></main>
+</div>
+<script>
+  const RAW = "https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/docs/guide/";
+  const GUIDES = [
+    ["getting-started", "🚀 Getting started"],
+    ["agents", "🤖 Agents & skills"],
+    ["projects", "📁 Projects"],
+    ["ai-features", "✨ AI features"],
+    ["voice-feed", "🎤 Voice & feed"],
+    ["editor", "🎨 Office editor"],
+    ["plugins", "🧩 Plugins"],
+    ["office-ops", "🗂 Office ops"],
+    ["channels", "📨 Channels"],
+    ["cli", "⌨️ CLI"],
+    ["updates", "🔄 Updates"],
+    ["troubleshooting", "🛟 Troubleshooting"],
+  ];
+
+  // tiny, safe-enough markdown renderer (headings, lists, code, tables,
+  // links, bold/italic, blockquotes, images)
+  function md(src) {
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const lines = src.replace(/\r/g, "").split("\n");
+    let out = "", i = 0;
+    const inline = (s) => esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    while (i < lines.length) {
+      let l = lines[i];
+      if (/^```/.test(l)) { let c = ""; i++; while (i < lines.length && !/^```/.test(lines[i])) c += lines[i++] + "\n"; i++; out += "<pre><code>" + esc(c) + "</code></pre>"; continue; }
+      if (/^#{1,6}\s/.test(l)) { const n = l.match(/^#+/)[0].length; out += `<h${n}>${inline(l.replace(/^#+\s/, ""))}</h${n}>`; i++; continue; }
+      if (/^>\s?/.test(l)) { let q = ""; while (i < lines.length && /^>\s?/.test(lines[i])) q += lines[i++].replace(/^>\s?/, "") + " "; out += "<blockquote>" + inline(q) + "</blockquote>"; continue; }
+      if (/^\|/.test(l) && i + 1 < lines.length && /^\|[\s:|-]+\|/.test(lines[i + 1])) {
+        const row = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
+        const head = row(l); i += 2; let body = "";
+        while (i < lines.length && /^\|/.test(lines[i])) { body += "<tr>" + row(lines[i++]).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>"; }
+        out += "<table><tr>" + head.map((h) => `<th>${inline(h)}</th>`).join("") + "</tr>" + body + "</table>"; continue;
+      }
+      if (/^\s*[-*]\s/.test(l)) { out += "<ul>"; while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) out += "<li>" + inline(lines[i++].replace(/^\s*[-*]\s/, "")) + "</li>"; out += "</ul>"; continue; }
+      if (/^\s*\d+\.\s/.test(l)) { out += "<ol>"; while (i < lines.length && /^\s*\d+\.\s/.test(lines[i])) out += "<li>" + inline(lines[i++].replace(/^\s*\d+\.\s/, "")) + "</li>"; out += "</ol>"; continue; }
+      if (l.trim() === "") { i++; continue; }
+      out += "<p>" + inline(l) + "</p>"; i++;
+    }
+    return out;
+  }
+
+  const side = document.getElementById("side");
+  GUIDES.forEach(([id, label]) => {
+    const a = document.createElement("a"); a.textContent = label; a.href = "#" + id;
+    a.onclick = () => load(id); side.appendChild(a);
+  });
+  async function load(id) {
+    document.querySelectorAll("#side a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + id));
+    const doc = document.getElementById("doc");
+    doc.innerHTML = '<p id="loading">Loading…</p>';
+    try {
+      const txt = await (await fetch(RAW + id + ".md")).text();
+      doc.innerHTML = md(txt);
+      window.scrollTo(0, 0);
+    } catch { doc.innerHTML = "<p>Could not load this guide. <a href='" + RAW + id + ".md'>Open raw</a></p>"; }
+  }
+  load((location.hash || "#getting-started").slice(1));
+</script>
+</body>
+</html>
