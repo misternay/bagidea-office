@@ -38,4 +38,12 @@ func _process(delta: float) -> void:
 func _handle(line: String) -> void:
 	var evt: Variant = JSON.parse_string(line)
 	if evt is Dictionary:
+		# Office Editor saves → re-apply the custom layout (skip replay).
+		if evt.get("type") == "layout.changed" and not evt.get("replay", false):
+			var loader := get_node_or_null("../OfficeFloor/LayoutLoader")
+			if loader == null:
+				loader = get_tree().get_root().find_child("LayoutLoader", true, false)
+			if loader and loader.has_method("reload"):
+				loader.reload()
+			return
 		manager.handle(evt)

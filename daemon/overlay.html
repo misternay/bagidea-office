@@ -347,6 +347,19 @@
   /* voice buttons greyed when the main key is missing */
   .nokey { opacity: 0.35; filter: grayscale(1); }
 
+  /* 🎨 office editor */
+  .edpal { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .edchip { font-size: 11px; padding: 4px 9px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.04); color: #cfe3ff; }
+  .edchip.on { border-color: var(--accent); color: var(--accent); background: rgba(94,200,255,0.12); }
+  .edgrid { position: relative; width: 100%; height: 300px; border-radius: 10px;
+    background: repeating-linear-gradient(0deg, #0e1626 0 19px, #101a2c 19px 20px),
+                repeating-linear-gradient(90deg, #0e1626 0 19px, #101a2c 19px 20px);
+    border: 1px solid var(--line); overflow: hidden; cursor: crosshair; }
+  .editem { position: absolute; font-size: 17px; cursor: grab; line-height: 1;
+    filter: drop-shadow(0 1px 2px #000); }
+  .editem.sel { outline: 2px solid var(--accent); border-radius: 6px; background: rgba(94,200,255,0.2); }
+
   /* 📊 dashboard */
   .statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
   .statcard {
@@ -674,6 +687,7 @@
   <span id="conn"></span>
   <button id="opsBtn" title="Office Ops — งาน / ปฏิทิน / โน้ต / ผังองค์กร" style="margin-left:auto">🗂</button>
   <button id="pluginBtn" title="Plugins — ส่วนขยาย" style="margin-left:6px">🧩</button>
+  <button id="editBtn" title="จัดออฟฟิศ — Office Editor" style="margin-left:6px">🎨</button>
   <button id="discussBtn" title="Let agents discuss together" style="margin-left:6px">🗣</button>
   <button id="mapBtn" title="Top-down office map" style="margin-left:6px">🗺</button>
   <button id="dayBtn" title="World atmosphere" style="margin-left:6px">🌗</button>
@@ -2366,6 +2380,7 @@
 
   // ---- 🧩 plugins: list + open a plugin's panel inside the modal -----------
   document.getElementById("pluginBtn").onclick = () => openPlugins();
+  document.getElementById("editBtn").onclick = () => openEditor3d();
   async function openPlugins() {
     modal.classList.add("open");
     const r = await fetch("/plugins").then((x) => x.json()).catch(() => ({ plugins: [] }));
@@ -2398,6 +2413,124 @@
       `<iframe src="/plugin/${p.id}/panel" style="width:100%;height:60vh;border:none;border-radius:10px;background:#0c1322"></iframe>` +
       `<button class="bigbtn" id="plgBack" style="margin-top:8px">← ${t("กลับ")}</button>`;
     modalCard.querySelector("#plgBack").onclick = () => openPlugins();
+  }
+
+  // ---- 🎨 Office Editor: place furniture on a top-down grid ----------------
+  // World extents match the live map (MAP). Items store world meters; the
+  // grid is just a scaled view. Godot reads /layout and spawns on top of the
+  // base world, so atmosphere + effects are never touched.
+  const EDMAP = { x0: -11, x1: 17, z0: -11, z1: 14 };  // world bounds
+  const ED_ITEMS = [
+    ["desk", "🪑 โต๊ะทำงาน"], ["table", "🍽 โต๊ะกลม"], ["chair", "💺 เก้าอี้"],
+    ["shelf", "📚 ชั้นวาง"], ["plant", "🪴 ต้นไม้"], ["lamp", "💡 โคมไฟ"],
+    ["rug", "🟫 พรม"], ["partition", "🧱 ฉากกั้น"], ["wall", "🧱 กำแพง"],
+    ["poster", "🖼 รูป (import)"], ["model", "📦 โมเดล (import)"],
+  ];
+  let EDIT = { items: [], sel: -1, asset: null };
+  async function openEditor3d() {
+    modal.classList.add("open");
+    const r = await fetch("/layout").then((x) => x.json()).catch(() => ({ items: [] }));
+    EDIT = { items: r.items || [], sel: -1, asset: null };
+    modalCard.innerHTML = hdr("🎨 " + t("🎨 จัดออฟฟิศ (Editor)")) +
+      `<div style="font-size:11px;color:var(--dim);margin-bottom:8px">${t("คลิกบนผังเพื่อวาง · ลากเพื่อย้าย · ดับเบิลคลิกเพื่อลบ")}</div>
+       <div id="edPalette" class="edpal"></div>
+       <div id="edGrid" class="edgrid"></div>
+       <div id="edProps"></div>
+       <div class="btnrow" style="margin-top:10px">
+         <button class="danger" id="edClear">🗑 ${t("ล้างทั้งหมด")}</button>
+         <button class="primary" id="edSave">💾 ${t("บันทึกผัง")}</button>
+       </div>`;
+    const pal = modalCard.querySelector("#edPalette");
+    for (const [type, label] of ED_ITEMS) {
+      const b = document.createElement("div");
+      b.className = "edchip"; b.textContent = label; b.dataset.type = type;
+      b.onclick = () => {
+        pal.querySelectorAll(".edchip").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        EDIT.place = type;
+        if (type === "poster" || type === "model") edPickAsset(type);
+      };
+      pal.appendChild(b);
+    }
+    modalCard.querySelector("#edGrid").onclick = (e) => {
+      if (!EDIT.place || e.target.classList.contains("editem")) return;
+      const g = e.currentTarget.getBoundingClientRect();
+      const fx = (e.clientX - g.left) / g.width, fz = (e.clientY - g.top) / g.height;
+      const item = { type: EDIT.place,
+        x: +(EDMAP.x0 + fx * (EDMAP.x1 - EDMAP.x0)).toFixed(2),
+        z: +(EDMAP.z0 + fz * (EDMAP.z1 - EDMAP.z0)).toFixed(2),
+        rot: 0, scale: 1 };
+      if ((EDIT.place === "poster" || EDIT.place === "model") && EDIT.asset) item.asset = EDIT.asset;
+      EDIT.items.push(item);
+      EDIT.sel = EDIT.items.length - 1;
+      edRender();
+    };
+    modalCard.querySelector("#edClear").onclick = () => { EDIT.items = []; EDIT.sel = -1; edRender(); };
+    modalCard.querySelector("#edSave").onclick = async () => {
+      await api("/layout", { items: EDIT.items });
+      addChip("🎨 บันทึกผังออฟฟิศแล้ว — โลกอัปเดตทันที");
+      closeModal();
+    };
+    edRender();
+  }
+  async function edPickAsset(type) {
+    // reuse the upload pipeline: pick a file, store its /uploads url as asset
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = type === "poster" ? "image/*" : ".glb,.gltf,.fbx";
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      const up = await fetch("/upload", { method: "POST",
+        headers: { "x-file-name": encodeURIComponent(f.name) }, body: f }).then((x) => x.json());
+      EDIT.asset = up.path || up.url;
+      addChip("📎 พร้อมวาง: " + (up.name || f.name));
+    };
+    inp.click();
+  }
+  function edRender() {
+    const grid = modalCard.querySelector("#edGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const W = grid.clientWidth || 380, H = grid.clientHeight || 300;
+    const fx = (x) => (x - EDMAP.x0) / (EDMAP.x1 - EDMAP.x0) * W;
+    const fz = (z) => (z - EDMAP.z0) / (EDMAP.z1 - EDMAP.z0) * H;
+    const ICON = { desk: "🪑", table: "🍽", chair: "💺", shelf: "📚", plant: "🪴",
+      lamp: "💡", rug: "🟫", partition: "🧱", wall: "🧱", poster: "🖼", model: "📦" };
+    EDIT.items.forEach((it, i) => {
+      const d = document.createElement("div");
+      d.className = "editem" + (i === EDIT.sel ? " sel" : "");
+      d.textContent = ICON[it.type] || "▪";
+      d.style.left = fx(it.x) + "px";
+      d.style.top = fz(it.z) + "px";
+      d.style.transform = `translate(-50%,-50%) rotate(${it.rot || 0}deg) scale(${it.scale || 1})`;
+      d.onclick = (e) => { e.stopPropagation(); EDIT.sel = i; edRender(); };
+      d.ondblclick = (e) => { e.stopPropagation(); EDIT.items.splice(i, 1); EDIT.sel = -1; edRender(); };
+      // drag to move
+      d.onpointerdown = (e) => {
+        e.stopPropagation(); EDIT.sel = i;
+        const g = grid.getBoundingClientRect();
+        const move = (ev) => {
+          it.x = +(EDMAP.x0 + Math.max(0, Math.min(1, (ev.clientX - g.left) / g.width)) * (EDMAP.x1 - EDMAP.x0)).toFixed(2);
+          it.z = +(EDMAP.z0 + Math.max(0, Math.min(1, (ev.clientY - g.top) / g.height)) * (EDMAP.z1 - EDMAP.z0)).toFixed(2);
+          d.style.left = fx(it.x) + "px"; d.style.top = fz(it.z) + "px";
+        };
+        const up = () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up); edRender(); };
+        document.addEventListener("pointermove", move); document.addEventListener("pointerup", up);
+      };
+      grid.appendChild(d);
+    });
+    // selected-item props
+    const pb = modalCard.querySelector("#edProps");
+    if (EDIT.sel < 0 || !EDIT.items[EDIT.sel]) { pb.innerHTML = ""; return; }
+    const it = EDIT.items[EDIT.sel];
+    pb.innerHTML =
+      `<div class="field" style="margin-top:8px"><label>⚙ ${ICON[it.type] || ""} ${it.type}</label>
+        <div class="row" style="font-size:11px;color:var(--dim)">หมุน <input id="edRot" type="range" min="0" max="360" value="${it.rot || 0}">
+          ขนาด <input id="edScl" type="range" min="0.4" max="3" step="0.1" value="${it.scale || 1}">
+          สี <input id="edCol" type="color" value="#${it.color || '8a8f99'}"></div></div>`;
+    pb.querySelector("#edRot").oninput = (e) => { it.rot = +e.target.value; edRender(); };
+    pb.querySelector("#edScl").oninput = (e) => { it.scale = +e.target.value; edRender(); };
+    pb.querySelector("#edCol").oninput = (e) => { it.color = e.target.value.replace("#", ""); };
   }
 
   // ---- 📊 dashboard: the office at a glance --------------------------------

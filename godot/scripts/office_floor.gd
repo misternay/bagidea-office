@@ -40,6 +40,12 @@ func _ready() -> void:
 
 	_capture_map.call_deferred()
 
+	# 🎨 Office Editor layer: spawn the user's custom furniture/decor on top
+	# of the procedural world (atmosphere + effects stay intact).
+	var layout: Node = load("res://scripts/layout_loader.gd").new()
+	layout.name = "LayoutLoader"
+	add_child(layout)
+
 	# Splash floats logo-only over the desktop (transparent window). Going
 	# opaque here would paint a black box for the whole blocking scene build
 	# — flip only after the first real frame is on screen.

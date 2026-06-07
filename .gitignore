@@ -48,3 +48,4 @@ CharacterBase*
 # Plugin runtime data + user-dropped media
 plugins/*/data/
 plugins/music/tracks/
+daemon/layout.json

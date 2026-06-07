@@ -1654,6 +1654,7 @@ function readBodyRaw(req, cb) {
 }
 
 const MAPBG = path.join(__dirname, "map_bg.png");
+const LAYOUT_FILE = path.join(__dirname, "layout.json");  // Office Editor
 
 // Media file server for chat rendering (images / video / audio only).
 const MEDIA_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
@@ -2296,6 +2297,23 @@ const server = http.createServer((req, res) => {
       res.writeHead(403); return res.end("outside allowed roots");
     }
     serveMedia(res, norm);
+
+  } else if (req.method === "GET" && req.url === "/layout") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    try { res.end(fs.readFileSync(LAYOUT_FILE, "utf8")); }
+    catch { res.end(JSON.stringify({ items: [] })); }
+
+  } else if (req.method === "POST" && req.url === "/layout") {
+    // 🎨 Office Editor saves the whole layout; the world re-applies it live.
+    readBody(req, (body) => {
+      try {
+        const j = JSON.parse(body);
+        if (!Array.isArray(j.items)) throw new Error("items must be an array");
+        fs.writeFileSync(LAYOUT_FILE, JSON.stringify({ items: j.items.slice(0, 500) }, null, 1));
+        broadcast({ type: "layout.changed" }, false);
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
 
   } else if (req.method === "GET" && req.url === "/plugins") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
