@@ -51,6 +51,7 @@ enum UserEvent {
     MicDown,
     MicUp,
     SetHotkey(String),
+    PttKey(bool), // global voice hotkey: true = pressed, false = released
     WorldReady,
 }
 
@@ -104,39 +105,94 @@ fn send_win_h() {
     send_keys(&[(VK_LWIN, false), (0x48, false), (0x48, true), (VK_LWIN, true)]);
 }
 
-/// The Windows Voice Typing panel (TextInputHost) is ugly and floats over
-/// everything — OUR red pill/button is the mic indicator, so the panel gets
-/// parked off-screen while dictating (it keeps listening and typing). On
-/// mic-off it's moved back to a sane bottom-center spot first, so a manual
-/// Win+H later doesn't open an invisible panel.
-fn move_voice_panel(park: bool) {
-    std::thread::spawn(move || unsafe {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            FindWindowW, GetSystemMetrics, SetWindowPos, SM_CXSCREEN, SM_CYSCREEN,
-            SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
-        };
-        let title: Vec<u16> = "Microsoft Text Input Application\0".encode_utf16().collect();
-        for round in 0..14 {
-            if round > 0 {
-                std::thread::sleep(std::time::Duration::from_millis(150));
-            }
-            let h = FindWindowW(std::ptr::null(), title.as_ptr());
-            if !h.is_null() {
-                let (x, y) = if park {
-                    (-3000, -3000)
-                } else {
-                    ((GetSystemMetrics(SM_CXSCREEN) - 340) / 2, GetSystemMetrics(SM_CYSCREEN) - 320)
-                };
-                SetWindowPos(h, std::ptr::null_mut(), x, y, 0, 0,
-                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                if !park {
-                    break;
+/// The Windows Voice Typing panel (TextInputHost) is ugly, floats over
+/// everything, and its window TITLE varies between builds — so the panel is
+/// found by its owning PROCESS, not by name.
+static VOICE_HIDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+unsafe extern "system" fn enum_voice_windows(
+    h: HWND,
+    l: windows_sys::Win32::Foundation::LPARAM,
+) -> windows_sys::Win32::Foundation::BOOL {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    if IsWindowVisible(h) == 0 {
+        return 1;
+    }
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(h, &mut pid);
+    if pid == 0 {
+        return 1;
+    }
+    let hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+    if hp.is_null() {
+        return 1;
+    }
+    let mut buf = [0u16; 512];
+    let mut len = 512u32;
+    let ok = QueryFullProcessImageNameW(hp, 0, buf.as_mut_ptr(), &mut len);
+    CloseHandle(hp);
+    if ok != 0 {
+        let path = String::from_utf16_lossy(&buf[..len as usize]).to_lowercase();
+        if path.ends_with("textinputhost.exe") {
+            (*(l as *mut Vec<HWND>)).push(h);
+        }
+    }
+    1
+}
+
+fn visible_voice_windows() -> Vec<HWND> {
+    let mut v: Vec<HWND> = Vec::new();
+    unsafe {
+        EnumWindows(Some(enum_voice_windows), &mut v as *mut _ as isize);
+    }
+    v
+}
+
+/// Mic ON: keep the system panel hidden for as long as the mic is hot
+/// (hiding the window does not stop recognition) — OUR red pill/button is
+/// the indicator. The panel re-shows itself on state changes, so a little
+/// daemon thread re-hides it every 250 ms until told to stop.
+fn voice_hide(on: bool) {
+    use std::sync::atomic::Ordering;
+    if !on {
+        VOICE_HIDE.store(false, Ordering::SeqCst);
+        return;
+    }
+    if VOICE_HIDE.swap(true, Ordering::SeqCst) {
+        return; // hider already running
+    }
+    std::thread::spawn(|| {
+        use std::sync::atomic::Ordering;
+        while VOICE_HIDE.load(Ordering::SeqCst) {
+            for h in visible_voice_windows() {
+                unsafe {
+                    ShowWindow(h, SW_HIDE);
                 }
-                // parking: keep re-asserting for the full window — the panel
-                // re-centers itself while it animates in
             }
-            if !park && round >= 4 {
-                break;
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+    });
+}
+
+/// Mic OFF: stop hiding, toggle the panel closed, then VERIFY — if a panel
+/// window survives, toggle once more, and as a last resort hide it so it can
+/// never squat on the screen.
+fn voice_close() {
+    voice_hide(false);
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        send_win_h();
+        std::thread::sleep(std::time::Duration::from_millis(900));
+        if !visible_voice_windows().is_empty() {
+            send_win_h();
+            std::thread::sleep(std::time::Duration::from_millis(700));
+            for h in visible_voice_windows() {
+                unsafe {
+                    ShowWindow(h, SW_HIDE);
+                }
             }
         }
     });
@@ -524,6 +580,18 @@ fn main() {
     if let (Some(m), Some(hk)) = (hk_mgr.as_ref(), cur_hotkey) {
         let _ = m.register(hk);
     }
+    // Hotkey presses arrive on a hook thread — forwarding them through the
+    // event-loop proxy WAKES the loop even when none of our windows is
+    // active. (The old try_recv polling slept with the loop: F6 from another
+    // app did nothing until some unrelated event woke us — user-reported.)
+    let p_hotkey = event_loop.create_proxy();
+    global_hotkey::GlobalHotKeyEvent::set_event_handler(Some(
+        move |e: global_hotkey::GlobalHotKeyEvent| {
+            let _ = p_hotkey.send_event(UserEvent::PttKey(
+                e.state == global_hotkey::HotKeyState::Pressed,
+            ));
+        },
+    ));
 
     // Office pid for hide/show of the wallpaper window.
     let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
@@ -693,63 +761,6 @@ fn main() {
             }
         }
 
-        // Global push-to-talk: hold the chord, dictate, release to stop.
-        while let Ok(e) = global_hotkey::GlobalHotKeyEvent::receiver().try_recv() {
-            if let Some(hk) = cur_hotkey {
-                if e.id == hk.id() {
-                    match e.state {
-                        global_hotkey::HotKeyState::Pressed => {
-                            // Keyboard auto-repeat fires Pressed again and
-                            // again while held — only the first one counts.
-                            if ptt_held {
-                                continue;
-                            }
-                            ptt_held = true;
-                            if !ptt_on {
-                                // ── mic ON: dictate a command for the Director.
-                                ptt_on = true;
-                                // Summon the overlay if it's parked — the live
-                                // pill must be visible, and dictation needs a
-                                // real foreground box (the hidden #pttInp).
-                                let hidden = overlay
-                                    .outer_position()
-                                    .map(|p| p.x < -2000)
-                                    .unwrap_or(true);
-                                if hidden {
-                                    let (px, py) = if feed {
-                                        (feed_x, feed_y)
-                                    } else {
-                                        (overlay_x, overlay_y)
-                                    };
-                                    overlay.set_outer_position(LogicalPosition::new(px, py));
-                                    raise_orb(&orb);
-                                }
-                                overlay.set_focus();
-                                force_foreground(overlay.hwnd() as HWND);
-                                let _ = overlay_view
-                                    .evaluate_script("window.pttStart && pttStart()");
-                                // Let focus actually land before Win+H opens
-                                // the panel, or it attaches to the wrong window.
-                                std::thread::sleep(std::time::Duration::from_millis(230));
-                                send_win_h();
-                                move_voice_panel(true); // hide the ugly panel
-                            } else {
-                                // ── mic OFF: close the panel + SEND to main.
-                                ptt_on = false;
-                                move_voice_panel(false); // back on-screen first
-                                std::thread::sleep(std::time::Duration::from_millis(120));
-                                send_win_h();
-                                let _ = overlay_view
-                                    .evaluate_script("window.pttEnd && pttEnd()");
-                            }
-                        }
-                        global_hotkey::HotKeyState::Released => {
-                            ptt_held = false;
-                        }
-                    }
-                }
-            }
-        }
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
             if let TrayIconEvent::Click { button: tray_icon::MouseButton::Left, button_state: tray_icon::MouseButtonState::Up, .. } = ev {
                 toggle = true;
@@ -862,12 +873,52 @@ fn main() {
                     force_foreground(overlay.hwnd() as HWND);
                     std::thread::sleep(std::time::Duration::from_millis(160));
                     send_win_h();
-                    move_voice_panel(true);  // our red button IS the indicator
+                    voice_hide(true);   // our red button IS the indicator
                 }
-                UserEvent::MicUp => {
-                    move_voice_panel(false); // sane spot for future manual Win+H
-                    std::thread::sleep(std::time::Duration::from_millis(120));
-                    send_win_h();            // toggle the panel closed
+                UserEvent::MicUp => voice_close(),
+                UserEvent::PttKey(pressed) => {
+                    // Global voice hotkey (F6): press toggles the mic — ON
+                    // dictates a command, OFF sends it to the office. The
+                    // auto-repeat a held key generates is debounced.
+                    if !pressed {
+                        ptt_held = false;
+                    } else if !ptt_held {
+                        ptt_held = true;
+                        if !ptt_on {
+                            // ── mic ON: the live pill needs the overlay on
+                            // screen, and dictation needs a real foreground
+                            // box (the hidden landing strip).
+                            ptt_on = true;
+                            let hidden = overlay
+                                .outer_position()
+                                .map(|p| p.x < -2000)
+                                .unwrap_or(true);
+                            if hidden {
+                                let (px, py) = if feed {
+                                    (feed_x, feed_y)
+                                } else {
+                                    (overlay_x, overlay_y)
+                                };
+                                overlay.set_outer_position(LogicalPosition::new(px, py));
+                                raise_orb(&orb);
+                            }
+                            overlay.set_focus();
+                            force_foreground(overlay.hwnd() as HWND);
+                            let _ = overlay_view
+                                .evaluate_script("window.pttStart && pttStart()");
+                            // Let focus land before Win+H opens the panel,
+                            // or it attaches to the wrong window.
+                            std::thread::sleep(std::time::Duration::from_millis(230));
+                            send_win_h();
+                            voice_hide(true);
+                        } else {
+                            // ── mic OFF: close + verify, then send to office.
+                            ptt_on = false;
+                            voice_close();
+                            let _ = overlay_view
+                                .evaluate_script("window.pttEnd && pttEnd()");
+                        }
+                    }
                 }
                 UserEvent::SetHotkey(s) => {
                     if let Some(m) = hk_mgr.as_ref() {

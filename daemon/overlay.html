@@ -1025,10 +1025,12 @@
       if (!val) return;
       if (document.body.classList.contains("feedmode"))
         addFeed("ceo", "🎤 " + val, "", "");
-      else addChip("🎤 สั่งงาน Director: " + val.slice(0, 140));
+      else addChip("🎤 คำสั่งจากคุณ: " + val.slice(0, 140));
+      // Spoken commands are YOUR words — they go through the CEO seat, so
+      // the Director walks over, takes the order, and reports back in person.
       await fetch("/chat", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ agent: "main", prompt: val }),
+        body: JSON.stringify({ agent: "ceo", prompt: val }),
       });
     }, 750);
   };
