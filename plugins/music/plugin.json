@@ -1,0 +1,17 @@
+{
+  "id": "music",
+  "name": "🎵 Music Player",
+  "version": "1.0.0",
+  "description": "เครื่องเล่นเพลงในออฟฟิศ — เปิด/หยุด/เปลี่ยนเพลง/วนเพลย์ลิสต์ได้ และ agents สั่งควบคุมได้",
+  "panel": "panel.html",
+  "commands": [
+    { "name": "play", "args": "<ชื่อเพลง/หมายเลข ว่าง=เล่นต่อ>", "desc": "เล่นเพลง" },
+    { "name": "pause", "args": "", "desc": "หยุดชั่วคราว" },
+    { "name": "next", "args": "", "desc": "เพลงถัดไป" },
+    { "name": "prev", "args": "", "desc": "เพลงก่อนหน้า" },
+    { "name": "loop", "args": "on|off", "desc": "วนเพลย์ลิสต์" },
+    { "name": "volume", "args": "0-100", "desc": "ปรับเสียง" },
+    { "name": "status", "args": "", "desc": "ดูว่ากำลังเล่นอะไร" }
+  ],
+  "needsKeys": []
+}

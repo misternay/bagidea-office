@@ -673,6 +673,7 @@
   <span class="logo">BAGIDEA</span> OFFICE
   <span id="conn"></span>
   <button id="opsBtn" title="Office Ops — งาน / ปฏิทิน / โน้ต / ผังองค์กร" style="margin-left:auto">🗂</button>
+  <button id="pluginBtn" title="Plugins — ส่วนขยาย" style="margin-left:6px">🧩</button>
   <button id="discussBtn" title="Let agents discuss together" style="margin-left:6px">🗣</button>
   <button id="mapBtn" title="Top-down office map" style="margin-left:6px">🗺</button>
   <button id="dayBtn" title="World atmosphere" style="margin-left:6px">🌗</button>
@@ -770,6 +771,55 @@
   window.onerror = (m, s, l, c) =>
     fetch("/event", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ type: "ui.error", agent: "overlay", text: `${m} @${l}:${c}` }) });
+
+  // ---- 🌐 i18n -------------------------------------------------------------
+  // The source strings in this file are THAI; t() returns them untouched when
+  // the language is Thai, and looks up an English (or other) translation
+  // otherwise. Default language is English for everyone EXCEPT a machine that
+  // pinned 'th' in localStorage (the owner's). Missing keys fall back to the
+  // Thai source, so the UI is never blank while translations fill in.
+  const I18N = {
+    en: {
+      "PLUGINS": "PLUGINS",
+      "ส่วนขยายของออฟฟิศ — คลิกเพื่อเปิดแผง · agents สั่งงาน plugin เหล่านี้ได้":
+        "Office extensions — click to open a panel · agents can drive these plugins",
+      "เพิ่ม plugin: วางโฟลเดอร์ใน": "Add a plugin: drop a folder in",
+      "แล้วกด": "then press",
+      "ดูวิธีเขียนใน docs/guide/plugins.md": "see docs/guide/plugins.md to author one",
+      "โหลด plugins ใหม่": "Reload plugins",
+      "ยังไม่มี plugin": "No plugins yet",
+      "คำสั่ง": "commands",
+      "เปิดแผง": "Open panel",
+      "กลับ": "Back",
+      "เปิด": "Open",
+      "ปิด": "Close",
+      "บันทึก": "Save",
+      "ลบ": "Delete",
+      "ทดสอบ": "Test",
+      "ยกเลิก": "Cancel",
+      "ภาษา": "Language",
+      "🎨 จัดออฟฟิศ (Editor)": "🎨 Office Editor",
+      "วางเฟอร์นิเจอร์ · กำแพง · ของตกแต่ง — แล้วบันทึก":
+        "Place furniture · walls · decor — then save",
+      "เพิ่ม": "Add", "ล้างทั้งหมด": "Clear all", "บันทึกผัง": "Save layout",
+      "เลือกของที่จะวาง": "Pick an item to place",
+      "คลิกบนผังเพื่อวาง · ลากเพื่อย้าย · ดับเบิลคลิกเพื่อลบ":
+        "Click the grid to place · drag to move · double-click to remove",
+    },
+  };
+  function uiLang() {
+    try { return localStorage.getItem("lang") || "en"; } catch { return "en"; }
+  }
+  let LANG = uiLang();
+  function t(s) {
+    if (LANG === "th") return s;
+    const d = I18N[LANG];
+    return (d && d[s]) || s;
+  }
+  function setLang(l) {
+    try { localStorage.setItem("lang", l); } catch {}
+    location.reload();
+  }
 
   // ---- portable identity (must match agent_manager.gd) -------------------
   function phash(id) {
@@ -1725,6 +1775,11 @@
             <option value="30">ทุก 30 นาที</option>
             <option value="60">ทุก 1 ชั่วโมง</option>
           </select></div>
+        <div class="field" style="margin-top:8px"><label>🌐 ${t("ภาษา")} / Language — เปลี่ยนภาษาของทั้งโปรแกรม</label>
+          <select id="langSel">
+            <option value="en">🇬🇧 English</option>
+            <option value="th">🇹🇭 ไทย</option>
+          </select></div>
         <div class="field" style="margin-top:8px"><label>☕ SOCIAL — agents ว่างๆ จับกลุ่มคุย/หยอกล้อกันเอง (อาจเสนอโปรเจคให้คุณอนุมัติ)</label>
           <select id="socSel">
             <option value="0">ปิด</option>
@@ -1823,6 +1878,9 @@
       const socSel = modalCard.querySelector("#socSel");
       socSel.value = String(SOCIALMIN);
       socSel.onchange = () => api("/registry/social", { min: Number(socSel.value) });
+      const langSel = modalCard.querySelector("#langSel");
+      langSel.value = LANG;
+      langSel.onchange = () => { api("/registry/lang", { lang: langSel.value }); setLang(langSel.value); };
       const hbSel = modalCard.querySelector("#hbSel");
       hbSel.value = String(HEARTBEAT);
       hbSel.onchange = async () => {
@@ -2305,6 +2363,43 @@
 
   // ---- 🗂 Office Ops: jobs / calendar / notes / org chart -------------------
   document.getElementById("opsBtn").onclick = () => openOps("jobs");
+
+  // ---- 🧩 plugins: list + open a plugin's panel inside the modal -----------
+  document.getElementById("pluginBtn").onclick = () => openPlugins();
+  async function openPlugins() {
+    modal.classList.add("open");
+    const r = await fetch("/plugins").then((x) => x.json()).catch(() => ({ plugins: [] }));
+    modalCard.innerHTML = hdr("🧩 " + t("PLUGINS")) +
+      `<div style="font-size:11px;color:var(--dim);margin-bottom:10px">${t("ส่วนขยายของออฟฟิศ — คลิกเพื่อเปิดแผง · agents สั่งงาน plugin เหล่านี้ได้")}</div>
+       <div id="plgList"></div>
+       <div style="font-size:10.5px;color:var(--dim);margin-top:10px">
+         ➕ ${t("เพิ่ม plugin: วางโฟลเดอร์ใน")} <code>plugins/</code> ${t("แล้วกด")} 🔄 — ${t("ดูวิธีเขียนใน docs/guide/plugins.md")}</div>
+       <button class="bigbtn" id="plgReload" style="margin-top:8px">🔄 ${t("โหลด plugins ใหม่")}</button>`;
+    const box = modalCard.querySelector("#plgList");
+    if (!(r.plugins || []).length)
+      box.innerHTML = `<div style="font-size:11.5px;color:var(--dim)">${t("ยังไม่มี plugin")}</div>`;
+    for (const p of r.plugins || []) {
+      const row = document.createElement("div");
+      row.className = "arow";
+      row.innerHTML = `<div class="meta"><b>${p.name}</b>
+          <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
+        (p.commands.length ? ` · ${p.commands.length} ${t("คำสั่ง")}` : "") + `</span></div>` +
+        (p.panel ? `<div class="winbtn" title="${t("เปิดแผง")}">▶</div>` : "");
+      if (p.panel) row.querySelector(".winbtn").onclick = () => openPluginPanel(p);
+      else row.style.cursor = "default";
+      box.appendChild(row);
+    }
+    modalCard.querySelector("#plgReload").onclick = () =>
+      api("/plugins/reload", {}).then(() => openPlugins());
+  }
+  function openPluginPanel(p) {
+    modal.classList.add("open");
+    modalCard.innerHTML = hdr(p.name) +
+      `<iframe src="/plugin/${p.id}/panel" style="width:100%;height:60vh;border:none;border-radius:10px;background:#0c1322"></iframe>` +
+      `<button class="bigbtn" id="plgBack" style="margin-top:8px">← ${t("กลับ")}</button>`;
+    modalCard.querySelector("#plgBack").onclick = () => openPlugins();
+  }
+
   // ---- 📊 dashboard: the office at a glance --------------------------------
   async function renderDash() {
     const s = await fetch("/stats").then((x) => x.json()).catch(() => null);
@@ -3122,6 +3217,15 @@
       if (ev.features) FEATURES = ev.features;
       TTSON = ev.tts !== false;
       SOCIALMIN = Number(ev.socialMin !== undefined ? ev.socialMin : 60);
+      // Machine default language (registry) applies only when the user hasn't
+      // pinned one in this webview. Reload once so the UI re-renders in it.
+      try {
+        if (!localStorage.getItem("lang") && ev.lang && ev.lang !== LANG) {
+          localStorage.setItem("lang", ev.lang);
+          if (ev.lang !== "en") return location.reload();
+          LANG = ev.lang;
+        }
+      } catch {}
       gateVoiceUI();
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();

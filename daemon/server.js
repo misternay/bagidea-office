@@ -104,7 +104,8 @@ function rosterEvt() {
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
-    socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60) };
+    socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
+    lang: reg.lang || "en" };
 }
 
 // Structured persona → one compiled system prompt (editor v2 fields).
@@ -535,7 +536,8 @@ ${places}
 อย่าเปิดหน้าต่างรบกวนผู้ใช้; ถ้าจำเป็นต้องเปิดจริงๆ จนไม่มีทางอื่น ให้รันคำสั่งเปิดตรงๆ
 แล้วระบบ Security จะขอ allow จากผู้ใช้ให้เอง.
 กฎเหล็ก: server/process ทุกตัวที่คุณเปิดเพื่อทดสอบ (dev server, next start, ฯลฯ)
-ต้องปิดให้หมดก่อนจบงาน — ห้ามทิ้งโปรเซสค้างไว้ในเครื่องผู้ใช้เด็ดขาด.${keysLine}${sysTools}
+ต้องปิดให้หมดก่อนจบงาน — ห้ามทิ้งโปรเซสค้างไว้ในเครื่องผู้ใช้เด็ดขาด.${keysLine}${sysTools}${
+  (typeof plugins !== "undefined" && plugins.agentNote()) || ""}
 </office-projects>`;
 }
 
@@ -1508,6 +1510,11 @@ const channels = require("./channels")({
 });
 channels.restart();
 
+// ---------------------------------------------------------------- plugins
+const plugins = require("./plugins")({
+  broadcast, reg, workspace: WORKSPACE, log: (s) => console.log(s),
+});
+
 // ---------------------------------------------------------------- social
 // The office has a SOUL: idle agents occasionally hang out — usually a
 // token-free canned banter scene in the meeting corner, sometimes a real
@@ -2290,6 +2297,19 @@ const server = http.createServer((req, res) => {
     }
     serveMedia(res, norm);
 
+  } else if (req.method === "GET" && req.url === "/plugins") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ plugins: plugins.list() }));
+
+  } else if (req.method === "POST" && req.url === "/plugins/reload") {
+    plugins.load();
+    broadcast({ type: "plugins.changed" }, false);
+    res.writeHead(200); res.end("ok");
+
+  } else if (req.url.startsWith("/plugin/") &&
+      plugins.handleHttp(req, res, readBody, readBodyRaw)) {
+    /* handled by a plugin */
+
   } else if (req.method === "POST" && req.url === "/registry/key/test") {
     // 🧪 verify a main key actually works (a tiny authenticated call).
     readBody(req, (body) => {
@@ -2591,6 +2611,16 @@ const server = http.createServer((req, res) => {
         broadcast({ type: "proposal." + p.status, agent: p.by, name: p.name, proposal: p.id });
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/lang") {
+    readBody(req, (body) => {
+      try {
+        reg.lang = String(JSON.parse(body).lang || "en").slice(0, 5);
+        saveReg();
+        pushRoster();
+        res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
     });
 
   } else if (req.method === "POST" && req.url === "/registry/social") {

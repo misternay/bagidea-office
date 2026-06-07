@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎵 Music</title>
+<style>
+  :root { --accent:#5ec8ff; --dim:#8294ab; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Noto Sans Thai',sans-serif; }
+  body { background:#0c1322; color:#dbe7ff; padding:14px; user-select:none; }
+  h2 { font-size:13px; letter-spacing:1.5px; color:var(--accent); margin-bottom:12px; }
+  #now { background:linear-gradient(160deg,#15203a,#0c1322); border:1px solid rgba(255,255,255,0.08);
+    border-radius:12px; padding:14px; text-align:center; margin-bottom:12px; }
+  #disc { width:84px; height:84px; border-radius:50%; margin:0 auto 10px;
+    background:radial-gradient(circle at 50% 50%,#2a3a5c 0 18%,#1a2740 19% 100%);
+    border:3px solid #243250; position:relative; }
+  #disc::after { content:""; position:absolute; inset:38px; border-radius:50%; background:var(--accent); }
+  body.playing #disc { animation:spin 3s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #title { font-size:13px; font-weight:600; min-height:18px; }
+  #sub { font-size:10.5px; color:var(--dim); margin-top:2px; }
+  .ctrls { display:flex; justify-content:center; gap:8px; margin:12px 0; }
+  .ctrls button { width:42px; height:42px; border-radius:50%; cursor:pointer; font-size:16px;
+    background:rgba(94,200,255,0.1); border:1px solid rgba(94,200,255,0.35); color:#dbe7ff; }
+  .ctrls #pp { width:52px; height:52px; font-size:20px; }
+  .ctrls button:hover { border-color:var(--accent); }
+  .row { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); margin:8px 0; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  .pill { padding:3px 9px; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
+    cursor:pointer; font-size:10.5px; }
+  .pill.on { color:var(--accent); border-color:var(--accent); background:rgba(94,200,255,0.1); }
+  #list { margin-top:10px; max-height:220px; overflow-y:auto; }
+  .trk { padding:7px 10px; border-radius:8px; cursor:pointer; font-size:11.5px;
+    display:flex; gap:8px; align-items:center; }
+  .trk:hover { background:rgba(94,200,255,0.07); }
+  .trk.cur { background:rgba(94,200,255,0.13); color:var(--accent); }
+  #empty { color:var(--dim); font-size:11px; text-align:center; padding:18px 8px; line-height:1.6; }
+</style></head>
+<body>
+<h2>🎵 MUSIC PLAYER</h2>
+<div id="now">
+  <div id="disc"></div>
+  <div id="title">— ไม่มีเพลง —</div>
+  <div id="sub"></div>
+</div>
+<div class="ctrls">
+  <button id="prev" title="ก่อนหน้า">⏮</button>
+  <button id="pp" title="เล่น/หยุด">▶</button>
+  <button id="next" title="ถัดไป">⏭</button>
+</div>
+<div class="row"><span>🔊</span><input id="vol" type="range" min="0" max="100"><span class="pill" id="loop">🔁 วน</span></div>
+<div id="list"></div>
+<div id="empty" style="display:none">
+  ยังไม่มีเพลง<br>วางไฟล์ <b>.mp3</b> ไว้ใน<br><code>plugins/music/tracks/</code><br>แล้วรีเฟรช
+</div>
+<audio id="audio"></audio>
+<script>
+  const A = document.getElementById("audio");
+  let S = { list: [], index: 0, playing: false, volume: 60, loop: true };
+
+  async function pull() {
+    try { S = await (await fetch("/plugin/music/state")).json(); } catch {}
+    render();
+    sync();
+  }
+  function render() {
+    document.getElementById("empty").style.display = S.list.length ? "none" : "block";
+    document.getElementById("vol").value = S.volume;
+    document.getElementById("loop").classList.toggle("on", S.loop);
+    const cur = S.list[S.index];
+    document.getElementById("title").textContent = cur ? cur.replace(/\.[^.]+$/, "") : "— ไม่มีเพลง —";
+    document.getElementById("sub").textContent = S.list.length ? `${S.index + 1} / ${S.list.length}` : "";
+    document.body.classList.toggle("playing", S.playing);
+    document.getElementById("pp").textContent = S.playing ? "⏸" : "▶";
+    const L = document.getElementById("list");
+    L.innerHTML = "";
+    S.list.forEach((f, i) => {
+      const d = document.createElement("div");
+      d.className = "trk" + (i === S.index ? " cur" : "");
+      d.textContent = (i === S.index && S.playing ? "🎵 " : "") + f.replace(/\.[^.]+$/, "");
+      d.onclick = () => cmd("play", String(i + 1));
+      L.appendChild(d);
+    });
+  }
+  // make the actual audio element match the shared state
+  function sync() {
+    A.volume = (S.volume || 60) / 100;
+    const want = S.list.length ? "/plugin/music/track?i=" + S.index : "";
+    if (want && !A.src.endsWith("i=" + S.index)) A.src = want;
+    if (S.playing && want) A.play().catch(() => {});
+    else A.pause();
+  }
+  A.onended = () => cmd("next");
+  async function cmd(c, args) {
+    try { await fetch("/plugin/music/cmd", { method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cmd: c, args: args || "" }) }); } catch {}
+    pull();
+  }
+  document.getElementById("pp").onclick = () => cmd(S.playing ? "pause" : "play");
+  document.getElementById("next").onclick = () => cmd("next");
+  document.getElementById("prev").onclick = () => cmd("prev");
+  document.getElementById("loop").onclick = () => cmd("loop", S.loop ? "off" : "on");
+  document.getElementById("vol").oninput = (e) => { A.volume = e.target.value / 100; };
+  document.getElementById("vol").onchange = (e) => cmd("volume", e.target.value);
+
+  // live updates when an AGENT controls the player
+  try {
+    const ws = new WebSocket("ws://127.0.0.1:8787/ws");
+    ws.onmessage = (m) => { try { const e = JSON.parse(m.data);
+      if (!e.replay && e.type === "plugin.event" && e.plugin === "music") pull(); } catch {} };
+  } catch {}
+  pull();
+  setInterval(pull, 4000);
+</script>
+</body></html>
