@@ -7,8 +7,8 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 
 🌐 **Website:** the landing page + browsable docs live in [`web/`](web/) (deployable to any static host).
 
-![The office, alive on a real desktop — night shift, Ghost Deck glowing](docs/img/world.png)
-*A real desktop, captured live: agents at their desks at 4 AM, the floating Ghost Deck glowing top-right, garden lamps on, desktop icons rendering on top — this is a real wallpaper.*
+![The office, alive on a real desktop — the team at their desks](docs/img/world.png)
+*Captured live from the wallpaper: the CEO, the Director (Shino) and staff at work, glowing monitors, the brand billboard, the server room humming — desktop icons render on top. This is a real wallpaper.*
 
 > ✅ **Status: working product (Windows 11).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions working *inside real project folders* → spatialized approvals → agent management UI → Telegram/Discord/LINE channels → CLI → self-updater. Some art packs are not bundled (licenses — see [Art assets](#art-assets)); the game falls back to procedural placeholders without them.
 
@@ -39,7 +39,7 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 ### 🖥️ Live wallpaper world (Layer 1 — Godot 4)
 - Renders **behind your desktop icons** (WorkerW technique, same as Wallpaper Engine)
 - HD-2D look: 3D office + billboarded pixel-art sprites lit by the scene, sky-driven image-based lighting, SSR-polished reflective floors, a cinematic tilt-shift focus pass (breathing vignette, edge desaturation, anamorphic bars), film grain, native-res MSAA
-- **10 zones**: Executive Office, Operations Floor (6 desks), Lobby, Cafeteria, Security Center, Meeting Room, Server Room, two Dormitories (8 bunks — offline agents walk to a bed and sleep, they never just vanish), and a **Recreation Room** with a TV corner, chess, a hydroponics garden, a wandering pixel dog 🐕 and a self-kicking football ⚽
+- **A swappable 3×3 room grid (jigsaw)**: every room is an identical cell, so any room fits any slot — rearrange the whole floor from the Office Editor and the furniture, agent anchors and navigation all move with it. Rooms include Executive (CEO command console), Operations (6 desks, monitors facing their seats), Lobby, Cafeteria, Server, Meeting (seats face the table), Recreation, and two Dormitories (offline agents walk to a bunk and sleep). A wandering **office cat 🐱** and a self-kicking football ⚽ follow the Recreation room, and a couple of **dogs 🐕** hang out in the Cafeteria — when you swap those rooms, the pets follow
 - A **countryside** around the office: 4,200 blades of wind-swaying grass, low-poly mountains and trees, drifting cartoon clouds (a near layer actually crosses the camera frame), bird flocks, daytime pollen motes and fireflies at night
 - Agents **walk** between zones on an A* waypoint graph with 4-direction animated spritesheets; facing follows movement
 - **Real-time day/night cycle** — sun, sky color, ambient and reflections follow your machine's clock (sunset ~17:00, night by 18:00); manual override from the overlay (🌗) for golden-hour screenshots
@@ -53,9 +53,10 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 - Branded boot: a transparent floating logo splash + a pulsing circular logo card — never a black box
 
 ### 🧩 Extensibility & customization (2026-06)
-- **Plugins**: a real extension host — a plugin folder adds UI panels, server routes, and **commands agents can drive**. Ships with a **🎵 Music Player** (control from the panel or by asking an agent); write your own per [the guide](docs/guide/plugins.md)
-- **🎨 Office Editor**: place furniture / walls / decor on a top-down grid and **import your own models (.glb/.gltf/.fbx) and images** — spawned on top of the world, atmosphere intact
-- **🌐 Multi-language UI**: English default, Thai included, picker in settings (per-machine default)
+- **Plugins**: a real extension host — a plugin folder adds UI panels, server routes, and **commands agents can drive**, with `ctx` access to the office (registry, feed, broadcast, `runClaude`, private storage). Ships with two **core** plugins (🎵 Music Player, 🧮 Calculator — locked, pinned to the top of the list); install more from any GitHub repo (`bagidea plugin install <url>`). Start from the official **[template](https://github.com/bagidea/bagidea-office-template)** (a Hello-World plugin + a `CLAUDE.md` so an agent can build one), or read the worked examples — the [calculator](https://github.com/bagidea/bagidea-office-calculator-plugin) and [music-player](https://github.com/bagidea/bagidea-office-music-player-plugin) repos. Full spec: [the guide](docs/guide/plugins.md)
+- **🎨 Office Editor**: rearrange the **room grid** (click two rooms to swap), place furniture / walls / decor on a top-down grid, and **import your own models (.glb/.gltf/.fbx) and images** — spawned on top of the world, atmosphere intact
+- **Agent skill library**: every office ships with 9 builtin capability packs (deep-research, office-control, plugin-builder, code-review, doc-writer, debug-detective, data-wrangler, project-kickoff, diagram-maker) you can assign from the editor — plus Hermes-style auto-learned skills that grow at runtime
+- **🌐 Multi-language UI — 14 languages**: English default + ไทย/中文/Español/हिन्दी/العربية/Português/Русский/日本語/Deutsch/Français/한국어/Indonesia/Tiếng Việt. The overlay auto-translates to any of them; picker in settings (office-wide, per-machine default)
 - **🌍 Official website** in [`web/`](web/) — landing page + browsable docs, deployable to any static host
 
 ### 🎤 Voice, channels, memory & media (2026-06)
@@ -64,9 +65,10 @@ Not a dashboard. Not a chat window. A **world** that renders the true state of y
 - **Hermes-style memory** (token-lean): shared `workspace/OFFICE.md` + per-agent `workspace/memory/<id>.md`, distilled automatically after real work; fresh sessions get pointers + a short tail, full recall on demand
 - **Main API keys + feature gates**: `OPENAI_API_KEY` / `GEMINI_API_KEY` are first-class — voice/TTS/image/realtime grey out with guidance until set; an extra-key vault feeds agents' own env
 - **Attachments & media**: paperclip / drag-drop upload; chat renders images, video, audio inline; agents produce images via the `/gen/image` **system tool** and they appear automatically
-- **Social office**: idle agents hang out (banter + real AI-to-AI chats) and can pitch **project proposals** you approve into existence
+- **Social office**: idle agents drift together — sometimes in **groups of 3–4** — for free canned banter or real AI-to-AI chats, and a good conversation can crystallize into a **project proposal**. Pitches are steered toward standalone projects or **office plugins** (never editing the core program); you approve or reject each one with an **optional note to the team**, and approved work scaffolds into a default `projects/` folder
+- **📞 Calls**: the **main agent only** is callable (realtime Gemini Live voice) — it speaks in the voice you assigned it, or a sensible default preset
 - **📊 Dashboard** (OFFICE OPS → STATS): runs / cost / 7-day chart / busiest agents / uptime / channels / key status
-- **`bagidea` CLI v2**: `ask`, `status`, `stats`, `feed`, `say`, `image`, `agents`, `projects`, `channels`, and more
+- **`bagidea` CLI**: `start`/`stop`/`restart`, `ask`/`chat`, `status`, `stats`, `agents`, `projects`, `proposals` + `proposal approve|reject <id> [note]`, `plugins` + `plugin install|remove`, `lang`, `say`/`voices`/`image`, `channels`, `keys`, `update`, and more (`bagidea --help`)
 - **Living chat head**: a drifting gradient ring that spins amber while agents work
 
 ### 🔌 Event daemon (Layer 0 — Node.js, zero dependencies)
@@ -358,17 +360,28 @@ The installer puts `bagidea` on your PATH (manual installs: the repo root has
 `bagidea.cmd`). It talks to the running office — and can start it.
 
 ```
-bagidea start                 launch the office (if not running)
-bagidea stop                  stop the whole suite
-bagidea status                health + agents + projects + who's working
-bagidea ask "<message>"       ask the Director and WAIT for the final answer
-bagidea chat <agent> "<msg>"  fire-and-forget to a specific agent
-bagidea projects              list projects with live status
-bagidea open "<project>"      open a project window (same as ▶)
-bagidea feed                  live office event stream in your terminal
-bagidea update                update to the latest version + relaunch
-bagidea version               current build
+bagidea start | stop | restart    launch / stop / restart the whole suite
+bagidea status                    health + agents + projects + who's working
+bagidea stats                     dashboard: runs / cost / busiest / uptime
+bagidea ask "<message>"           ask the Director and WAIT for the final answer
+bagidea chat <agent> "<msg>"      fire-and-forget to a specific agent
+bagidea agents | projects         list staff / projects with live status
+bagidea open "<project>"          open a project window (same as ▶)
+bagidea proposals                 team project pitches awaiting a verdict
+bagidea proposal show <id>        read a pitch in full
+bagidea proposal approve|reject <id> [note]   decide (+ optional note to the team)
+bagidea plugins                   list installed plugins
+bagidea plugin install <git-url>  add a plugin · plugin remove <id>
+bagidea lang [code]               show / set the office language (14 languages)
+bagidea say "<text>" | voices     speak via TTS / list voice presets
+bagidea image "<prompt>"          generate an image into the office
+bagidea channels | keys           channel + API-key status
+bagidea feed                      live office event stream in your terminal
+bagidea update                    update to the latest version + relaunch
+bagidea --help | --version        full command list / current build
 ```
+
+Full reference: [`docs/guide/cli.md`](docs/guide/cli.md).
 
 ## HTTP API
 
@@ -499,6 +512,10 @@ this makes them employable"*).
 - [x] Attachments & inline media, AI image generation system tool
 - [x] Social office + project proposals, dashboard, CLI v2
 - [x] **Plugins** (host + music player + SDK), **Office Editor** (place/import), **i18n**, official **website**
+- [x] **Swappable 3×3 room grid** — rearrange the floor; furniture, anchors, nav and pets follow
+- [x] **Plugin ecosystem** — core vs installed plugins, 🧮 Calculator, GitHub install, official template + example repos
+- [x] **14-language UI**, **builtin agent skill library** (9 packs), open-source clone+build installer, `bagidea restart`
+- [x] **Social groups** (3–4 agents) → plugin-oriented proposals with approve/reject notes; **main-only calls** with assigned voices
 - [ ] Wake word; channel round-trip reports (delegate results back to the channel)
 - [ ] macOS/Linux wallpaper backends
 - [ ] Signed binary releases (skip the Rust build on install)

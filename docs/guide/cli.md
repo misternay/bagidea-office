@@ -9,10 +9,12 @@
 โปรแกรม
   bagidea start                 เปิดออฟฟิศ (ถ้ายังไม่เปิด)
   bagidea stop                  ปิดทั้งชุด
+  bagidea restart               ปิดแล้วเปิดใหม่ (โหลดโค้ด/ฉาก/ปลั๊กอินใหม่)
   bagidea status                ภาพรวมระบบ + agents + โปรเจค + keys
   bagidea stats                 📊 สถิติงาน 7 วัน + ค่าใช้จ่าย + กราฟ
   bagidea update                อัปเดต + รีสตาร์ท
-  bagidea version               commit ปัจจุบัน
+  bagidea --version             commit ปัจจุบัน
+  bagidea --help                หน้านี้
 
 คุยกับออฟฟิศ
   bagidea ask "<ข้อความ>"        สั่งงานในนาม CEO และรอคำตอบจบ
@@ -27,15 +29,27 @@
   bagidea memory <agent>        อ่านสมุดความจำของ agent
   bagidea office                อ่าน OFFICE.md (ข้อมูลกลาง)
 
+ข้อเสนอจากทีม
+  bagidea proposals             ข้อเสนอโปรเจคที่รออนุมัติ
+  bagidea proposal show <id>    อ่านรายละเอียดเต็ม
+  bagidea proposal approve <id> [ข้อความ]   อนุมัติ (+ ข้อความถึงทีม)
+  bagidea proposal reject <id> [ข้อความ]    ไม่อนุมัติ (+ เหตุผล)
+
+ปลั๊กอิน
+  bagidea plugins               รายการปลั๊กอินที่ติดตั้ง
+  bagidea plugin install <url>  ติดตั้งจาก GitHub
+  bagidea plugin remove <id>    ถอน (ปลั๊กอินหลักถอนไม่ได้)
+
 AI features (ใช้ main API keys)
+  bagidea lang [code]               ดู/ตั้งภาษาออฟฟิศ (14 ภาษา)
   bagidea say "<ข้อความ>" [preset]  ให้เสียง TTS พูด (default sunny)
+  bagidea voices                    รายชื่อเสียง preset
   bagidea image "<prompt>"          สร้างภาพ AI → ได้ path
   bagidea keys                      ดู key ที่ตั้งไว้ (ไม่โชว์ค่า)
   bagidea channels                  สถานะ Telegram / Discord / LINE
 
 ซ่อมบำรุง
   bagidea fixmic                รีเซ็ตแผงไมค์ Windows ที่ค้าง
-  bagidea help                  หน้านี้
 ```
 
 ## ตัวอย่างการใช้จริง
