@@ -105,7 +105,7 @@ func _maybe_focus(node: Node3D, chance := 0.45, dur := 7.0) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now < _focus_cd or randf() > chance or not is_instance_valid(node):
 		return
-	_focus_cd = now + randf_range(45.0, 90.0)
+	_focus_cd = now + randf_range(28.0, 60.0)
 	var rig := get_node_or_null("../CameraRig")
 	if rig:
 		rig.focus_on(node, dur)
@@ -330,6 +330,7 @@ func handle(evt: Dictionary) -> void:
 		"subagent.split":
 			# The parent stays at its desk awaiting its clones' reports.
 			_to_desk(a)
+			_maybe_focus(a.node, 0.55, 7.0)
 			a.node.set_status("รอผล sub-agents 👻")
 		"skill.created":
 			# Hermes moment: the agent distilled its work into a new skill.
@@ -478,6 +479,7 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 	g.set_state("working")
 	g.set_status("👻 " + job.replace("\n", " ").left(26))
 	Burst.spawn(world, pnode.position)  # 💥 the split moment earns a show
+	_maybe_focus(g, 0.85, 7.0)
 	Sfx.play("split")
 	# Materialize (set_ghost fades itself in) and HURRY to the deck — on the
 	# walkable graph like everyone else, just much faster, via the glass
@@ -522,6 +524,7 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 	var info: Array = Fx.strip("success" if ok else "failure")
 	if hud and not info.is_empty():
 		hud.fx(g, info[0], info[1], 1)
+	_maybe_focus(g, 0.7, 6.0)  # the merge is a show too
 	# Hurry home along the graph (down the stairs) and dissolve into the owner.
 	var dur := 0.0
 	var pid := sub.get_slice("#", 0)
@@ -546,7 +549,7 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 ## grace — granted tools get auto-approved within milliseconds, so the agent
 ## should keep working at its desk instead of bolting for the window.
 func _security_walk_after_grace(a: Dictionary, id: String, task: String) -> void:
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(3.0).timeout   # be sure a trip is really needed before leaving the desk
 	if not _sec_pending.get(task, false):
 		return
 	_sec_pending.erase(task)
@@ -558,7 +561,7 @@ func _security_walk_after_grace(a: Dictionary, id: String, task: String) -> void
 
 ## Same grace for a ghost: only head down to Security if still unresolved.
 func _ghost_security_after_grace(id: String) -> void:
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(3.0).timeout   # be sure a trip is really needed before leaving the desk
 	if not _sec_pending.erase("g:" + id):
 		return   # approved/denied already landed — it never had to leave
 	if not ghosts.has(id) or not is_instance_valid(ghosts[id].node):
@@ -688,6 +691,7 @@ func _deliver_to_main(a: Dictionary) -> void:
 
 func _finish(a: Dictionary, label: String) -> void:
 	a.node.set_status(label)
+	_maybe_focus(a.node, 0.5, 6.0)  # a finished task is worth a beat
 	_release_desk(a)
 	_set_state(a, "idle")
 	await get_tree().create_timer(2.0).timeout
@@ -720,6 +724,12 @@ func _clear_status_later(a: Dictionary, delay: float) -> void:
 		a.node.set_status("")
 
 func _walk(node: Sprite3D, target: String, face_dir := -1) -> float:
+	# Any walk that ENDS at a work desk faces the monitor (north) on arrival, so
+	# seated agents always look at their screen — no matter which path sent them
+	# there (e.g. the Director returning from the CEO). The CEO console is its
+	# own special case and is left facing the room.
+	if face_dir < 0 and (target.begins_with("desk") or target == "lead_desk"):
+		face_dir = node.DIR_UP
 	var path: Array = world.path_to(node.position, target)
 	# Shared gathering spots (room centres, café/rec/meeting seats, lobby) are
 	# visited by several characters — scatter the final step so they never stand
@@ -1033,6 +1043,7 @@ func _act_ball(a: Dictionary) -> void:
 	if world.ball.has_method("kick_now"):
 		world.ball.kick_now()
 	Fx.spawn(a.node, "sparkle", Vector3(0, 0.4, 0), 0.03)
+	_maybe_focus(a.node, 0.6, 6.0)
 	_clear_status_later(a, 6.0)
 
 func _act_pet(a: Dictionary) -> void:
@@ -1049,6 +1060,7 @@ func _act_pet(a: Dictionary) -> void:
 		world.pet.attend(a.node.position)
 	Fx.spawn(a.node, "heart", Vector3(0, 1.2, 0))
 	Fx.spawn(world.pet, "heart", Vector3(0, 0.5, 0), 0.02)
+	_maybe_focus(a.node, 0.7, 6.0)
 	_clear_status_later(a, 7.0)
 
 func _act_chat(a: Dictionary, pool: Array) -> void:
@@ -1063,6 +1075,7 @@ func _act_chat(a: Dictionary, pool: Array) -> void:
 	await get_tree().create_timer(d + 0.3).timeout
 	if a.state == "idle" and is_instance_valid(a.node):
 		_fx(a, "music")
+		_maybe_focus(a.node, 0.55, 6.0)
 	_clear_status_later(a, 6.0)
 	_clear_status_later(b, 6.0)
 
