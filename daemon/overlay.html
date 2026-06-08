@@ -3584,6 +3584,11 @@
         openOps("proj");
       return;
     }
+    if (ev.type === "editor.opening") {
+      // 3D editor is taking the screen — hide the chat so it's centered+clear.
+      if (shellPost && !document.body.classList.contains("feedmode")) shellPost("hide");
+      return;
+    }
     if (ev.type === "voice.say") {
       // 🗣 an agent chose to speak — fetch its voice and play (queued).
       // Never on journal replay: restarted clients must stay silent.

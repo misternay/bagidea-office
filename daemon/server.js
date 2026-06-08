@@ -1654,7 +1654,8 @@ function readBodyRaw(req, cb) {
 }
 
 const MAPBG = path.join(__dirname, "map_bg.png");
-const LAYOUT_FILE = path.join(__dirname, "layout.json");  // Office Editor
+const LAYOUT_FILE = path.join(__dirname, "layout.json");   // Office Editor
+const PRESETS_FILE = path.join(__dirname, "presets.json"); // saved layouts
 
 // Media file server for chat rendering (images / video / audio only).
 const MEDIA_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
@@ -2303,6 +2304,31 @@ const server = http.createServer((req, res) => {
     try { res.end(fs.readFileSync(LAYOUT_FILE, "utf8")); }
     catch { res.end(JSON.stringify({ items: [] })); }
 
+  } else if (req.method === "GET" && req.url === "/presets") {
+    // custom layout presets the user saved from the 3D editor (defaults live
+    // in the editor itself).
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    try { res.end(fs.readFileSync(PRESETS_FILE, "utf8")); }
+    catch { res.end(JSON.stringify({ presets: [] })); }
+
+  } else if (req.method === "POST" && req.url === "/presets") {
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        let presets = [];
+        try { presets = JSON.parse(fs.readFileSync(PRESETS_FILE, "utf8")).presets || []; } catch {}
+        if (p.remove) presets = presets.filter((x) => x.name !== p.remove);
+        else {
+          const name = String(p.name || "").trim().slice(0, 40);
+          if (!name || !Array.isArray(p.items)) throw new Error("need name + items");
+          presets = presets.filter((x) => x.name !== name);  // overwrite same name
+          presets.push({ name, items: p.items.slice(0, 500), ts: Date.now() });
+        }
+        fs.writeFileSync(PRESETS_FILE, JSON.stringify({ presets }, null, 1));
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
   } else if (req.method === "POST" && req.url === "/layout") {
     // 🎨 Office Editor saves the whole layout; the world re-applies it live.
     readBody(req, (body) => {
@@ -2333,6 +2359,8 @@ const server = http.createServer((req, res) => {
       if (!fs.existsSync(godot)) { res.writeHead(500); return res.end("ไม่พบ Godot — ตั้ง env BAGIDEA_GODOT"); }
       spawn(godot, ["--path", gdir, "--", "--editor3d"],
         { detached: true, stdio: "ignore", windowsHide: false }).unref();
+      // tell the overlay to tuck the chat away so the editor owns the screen
+      broadcast({ type: "editor.opening" }, false);
       res.writeHead(200); res.end("ok");
     } catch (e) { res.writeHead(500); res.end(String(e.message)); }
 

@@ -87,7 +87,12 @@ func _enter_editor_mode() -> void:
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
 	DisplayServer.window_set_size(Vector2i(1280, 800))
 	DisplayServer.window_set_title("BagIdea Office — 3D Editor")
+	# Opaque window with the office SKY as the background — no black splash
+	# (the procedural sky fills any empty area; a see-through window just
+	# showed the desktop through the floor, which is useless for editing).
 	get_viewport().transparent_bg = false
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_TRANSPARENT, false)
+	RenderingServer.set_default_clear_color(Color(0.05, 0.07, 0.12))
 	Engine.max_fps = 60
 	# bright, fixed daylight for clear editing
 	_cli_pinned = true
@@ -107,11 +112,16 @@ func _enter_editor_mode() -> void:
 		var node := get_node_or_null(n)
 		if node:
 			node.visible = false
+	# camera = the real framing, DOF off (blur made everything fuzzy)
+	var cam: Camera3D = $CameraRig/Camera3D
+	if cam.attributes:
+		cam.attributes.dof_blur_far_enabled = false
+		cam.attributes.dof_blur_near_enabled = false
 	# drive the camera + editing
 	var ed: Node = load("res://scripts/map_editor.gd").new()
 	ed.name = "MapEditor"
 	add_child(ed)
-	ed.setup($CameraRig/Camera3D)
+	ed.setup($CameraRig, cam)
 
 ## Manual atmosphere from the overlay: {"hour": 17.5} pins the clock for
 ## debugging/beauty shots; {"hour": "auto"} hands it back to real time.

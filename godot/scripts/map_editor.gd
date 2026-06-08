@@ -13,6 +13,7 @@ extends Node3D
 const LAYOUT_URL := "http://127.0.0.1:8787/layout"
 const ASSETS_URL := "http://127.0.0.1:8787/assets"
 
+var rig: Node3D                   # CameraRig — driven exactly like the real view
 var cam: Camera3D
 var _root: Node3D                 # holds placed item rigs
 var items: Array = []             # parallel to _root children: {dict, node}
@@ -20,18 +21,22 @@ var sel: int = -1
 var armed_type := ""              # palette item to place on next empty click
 var armed_asset := ""             # for poster/model placement
 var play_anim := true
+var imported_models: Array = []   # paths of .glb/.fbx imported this session
 
-# orbit camera state
-var orbit_yaw := 0.6
-var orbit_pitch := 0.9
-var orbit_dist := 26.0
-var orbit_target := Vector3(3, 0, 1.5)
+# Camera = the REAL wallpaper framing, frozen (no drift), DOF off, and the
+# only freedom is a gentle left/right yaw so height + focus + beauty stay put.
+const BASE_TARGET := Vector3(2.5, 0.2, 0.8)
+const BASE_YAW := -12.0
+const BASE_PITCH := -45.0
+const BASE_DIST := 58.0
+const YAW_LIMIT := 9.0            # ± degrees of allowed sway
+var yaw := BASE_YAW
 var _dragging_cam := false
-var _panning := false
 var _dragging_item := false
 
 var _req: HTTPRequest
 var _save_req: HTTPRequest
+var _preset_req: HTTPRequest
 var ui: Control
 
 const TYPES := [
@@ -39,7 +44,45 @@ const TYPES := [
 	["shelf", "📚 Shelf"], ["plant", "🪴 Plant"], ["lamp", "💡 Lamp"], ["rug", "🟫 Rug"],
 ]
 
-func setup(camera: Camera3D) -> void:
+# 5 starter furniture-arrangement presets across the floor (x -11..17,
+# z -11..14). Loading one replaces the current items; tweak then "Save as
+# preset" to keep a custom one. These are intentionally simple seeds.
+const PRESETS := [
+	{ "name": "Classic grid", "items": [
+		{ "type": "desk", "x": -7, "z": -7, "rot": 0 }, { "type": "chair", "x": -7, "z": -6, "rot": 180 },
+		{ "type": "desk", "x": -4, "z": -7, "rot": 0 }, { "type": "chair", "x": -4, "z": -6, "rot": 180 },
+		{ "type": "desk", "x": -7, "z": -3, "rot": 0 }, { "type": "chair", "x": -7, "z": -2, "rot": 180 },
+		{ "type": "desk", "x": -4, "z": -3, "rot": 0 }, { "type": "chair", "x": -4, "z": -2, "rot": 180 },
+		{ "type": "plant", "x": -9.5, "z": -8.5 }, { "type": "plant", "x": -1.5, "z": -1 },
+		{ "type": "lamp", "x": -2, "z": -8, "color": "ffe6b0" } ] },
+	{ "name": "Open plan", "items": [
+		{ "type": "table", "x": -5, "z": -5, "scale": 1.4 }, { "type": "chair", "x": -6, "z": -5, "rot": 90 },
+		{ "type": "chair", "x": -4, "z": -5, "rot": 270 }, { "type": "chair", "x": -5, "z": -6, "rot": 180 },
+		{ "type": "chair", "x": -5, "z": -4, "rot": 0 },
+		{ "type": "rug", "x": -5, "z": -5, "scale": 1.6, "color": "33405a" },
+		{ "type": "plant", "x": -8, "z": -2 }, { "type": "shelf", "x": -9, "z": -7, "rot": 90 } ] },
+	{ "name": "Cozy lounge", "items": [
+		{ "type": "rug", "x": 2, "z": 4, "scale": 1.8, "color": "7a3b4b" },
+		{ "type": "table", "x": 2, "z": 4, "scale": 0.8 },
+		{ "type": "chair", "x": 0.8, "z": 4, "rot": 90 }, { "type": "chair", "x": 3.2, "z": 4, "rot": 270 },
+		{ "type": "plant", "x": -0.5, "z": 2.5 }, { "type": "plant", "x": 4.5, "z": 5.5 },
+		{ "type": "lamp", "x": 0, "z": 6, "color": "ffcf9a" }, { "type": "lamp", "x": 4.5, "z": 2.5, "color": "ffcf9a" },
+		{ "type": "shelf", "x": 5.5, "z": 4, "rot": 270 } ] },
+	{ "name": "Focus pods", "items": [
+		{ "type": "desk", "x": 8, "z": -7 }, { "type": "chair", "x": 8, "z": -6, "rot": 180 }, { "type": "shelf", "x": 9.4, "z": -7, "rot": 90 },
+		{ "type": "desk", "x": 8, "z": -3 }, { "type": "chair", "x": 8, "z": -2, "rot": 180 }, { "type": "shelf", "x": 9.4, "z": -3, "rot": 90 },
+		{ "type": "desk", "x": 12, "z": -7 }, { "type": "chair", "x": 12, "z": -6, "rot": 180 }, { "type": "plant", "x": 13.5, "z": -8 },
+		{ "type": "lamp", "x": 10, "z": -5, "color": "cfe0ff" } ] },
+	{ "name": "Minimal green", "items": [
+		{ "type": "desk", "x": 0, "z": 0 }, { "type": "chair", "x": 0, "z": 1, "rot": 180 },
+		{ "type": "plant", "x": -2, "z": -1 }, { "type": "plant", "x": 2, "z": -1 },
+		{ "type": "plant", "x": -2, "z": 2 }, { "type": "plant", "x": 2, "z": 2 },
+		{ "type": "rug", "x": 0, "z": 0.5, "scale": 1.3, "color": "2f5a3a" } ] },
+]
+var custom_presets: Array = []
+
+func setup(camera_rig: Node3D, camera: Camera3D) -> void:
+	rig = camera_rig
 	cam = camera
 
 func _ready() -> void:
@@ -48,30 +91,24 @@ func _ready() -> void:
 	add_child(_root)
 	_req = HTTPRequest.new(); add_child(_req); _req.request_completed.connect(_on_layout)
 	_save_req = HTTPRequest.new(); add_child(_save_req)
+	_preset_req = HTTPRequest.new(); add_child(_preset_req); _preset_req.request_completed.connect(_on_preset)
 	_build_ui()
 	_update_cam()
 	_req.request(LAYOUT_URL)
+	_preset_req.request("http://127.0.0.1:8787/presets")  # pull saved presets
 
 # ---------------------------------------------------------------- camera
 func _update_cam() -> void:
-	if cam == null:
+	if rig == null or cam == null:
 		return
-	var dir := Vector3(
-		cos(orbit_pitch) * sin(orbit_yaw),
-		sin(orbit_pitch),
-		cos(orbit_pitch) * cos(orbit_yaw))
-	cam.position = orbit_target + dir * orbit_dist
-	cam.look_at(orbit_target, Vector3.UP)
+	rig.position = BASE_TARGET
+	rig.rotation_degrees = Vector3(BASE_PITCH, yaw, 0.0)
+	cam.position = Vector3(0.0, 0.0, BASE_DIST)
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton:
-		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
-			orbit_dist = max(6.0, orbit_dist - 2.0); _update_cam()
-		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			orbit_dist = min(70.0, orbit_dist + 2.0); _update_cam()
-		elif e.button_index == MOUSE_BUTTON_RIGHT or e.button_index == MOUSE_BUTTON_MIDDLE:
+		if e.button_index == MOUSE_BUTTON_RIGHT or e.button_index == MOUSE_BUTTON_MIDDLE:
 			_dragging_cam = e.pressed
-			_panning = e.pressed and Input.is_key_pressed(KEY_SHIFT)
 		elif e.button_index == MOUSE_BUTTON_LEFT:
 			if e.pressed:
 				_on_left_press(e.position)
@@ -79,13 +116,9 @@ func _unhandled_input(e: InputEvent) -> void:
 				_dragging_item = false
 	elif e is InputEventMouseMotion:
 		if _dragging_cam:
-			if _panning:
-				var right := cam.global_transform.basis.x
-				var up := cam.global_transform.basis.y
-				orbit_target -= (right * e.relative.x - up * e.relative.y) * orbit_dist * 0.0016
-			else:
-				orbit_yaw -= e.relative.x * 0.008
-				orbit_pitch = clamp(orbit_pitch + e.relative.y * 0.008, 0.2, 1.45)
+			# yaw only, clamped — locks height, distance and focus so the
+			# framing never drifts from the real wallpaper look.
+			yaw = clampf(yaw - e.relative.x * 0.06, BASE_YAW - YAW_LIMIT, BASE_YAW + YAW_LIMIT)
 			_update_cam()
 		elif _dragging_item and sel >= 0:
 			var hit := _floor_hit(e.position)
@@ -258,12 +291,25 @@ func _build_ui() -> void:
 		var b := Button.new(); b.text = t[1]
 		b.pressed.connect(func(): armed_type = t[0]; armed_asset = ""; _flash("วาง: " + t[1]))
 		vb.add_child(b)
+	# presets
+	var pl := Label.new(); pl.text = "— Presets —"; pl.add_theme_font_size_override("font_size", 10); vb.add_child(pl)
+	var pbtn := OptionButton.new(); pbtn.name = "PresetPick"
+	pbtn.add_item("เลือก preset…")
+	for pr in PRESETS:
+		pbtn.add_item("⭐ " + pr["name"])
+	pbtn.item_selected.connect(_on_preset_picked)
+	vb.add_child(pbtn)
+	# import + library
 	var imp := Button.new(); imp.text = "📦 Import .glb"; imp.pressed.connect(_import_model); vb.add_child(imp)
 	var pst := Button.new(); pst.text = "🖼 Import image"; pst.pressed.connect(_import_image); vb.add_child(pst)
+	var lib := Label.new(); lib.name = "LibLabel"; lib.text = "คลังโมเดล: (ว่าง)"
+	lib.add_theme_font_size_override("font_size", 10); vb.add_child(lib)
 	var animchk := CheckButton.new(); animchk.text = "เล่น animation โมเดล"; animchk.button_pressed = true
 	animchk.toggled.connect(func(on): play_anim = on); vb.add_child(animchk)
 	var save := Button.new(); save.text = "💾 บันทึก (อัปเดตวอลเปเปอร์)"; save.pressed.connect(_save); vb.add_child(save)
+	var savep := Button.new(); savep.text = "⭐ บันทึกเป็น preset"; savep.pressed.connect(_save_as_preset); vb.add_child(savep)
 	ui.add_child(panel)
+	_refresh_lib()
 
 	# right selected-item panel
 	var sp := PanelContainer.new(); sp.name = "SelPanel"
@@ -321,7 +367,11 @@ func _refresh_sel() -> void:
 
 func _import_model() -> void:
 	_pick_file(["*.glb", "*.gltf", "*.fbx"], func(path):
-		armed_type = "model"; armed_asset = path; _flash("คลิกวางโมเดล"))
+		armed_type = "model"; armed_asset = path
+		if not imported_models.has(path):
+			imported_models.append(path)
+		_refresh_lib()
+		_flash("คลิกวางโมเดล"))
 
 func _import_image() -> void:
 	_pick_file(["*.png", "*.jpg", "*.jpeg", "*.webp"], func(path):
@@ -338,10 +388,80 @@ func _pick_file(filters: PackedStringArray, cb: Callable) -> void:
 	fd.canceled.connect(func(): fd.queue_free())
 	fd.popup_centered(Vector2i(800, 560))
 
-func _save() -> void:
+func _current_items() -> Array:
 	var out: Array = []
 	for e in items:
 		out.append(e["dict"])
-	var body := JSON.stringify({ "items": out })
+	return out
+
+func _save() -> void:
+	var body := JSON.stringify({ "items": _current_items() })
 	_save_req.request(LAYOUT_URL, ["content-type: application/json"], HTTPClient.METHOD_POST, body)
 	_flash("💾 บันทึกแล้ว — วอลเปเปอร์อัปเดต")
+
+# ---------------------------------------------------------------- presets
+func _on_preset_picked(idx: int) -> void:
+	if idx <= 0:
+		return
+	var list := PRESETS + custom_presets
+	if idx - 1 >= list.size():
+		return
+	_load_preset(list[idx - 1])
+
+func _load_preset(pr: Dictionary) -> void:
+	for c in _root.get_children():
+		c.queue_free()
+	items.clear()
+	sel = -1
+	for it in pr.get("items", []):
+		if it is Dictionary:
+			_add_item(it.duplicate(true))
+	_refresh_sel()
+	_flash("⭐ โหลด preset: " + String(pr.get("name", "")))
+
+func _save_as_preset() -> void:
+	# tiny inline name prompt
+	var dlg := AcceptDialog.new()
+	dlg.title = "บันทึกเป็น preset"
+	var le := LineEdit.new(); le.placeholder_text = "ชื่อ preset"; le.custom_minimum_size = Vector2(260, 0)
+	dlg.add_child(le)
+	dlg.register_text_enter(le)
+	add_child(dlg)
+	dlg.confirmed.connect(func():
+		var nm := le.text.strip_edges()
+		if nm != "":
+			var body := JSON.stringify({ "name": nm, "items": _current_items() })
+			_save_req.request("http://127.0.0.1:8787/presets", ["content-type: application/json"], HTTPClient.METHOD_POST, body)
+			_flash("⭐ บันทึก preset: " + nm)
+			_preset_req.request("http://127.0.0.1:8787/presets")  # refresh list
+		dlg.queue_free())
+	dlg.canceled.connect(func(): dlg.queue_free())
+	dlg.popup_centered(Vector2i(320, 130))
+	le.grab_focus()
+
+func _on_preset(_r: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
+	if code != 200:
+		return
+	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if data is Dictionary and data.get("presets") is Array:
+		custom_presets = data["presets"]
+		var pick := ui.find_child("PresetPick", true, false)
+		if pick and pick is OptionButton:
+			var ob := pick as OptionButton
+			# rebuild: default + custom
+			while ob.item_count > 1 + PRESETS.size():
+				ob.remove_item(ob.item_count - 1)
+			for cp in custom_presets:
+				ob.add_item("🔸 " + String(cp.get("name", "")))
+
+func _refresh_lib() -> void:
+	var lbl := ui.find_child("LibLabel", true, false)
+	if lbl == null or not (lbl is Label):
+		return
+	if imported_models.is_empty():
+		(lbl as Label).text = "คลังโมเดล: (ว่าง)"
+	else:
+		var names: Array = []
+		for m in imported_models:
+			names.append(String(m).get_file())
+		(lbl as Label).text = "คลังโมเดล: " + ", ".join(names)
