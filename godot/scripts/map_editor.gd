@@ -19,22 +19,25 @@ var cam: Camera3D
 var _root: Node3D
 var items: Array = []             # [{dict, node, body}]
 var sel: int = -1
-var armed_type := ""
-var armed_asset := ""
 var play_anim := true
 var _hi: MeshInstance3D            # selection highlight ring
 
-# camera: real framing, symmetric yaw, gentle zoom
+# camera: real framing + game-style controls (LMB pan, RMB orbit, wheel zoom)
 const BASE_TARGET := Vector3(2.5, 0.2, 0.8)
 const BASE_YAW := -12.0
 const BASE_PITCH := -45.0
+var target := BASE_TARGET
 var yaw := BASE_YAW
 const YAW_LIMIT := 32.0
 var dist := 58.0
 const DIST_MIN := 30.0
 const DIST_MAX := 64.0
-var _drag_cam := false
-var _drag_item := false
+var _orbit := false               # RMB/MMB held → rotate
+var _lmb := false                 # LMB held
+var _drag_item := false           # LMB drag is moving the selected item
+var _panning := false             # LMB drag is panning the camera
+var _press_pos := Vector2.ZERO
+var _moved := false
 
 var _req: HTTPRequest
 var _save_req: HTTPRequest
@@ -97,45 +100,62 @@ func _ready() -> void:
 func _update_cam() -> void:
 	if rig == null or cam == null:
 		return
-	rig.position = BASE_TARGET
+	rig.position = target
 	rig.rotation_degrees = Vector3(BASE_PITCH, yaw, 0.0)
 	cam.position = Vector3(0.0, 0.0, dist)
+
+# True while the cursor is over an editor panel — gate camera input so
+# scrolling a menu doesn't also zoom the world (and pans don't start on UI).
+func _over_ui() -> bool:
+	return get_viewport().gui_get_hovered_control() != null
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
+			if _over_ui(): return
 			dist = clampf(dist - 2.5, DIST_MIN, DIST_MAX); _update_cam()
 		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if _over_ui(): return
 			dist = clampf(dist + 2.5, DIST_MIN, DIST_MAX); _update_cam()
 		elif e.button_index == MOUSE_BUTTON_RIGHT or e.button_index == MOUSE_BUTTON_MIDDLE:
-			_drag_cam = e.pressed
+			_orbit = e.pressed and not _over_ui()
 		elif e.button_index == MOUSE_BUTTON_LEFT:
-			if e.pressed: _on_left_press(e.position)
-			else: _drag_item = false
+			if e.pressed:
+				if _over_ui(): return
+				_lmb = true; _moved = false; _press_pos = e.position
+				_begin_left(e.position)
+			else:
+				# a click with no drag on empty space → unselect
+				if _lmb and not _moved and not _drag_item:
+					sel = -1; _place_highlight(); _refresh_sel()
+				_lmb = false; _drag_item = false; _panning = false
 	elif e is InputEventMouseMotion:
-		if _drag_cam:
+		if _orbit:
 			yaw = clampf(yaw - e.relative.x * 0.08, BASE_YAW - YAW_LIMIT, BASE_YAW + YAW_LIMIT)
 			_update_cam()
-		elif _drag_item and sel >= 0:
-			var hit := _floor_hit(e.position)
-			if hit != Vector3.INF:
-				items[sel]["dict"]["x"] = snappedf(hit.x, 0.1)
-				items[sel]["dict"]["z"] = snappedf(hit.z, 0.1)
-				items[sel]["node"].position.x = items[sel]["dict"]["x"]
-				items[sel]["node"].position.z = items[sel]["dict"]["z"]
-				_place_highlight()
+		elif _lmb:
+			if e.relative.length() > 0.5: _moved = true
+			if _drag_item and sel >= 0:
+				var hit := _floor_hit(e.position)
+				if hit != Vector3.INF:
+					items[sel]["dict"]["x"] = snappedf(hit.x, 0.1)
+					items[sel]["dict"]["z"] = snappedf(hit.z, 0.1)
+					items[sel]["node"].position.x = items[sel]["dict"]["x"]
+					items[sel]["node"].position.z = items[sel]["dict"]["z"]
+					_place_highlight()
+			elif _panning:
+				# move the focus point on the floor, camera-relative (game pan)
+				var basis := cam.global_transform.basis
+				var right := Vector3(basis.x.x, 0, basis.x.z).normalized()
+				var fwd := Vector3(basis.z.x, 0, basis.z.z).normalized()
+				target += (-right * e.relative.x + fwd * e.relative.y) * dist * 0.0011
+				target.x = clampf(target.x, -14.0, 20.0)
+				target.z = clampf(target.z, -14.0, 18.0)
+				_update_cam()
 
-func _floor_hit(screen: Vector2) -> Vector3:
-	if cam == null: return Vector3.INF
-	var o := cam.project_ray_origin(screen)
-	var d := cam.project_ray_normal(screen)
-	if absf(d.y) < 0.0001: return Vector3.INF
-	var tt := -o.y / d.y
-	if tt < 0: return Vector3.INF
-	return o + d * tt
-
-func _on_left_press(screen: Vector2) -> void:
-	# real 3D pick: raycast against item colliders first
+# LMB pressed on the world: grab the clicked item (→ drag-move) or, on empty,
+# start a camera pan. Selection of a different item happens here too.
+func _begin_left(screen: Vector2) -> void:
 	var space := get_world_3d().direct_space_state
 	var o := cam.project_ray_origin(screen)
 	var d := cam.project_ray_normal(screen)
@@ -151,15 +171,27 @@ func _on_left_press(screen: Vector2) -> void:
 			for i in items.size():
 				if items[i]["node"] == node:
 					sel = i; _drag_item = true; _place_highlight(); _refresh_sel(); _refresh_scene(); return
-	# nothing hit → place armed item at floor point
-	if armed_type != "":
-		var hit := _floor_hit(screen)
-		if hit == Vector3.INF: return
-		var it := { "type": armed_type, "x": snappedf(hit.x, 0.1), "z": snappedf(hit.z, 0.1), "rot": 0.0, "scale": 1.0 }
-		if armed_asset != "": it["asset"] = armed_asset
-		_add_item(it); sel = items.size() - 1; _place_highlight(); _refresh_sel(); _refresh_scene()
-	else:
-		sel = -1; _place_highlight(); _refresh_sel()
+	# empty space → pan the camera (and unselect on a clean click)
+	_panning = true
+
+func _floor_hit(screen: Vector2) -> Vector3:
+	if cam == null: return Vector3.INF
+	var o := cam.project_ray_origin(screen)
+	var d := cam.project_ray_normal(screen)
+	if absf(d.y) < 0.0001: return Vector3.INF
+	var tt := -o.y / d.y
+	if tt < 0: return Vector3.INF
+	return o + d * tt
+
+# Add an item from the palette / library: it appears at the camera focus,
+# gets selected, ready to drag into place. (Placement is via buttons now —
+# clicking empty space only unselects.)
+func _add_at_focus(type: String, asset := "") -> void:
+	var it := { "type": type, "x": snappedf(target.x, 0.1), "z": snappedf(target.z, 0.1), "rot": 0.0, "scale": 1.0 }
+	if asset != "": it["asset"] = asset
+	_add_item(it); sel = items.size() - 1
+	_place_highlight(); _refresh_sel(); _refresh_scene()
+	_flash("เพิ่มแล้ว — ลากเพื่อจัดวาง")
 
 # ---------------------------------------------------------------- highlight
 func _make_highlight() -> void:
@@ -295,8 +327,54 @@ func _spawn_model(rig2: Node3D, asset: String) -> void:
 				(ap as AnimationPlayer).play((ap as AnimationPlayer).get_animation_list()[0])
 
 # ---------------------------------------------------------------- UI
+# A brand-dark theme so the editor doesn't look like raw Godot greybox.
+func _build_theme() -> Theme:
+	var th := Theme.new()
+	var accent := Color(0.37, 0.78, 1.0)
+	var ink := Color(0.88, 0.93, 1.0)
+	# panels: dark glass, rounded
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color(0.04, 0.07, 0.12, 0.94)
+	panel.set_corner_radius_all(14)
+	panel.set_border_width_all(1); panel.border_color = Color(1, 1, 1, 0.10)
+	panel.set_content_margin_all(12)
+	panel.shadow_color = Color(0, 0, 0, 0.5); panel.shadow_size = 16
+	th.set_stylebox("panel", "PanelContainer", panel)
+	# buttons
+	var mk := func(bg: Color, bord: Color) -> StyleBoxFlat:
+		var s := StyleBoxFlat.new(); s.bg_color = bg; s.set_corner_radius_all(9)
+		s.set_border_width_all(1); s.border_color = bord
+		s.content_margin_top = 7; s.content_margin_bottom = 7
+		s.content_margin_left = 11; s.content_margin_right = 11
+		return s
+	th.set_stylebox("normal", "Button", mk.call(Color(1, 1, 1, 0.05), Color(1, 1, 1, 0.10)))
+	th.set_stylebox("hover", "Button", mk.call(Color(0.37, 0.78, 1.0, 0.16), accent))
+	th.set_stylebox("pressed", "Button", mk.call(Color(0.37, 0.78, 1.0, 0.28), accent))
+	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	th.set_color("font_color", "Button", ink)
+	th.set_color("font_hover_color", "Button", Color(1, 1, 1))
+	th.set_font_size("font_size", "Button", 13)
+	th.set_color("font_color", "Label", ink)
+	# option button mirrors Button
+	th.set_stylebox("normal", "OptionButton", mk.call(Color(1, 1, 1, 0.05), accent))
+	th.set_stylebox("hover", "OptionButton", mk.call(Color(0.37, 0.78, 1.0, 0.16), accent))
+	th.set_stylebox("pressed", "OptionButton", mk.call(Color(0.37, 0.78, 1.0, 0.2), accent))
+	th.set_color("font_color", "OptionButton", ink)
+	# sliders
+	var track := StyleBoxFlat.new(); track.bg_color = Color(1, 1, 1, 0.08); track.set_corner_radius_all(4); track.content_margin_top = 3; track.content_margin_bottom = 3
+	var fill := StyleBoxFlat.new(); fill.bg_color = accent; fill.set_corner_radius_all(4); fill.content_margin_top = 3; fill.content_margin_bottom = 3
+	th.set_stylebox("slider", "HSlider", track)
+	th.set_stylebox("grabber_area", "HSlider", fill)
+	th.set_stylebox("grabber_area_highlight", "HSlider", fill)
+	# scroll + line edit
+	var le := StyleBoxFlat.new(); le.bg_color = Color(0, 0, 0, 0.3); le.set_corner_radius_all(8); le.set_content_margin_all(8); le.set_border_width_all(1); le.border_color = Color(1, 1, 1, 0.12)
+	th.set_stylebox("normal", "LineEdit", le)
+	th.set_color("font_color", "LineEdit", ink)
+	return th
+
 func _build_ui() -> void:
 	ui = Control.new(); ui.set_anchors_preset(Control.PRESET_FULL_RECT); ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.theme = _build_theme()
 	var layer := CanvasLayer.new(); layer.add_child(ui); add_child(layer)
 
 	# left: palette + presets + import
@@ -307,8 +385,9 @@ func _build_ui() -> void:
 	var hint := Label.new(); hint.text = "คลิกวัตถุ=เลือก · ลาก=ย้าย · ขวาหมุน · ลูกกลิ้งซูม"
 	hint.add_theme_font_size_override("font_size", 9); hint.autowrap_mode = TextServer.AUTOWRAP_WORD; vb.add_child(hint)
 	for t in TYPES:
-		var b := Button.new(); b.text = t[1]
-		b.pressed.connect(func(): armed_type = t[0]; armed_asset = ""; _flash("วาง: " + t[1]))
+		var b := Button.new(); b.text = "＋ " + t[1]
+		var ty: String = t[0]
+		b.pressed.connect(func(): _add_at_focus(ty))
 		vb.add_child(b)
 	var pl := Label.new(); pl.text = "— Presets (layout) —"; pl.add_theme_font_size_override("font_size", 10); vb.add_child(pl)
 	var pbtn := OptionButton.new(); pbtn.name = "PresetPick"; pbtn.add_item("เลือก preset…")
@@ -398,7 +477,7 @@ func _refresh_lib() -> void:
 		var icon := "📦 " if a.get("kind") == "model" else "🖼 "
 		b.text = icon + String(a.get("name", "")); b.add_theme_font_size_override("font_size", 10)
 		var ap := String(a.get("path", "")); var ak := String(a.get("kind", "model"))
-		b.pressed.connect(func(): armed_type = ("model" if ak == "model" else "poster"); armed_asset = ap; _flash("คลิกวาง: " + String(a.get("name", ""))))
+		b.pressed.connect(func(): _add_at_focus("model" if ak == "model" else "poster", ap))
 		row.add_child(b)
 		var x := Button.new(); x.text = "✕"; x.add_theme_font_size_override("font_size", 10)
 		x.pressed.connect(func():
@@ -468,11 +547,11 @@ func _register_asset(path: String, kind: String) -> void:
 
 func _import_model() -> void:
 	_pick_file(["*.glb", "*.gltf", "*.fbx"], func(p):
-		armed_type = "model"; armed_asset = p; _register_asset(p, "model"); _flash("คลิกวางโมเดล"))
+		_register_asset(p, "model"); _add_at_focus("model", p))
 
 func _import_image() -> void:
 	_pick_file(["*.png", "*.jpg", "*.jpeg", "*.webp"], func(p):
-		armed_type = "poster"; armed_asset = p; _register_asset(p, "image"); _flash("คลิกวางรูป"))
+		_register_asset(p, "image"); _add_at_focus("poster", p))
 
 func _pick_file(filters: PackedStringArray, cb: Callable) -> void:
 	var fd := FileDialog.new(); fd.file_mode = FileDialog.FILE_MODE_OPEN_FILE
