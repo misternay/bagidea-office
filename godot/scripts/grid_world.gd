@@ -45,11 +45,11 @@ const ROOM_DEFS := {
 # central plus-corridor that links the four door gaps stays clear — agents and
 # the swap never drop furniture in a doorway. (cell is 10.5 x 8 → half 5.25 x 4)
 const ROOM_ANCHORS := {
-	"exec":  {"exec_c": Vector2(0, 0), "ceo_desk": Vector2(-2.6, -3.0), "lead_desk": Vector2(3.0, -2.5),
+	"exec":  {"exec_c": Vector2(0, 0), "ceo_desk": Vector2(-2.6, -3.0), "lead_desk": Vector2(3.0, -3.35),
 		"pace_a": Vector2(-3.0, 2.4), "pace_b": Vector2(3.0, 2.4)},
-	"ops":   {"ops_c": Vector2(0, 0), "desk1": Vector2(-4.0, -2.5), "desk2": Vector2(-2.0, -2.5),
-		"desk3": Vector2(2.0, -2.5), "desk4": Vector2(4.0, -2.5), "desk5": Vector2(-2.5, 2.4),
-		"desk6": Vector2(2.5, 2.4), "ap1": Vector2(-4.2, 2.4), "ap2": Vector2(4.2, 2.4)},
+	"ops":   {"ops_c": Vector2(0, 0), "desk1": Vector2(-4.0, -3.35), "desk2": Vector2(-2.0, -3.35),
+		"desk3": Vector2(2.0, -3.35), "desk4": Vector2(4.0, -3.35), "desk5": Vector2(-2.5, 1.55),
+		"desk6": Vector2(2.5, 1.55), "ap1": Vector2(-4.2, 2.4), "ap2": Vector2(4.2, 2.4)},
 	"server": {"server_c": Vector2(0, 0)},
 	"lobby": {"lobby_c": Vector2(0, 0), "spawn": Vector2(0, 3.4), "sec_c": Vector2(-3.2, -2.5),
 		"sec_window": Vector2(-3.2, -1.7)},
@@ -63,6 +63,8 @@ const ROOM_ANCHORS := {
 	"dorm":  {"dorm_c": Vector2(0, 0), "bed1": Vector2(-3.0, -2.5), "bed2": Vector2(3.0, -2.5)},
 }
 const FLOOR_Y := 0.86
+const SEAT_DZ := -0.85   # desk pod chair offset (north of the desk); the work
+                         # anchor sits here so agents perch on the seat, not the desk.
 
 var _cell_node: Array = []      # slot index → container Node3D
 var _cell_center: Array = []    # slot index → Vector3 (fixed)
@@ -420,13 +422,15 @@ func _furnish(room: Node3D, kind: String, accent: String) -> void:
 
 ## A desk pod: desk box + monitor + chair, facing roty (180 = faces +z/front).
 func _desk_pod(room: Node3D, pos: Vector3, roty: float, kit: bool) -> void:
+	# CEO-style workstation (mirrors the command console so every seated agent
+	# looks identical): desk + monitor whose SCREEN faces the room (+Z), and the
+	# chair set just BEHIND the desk (north). The agent's home anchor sits on that
+	# chair (see SEAT_DZ) so it perches on the seat facing forward over the screen,
+	# never buried in the desk.
 	room.add_child(_box(pos + Vector3(0, 0.4, 0), Vector3(1.4, 0.8, 0.7), _m("23303f", 0.5)))
 	if kit:
-		# the worker (chair) faces `roty` toward the monitor; the monitor's SCREEN
-		# must face back at them — i.e. roty + 180 — so they see the glowing screen,
-		# not its backside.
-		_kit(room, "Large_Monitor_Blue", pos + Vector3(0, 0.8, -0.05 if roty == 180.0 else 0.05), roty + 180.0, 0.24)
-		_kit(room, "Chair_1", pos + Vector3(0, 0, 0.85 if roty == 180.0 else -0.85), roty, 0.55)
+		_kit(room, "Large_Monitor_Blue", pos + Vector3(0, 0.8, 0.05), 0.0, 0.24)   # screen faces +Z
+		_kit(room, "Chair_1", pos + Vector3(0, 0, SEAT_DZ), 0.0, 0.55)              # chair behind, faces +Z
 
 ## A single bunk (kit when present, else a block).
 func _bunk(room: Node3D, pos: Vector3, color: String, kit: bool) -> void:

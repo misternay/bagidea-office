@@ -134,6 +134,8 @@ func _resnap_agents() -> void:
 	var am := get_parent().get_node_or_null("AgentManager")
 	if am and am.has_method("resnap_agents"):
 		am.resnap_agents()
+	if am and am.has_method("reseat_ghosts"):
+		am.reseat_ghosts()
 	_reposition_rec_life()
 
 ## Keep the ambient life with its room: the cat + football follow the RECREATION
@@ -193,12 +195,29 @@ func set_billboard_texture(path: String) -> void:
 	_billboard_logo.material_override = m
 
 ## Ghost (sub-ops) deck position — editor nudges it, layout persists it.
+## The deck is a movable container; its desks/stairs are LOCAL children, so the
+## true world spot is always deck.position + the local constant. Ghosts must
+## resolve targets through these (never the raw consts) and re-seat when it moves.
 func move_ghost_deck(dx: float, dz: float) -> void:
 	if _ghost_deck: _ghost_deck.position += Vector3(dx, 0, dz)
+	_reseat_ghosts()
 func set_ghost_deck_pos(x: float, z: float) -> void:
 	if _ghost_deck: _ghost_deck.position = Vector3(x, _ghost_deck.position.y, z)
+	_reseat_ghosts()
 func ghost_deck_pos() -> Vector2:
 	return Vector2(_ghost_deck.position.x, _ghost_deck.position.z) if _ghost_deck else Vector2.ZERO
+
+## Live world position of a ghost desk / the stair ends (deck offset applied).
+func ghost_desk_count() -> int: return GHOST_DESKS.size()
+func _deck_base() -> Vector3: return _ghost_deck.position if _ghost_deck else Vector3.ZERO
+func ghost_stand(i: int) -> Vector3: return _deck_base() + GHOST_DESKS[i % GHOST_DESKS.size()]
+func ghost_stair_base() -> Vector3: return _deck_base() + GHOST_STAIR_BASE
+func ghost_stair_top() -> Vector3: return _deck_base() + GHOST_STAIR_TOP
+
+func _reseat_ghosts() -> void:
+	var am := get_parent().get_node_or_null("AgentManager")
+	if am and am.has_method("reseat_ghosts"):
+		am.reseat_ghosts()
 
 ## Hide/show the baked ops desks (used when a custom layout provides its own
 ## work desks so they don't double up).

@@ -468,8 +468,8 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 	var di := -1
 	if ghost_desks_free.size() > 0:
 		di = ghost_desks_free.pop_front()
-	var target: Vector3 = world.GHOST_DESKS[di] if di >= 0 \
-		else Vector3(14.1, 4.9, -4.3) + Vector3(randf_range(-1.6, 1.6), 0, randf_range(-1.2, 1.2))
+	var target: Vector3 = world.ghost_stand(di) if di >= 0 \
+		else world.ghost_stand(0) + Vector3(randf_range(-1.6, 1.6), 0.6, randf_range(-1.2, 1.2))
 	ghosts[sub] = {"node": g, "desk": di, "spot": target}
 	g.set_state("working")
 	g.set_status("👻 " + job.replace("\n", " ").left(26))
@@ -485,8 +485,8 @@ func _ghost_desk_route(g: Sprite3D, spot: Vector3) -> Array:
 	var pts: Array = []
 	if g.position.y <= 1.5:
 		pts += world.path_to(g.position, "server_c")
-		pts.append(world.GHOST_STAIR_BASE)
-	pts.append(world.GHOST_STAIR_TOP)
+		pts.append(world.ghost_stair_base())
+	pts.append(world.ghost_stair_top())
 	pts.append(spot)
 	return pts
 
@@ -495,9 +495,9 @@ func _ghost_ground_route(g: Sprite3D, target_wp: String) -> Array:
 	var pts: Array = []
 	var start: Vector3 = g.position
 	if start.y > 1.5:
-		pts.append(world.GHOST_STAIR_TOP)
-		pts.append(world.GHOST_STAIR_BASE)
-		start = world.GHOST_STAIR_BASE
+		pts.append(world.ghost_stair_top())
+		pts.append(world.ghost_stair_base())
+		start = world.ghost_stair_base()
 	pts += world.path_to(start, target_wp)
 	return pts
 
@@ -524,9 +524,9 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 		var pts: Array = []
 		var start: Vector3 = g.position
 		if start.y > 1.5:
-			pts.append(world.GHOST_STAIR_TOP)
-			pts.append(world.GHOST_STAIR_BASE)
-			start = world.GHOST_STAIR_BASE
+			pts.append(world.ghost_stair_top())
+			pts.append(world.ghost_stair_base())
+			start = world.ghost_stair_base()
 		pts += world.path_between(start, home)
 		dur = g.walk_to(pts)
 	await get_tree().create_timer(maxf(dur, 0.1) + 0.5).timeout
@@ -535,6 +535,16 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 		Burst.spawn(world, g.position, 0.65)
 		Sfx.play("whoosh")
 		g.ghost_dissolve()
+
+## The Ghost Deck moved (editor nudge) or rooms were swapped → re-target every
+## working ghost to the deck's CURRENT desk world position, live, even mid-task.
+func reseat_ghosts() -> void:
+	for sub in ghosts:
+		var gh: Dictionary = ghosts[sub]
+		if gh.desk < 0 or not is_instance_valid(gh.node):
+			continue
+		gh.spot = world.ghost_stand(gh.desk)
+		gh.node.walk_to(_ghost_desk_route(gh.node, gh.spot))
 
 func _route_hook_to_ghost(id: String, type: String, evt: Dictionary) -> void:
 	if not ghosts.has(id) or not is_instance_valid(ghosts[id].node):
