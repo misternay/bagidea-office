@@ -14,7 +14,8 @@
 //   }
 //
 // index.js exports: (ctx) => ({ routes?, onCommand?(cmd, args, reply) })
-//   ctx = { broadcast, reg, workspace, dataDir, log, runClaude? }
+//   ctx = { broadcast, feed, reg, saveReg, workspace, daemonDir,
+//           dataDir, pluginDir, manifest, log, runClaude }
 // Built-in plugins ship enabled; users drop new folders in plugins/ and
 // restart (or call /plugins/reload). See docs/guide/plugins.md.
 

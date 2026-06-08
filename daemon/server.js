@@ -1512,7 +1512,12 @@ channels.restart();
 
 // ---------------------------------------------------------------- plugins
 const plugins = require("./plugins")({
-  broadcast, reg, workspace: WORKSPACE, log: (s) => console.log(s),
+  broadcast, reg, saveReg, workspace: WORKSPACE, daemonDir: __dirname,
+  // run a real Claude Code turn as an agent (same engine the office uses).
+  runClaude: (agent, prompt, opts) => runClaude(agent || "main", prompt, opts || {}),
+  // post a visible line to the office feed (shows in the overlay stream).
+  feed: (text, agent) => broadcast({ type: "chat.message", agent: agent || "main", text: String(text) }),
+  log: (s) => console.log(s),
 });
 
 // ---------------------------------------------------------------- social

@@ -79,13 +79,16 @@ module.exports = (ctx) => ({
 | field | use |
 |---|---|
 | `ctx.broadcast(event, persist?)` | push a live event to every panel + the office feed (WS). Use `{type:"plugin.event", plugin:"<id>", ...}` |
-| `ctx.reg` | the office registry (agents, roles, settings) |
+| `ctx.feed(text, agentId?)` | post a visible line to the office feed stream (defaults to the `main` agent) |
+| `ctx.reg` | the office registry (agents, roles, settings) — read it freely |
+| `ctx.saveReg()` | persist registry changes you made (after mutating `ctx.reg`) |
 | `ctx.workspace` | absolute path to the agents' workspace |
+| `ctx.daemonDir` | the daemon folder — read office data files (`registry.json`, `projects.json`, …) |
 | `ctx.dataDir` | `plugins/<id>/data` — your private storage |
 | `ctx.pluginDir` | your plugin's folder (for `static/`, bundled files) |
 | `ctx.manifest` | your parsed `plugin.json` |
 | `ctx.log(msg)` | write to the daemon log |
-| `ctx.runClaude(agentId, prompt, opts?)` | run a real Claude Code turn (advanced) |
+| `ctx.runClaude(agentId, prompt, opts?)` | run a real Claude Code turn as that agent — the same engine the office uses (advanced) |
 
 ### Built-in HTTP routes (free, no code)
 - `GET /plugin/<id>/panel` → serves your `panel.html`
