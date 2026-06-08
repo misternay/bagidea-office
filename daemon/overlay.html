@@ -1040,7 +1040,7 @@
   const railEl = document.getElementById("rail");
   const missions = {};
   const agents = {};   // id -> {state}
-  let target = "main";
+  let target = "ceo";   // open on the CEO seat (you) — orders flow to the Director
 
   function ensureAgent(id, state) {
     if (!agents[id]) {
@@ -3767,7 +3767,7 @@
   }
   // boot (after all declarations — const TDZ bites otherwise)
   ensureAgent("main");
-  setTarget("main");
+  setTarget("ceo");   // first focus is the CEO seat (you)
   connect();
 
   // ---- send ---------------------------------------------------------------

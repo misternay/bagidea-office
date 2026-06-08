@@ -552,8 +552,7 @@ func _security_walk_after_grace(a: Dictionary, id: String, task: String) -> void
 		return
 	_walk(a.node, "sec_window")
 	_pulse_security()
-	if not theatrical:
-		world.board_set(task, "blocked", id)
+	world.board_set(task, "blocked", id)
 
 ## The Ghost Deck moved (editor nudge) or rooms were swapped → re-target every
 ## working ghost to the deck's CURRENT desk world position, live, even mid-task.
