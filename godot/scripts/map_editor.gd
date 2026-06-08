@@ -38,6 +38,7 @@ var _drag_item := false           # LMB drag is moving the selected item
 var _panning := false             # LMB drag is panning the camera
 var _press_pos := Vector2.ZERO
 var _moved := false
+var _pan_anchor := Vector3.ZERO   # world point grabbed under the cursor
 
 var _req: HTTPRequest
 var _save_req: HTTPRequest
@@ -144,14 +145,14 @@ func _unhandled_input(e: InputEvent) -> void:
 					items[sel]["node"].position.z = items[sel]["dict"]["z"]
 					_place_highlight()
 			elif _panning:
-				# move the focus point on the floor, camera-relative (game pan)
-				var basis := cam.global_transform.basis
-				var right := Vector3(basis.x.x, 0, basis.x.z).normalized()
-				var fwd := Vector3(basis.z.x, 0, basis.z.z).normalized()
-				target += (-right * e.relative.x + fwd * e.relative.y) * dist * 0.0011
-				target.x = clampf(target.x, -14.0, 20.0)
-				target.z = clampf(target.z, -14.0, 18.0)
-				_update_cam()
+				# grab-pan: keep the world point you grabbed under the cursor —
+				# rock solid at any yaw/zoom (no swing).
+				var cur := _floor_hit(e.position)
+				if cur != Vector3.INF and _pan_anchor != Vector3.INF:
+					target += _pan_anchor - cur
+					target.x = clampf(target.x, -14.0, 20.0)
+					target.z = clampf(target.z, -14.0, 18.0)
+					_update_cam()
 
 # LMB pressed on the world: grab the clicked item (→ drag-move) or, on empty,
 # start a camera pan. Selection of a different item happens here too.
@@ -173,6 +174,7 @@ func _begin_left(screen: Vector2) -> void:
 					sel = i; _drag_item = true; _place_highlight(); _refresh_sel(); _refresh_scene(); return
 	# empty space → pan the camera (and unselect on a clean click)
 	_panning = true
+	_pan_anchor = _floor_hit(screen)
 
 func _floor_hit(screen: Vector2) -> Vector3:
 	if cam == null: return Vector3.INF
@@ -195,15 +197,32 @@ func _add_at_focus(type: String, asset := "") -> void:
 
 # ---------------------------------------------------------------- highlight
 func _make_highlight() -> void:
+	# a bright disc + ring on the floor + a soft pillar of light so the
+	# selected object is unmistakable from any angle.
 	_hi = MeshInstance3D.new()
-	var tm := TorusMesh.new(); tm.inner_radius = 0.7; tm.outer_radius = 0.95
+	var tm := TorusMesh.new(); tm.inner_radius = 0.95; tm.outer_radius = 1.25
 	_hi.mesh = tm
-	var m := StandardMaterial3D.new(); m.albedo_color = Color(0.4, 0.85, 1.0)
-	m.emission_enabled = true; m.emission = Color(0.4, 0.85, 1.0); m.emission_energy_multiplier = 2.0
+	var m := StandardMaterial3D.new(); m.albedo_color = Color(0.45, 0.9, 1.0)
+	m.emission_enabled = true; m.emission = Color(0.45, 0.9, 1.0); m.emission_energy_multiplier = 4.0
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.albedo_color.a = 0.9
 	_hi.material_override = m
 	_hi.visible = false
 	add_child(_hi)
+	# pillar
+	var pil := MeshInstance3D.new()
+	var cm := CylinderMesh.new(); cm.top_radius = 0.9; cm.bottom_radius = 0.9; cm.height = 3.0
+	pil.mesh = cm; pil.position.y = 1.5; pil.name = "Pillar"
+	var pm := StandardMaterial3D.new(); pm.albedo_color = Color(0.45, 0.9, 1.0, 0.12)
+	pm.emission_enabled = true; pm.emission = Color(0.45, 0.9, 1.0); pm.emission_energy_multiplier = 1.0
+	pm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	pil.material_override = pm
+	_hi.add_child(pil)
+
+func _process(_dt: float) -> void:
+	if _hi and _hi.visible:
+		_hi.rotation_degrees.y += _dt * 40.0   # gentle spin so it reads as "selected"
 
 func _place_highlight() -> void:
 	if sel < 0 or sel >= items.size():
@@ -377,28 +396,37 @@ func _build_ui() -> void:
 	ui.theme = _build_theme()
 	var layer := CanvasLayer.new(); layer.add_child(ui); add_child(layer)
 
-	# left: palette + presets + import
-	var panel := PanelContainer.new(); panel.position = Vector2(12, 12); panel.custom_minimum_size = Vector2(210, 0)
-	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(206, 540); panel.add_child(sc)
-	var vb := VBoxContainer.new(); vb.add_theme_constant_override("separation", 5); vb.custom_minimum_size = Vector2(196, 0); sc.add_child(vb)
-	var title := Label.new(); title.text = "🎨 OFFICE EDITOR"; vb.add_child(title)
-	var hint := Label.new(); hint.text = "คลิกวัตถุ=เลือก · ลาก=ย้าย · ขวาหมุน · ลูกกลิ้งซูม"
+	# ── TOP TOOLBAR — layout / file actions, separate from the object palette
+	var bar := PanelContainer.new(); bar.position = Vector2(12, 10)
+	var bh := HBoxContainer.new(); bh.add_theme_constant_override("separation", 8); bar.add_child(bh)
+	var bt := Label.new(); bt.text = "🎨 EDITOR"; bh.add_child(bt)
+	var sep := VSeparator.new(); bh.add_child(sep)
+	var plab := Label.new(); plab.text = "Layout:"; plab.add_theme_font_size_override("font_size", 11); bh.add_child(plab)
+	var pbtn := OptionButton.new(); pbtn.name = "PresetPick"; pbtn.add_item("เลือก layout…")
+	for pr in PRESETS: pbtn.add_item("⭐ " + pr["name"])
+	pbtn.item_selected.connect(_on_preset_picked); bh.add_child(pbtn)
+	var imp := Button.new(); imp.text = "📦 .glb"; imp.pressed.connect(_import_model); bh.add_child(imp)
+	var pst := Button.new(); pst.text = "🖼 image"; pst.pressed.connect(_import_image); bh.add_child(pst)
+	var save := Button.new(); save.text = "💾 บันทึก"; save.pressed.connect(_save); bh.add_child(save)
+	var savep := Button.new(); savep.text = "⭐ เป็น preset"; savep.pressed.connect(_save_as_preset); bh.add_child(savep)
+	ui.add_child(bar)
+
+	# ── LEFT — object palette only (categorised: system vs decor)
+	var panel := PanelContainer.new(); panel.position = Vector2(12, 64); panel.custom_minimum_size = Vector2(196, 0)
+	var sc := ScrollContainer.new(); sc.custom_minimum_size = Vector2(190, 470); panel.add_child(sc)
+	var vb := VBoxContainer.new(); vb.add_theme_constant_override("separation", 4); vb.custom_minimum_size = Vector2(178, 0); sc.add_child(vb)
+	var title := Label.new(); title.text = "＋ เพิ่มวัตถุ"; vb.add_child(title)
+	var hint := Label.new(); hint.text = "ซ้ายลาก=เลื่อนกล้อง · คลิกวัตถุ=เลือก · ลาก=ย้าย · ขวา=หมุน"
 	hint.add_theme_font_size_override("font_size", 9); hint.autowrap_mode = TextServer.AUTOWRAP_WORD; vb.add_child(hint)
+	var catlab := Label.new(); catlab.text = "🟢 ของตกแต่ง"; catlab.add_theme_font_size_override("font_size", 10); vb.add_child(catlab)
 	for t in TYPES:
-		var b := Button.new(); b.text = "＋ " + t[1]
+		var b := Button.new(); b.text = "＋ " + t[1]; b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var ty: String = t[0]
 		b.pressed.connect(func(): _add_at_focus(ty))
 		vb.add_child(b)
-	var pl := Label.new(); pl.text = "— Presets (layout) —"; pl.add_theme_font_size_override("font_size", 10); vb.add_child(pl)
-	var pbtn := OptionButton.new(); pbtn.name = "PresetPick"; pbtn.add_item("เลือก preset…")
-	for pr in PRESETS: pbtn.add_item("⭐ " + pr["name"])
-	pbtn.item_selected.connect(_on_preset_picked); vb.add_child(pbtn)
-	var imp := Button.new(); imp.text = "📦 Import .glb"; imp.pressed.connect(_import_model); vb.add_child(imp)
-	var pst := Button.new(); pst.text = "🖼 Import image"; pst.pressed.connect(_import_image); vb.add_child(pst)
-	var ac := CheckButton.new(); ac.text = "เล่น animation"; ac.button_pressed = true
+	var ac := CheckButton.new(); ac.text = "เล่น animation โมเดล"; ac.button_pressed = true
+	ac.add_theme_font_size_override("font_size", 10)
 	ac.toggled.connect(func(on): play_anim = on); vb.add_child(ac)
-	var save := Button.new(); save.text = "💾 บันทึก"; save.pressed.connect(_save); vb.add_child(save)
-	var savep := Button.new(); savep.text = "⭐ บันทึกเป็น preset"; savep.pressed.connect(_save_as_preset); vb.add_child(savep)
 	ui.add_child(panel)
 
 	# right top: selected item
@@ -442,16 +470,29 @@ func _refresh_sel() -> void:
 	sp.visible = true
 	var it: Dictionary = items[sel]["dict"]
 	var lbl := Label.new(); lbl.text = "⚙ " + String(it.get("type", "")); sv.add_child(lbl)
-	var rl := Label.new(); rl.text = "หมุน"; sv.add_child(rl)
-	var rot := HSlider.new(); rot.min_value = 0; rot.max_value = 360; rot.value = float(it.get("rot", 0))
-	rot.value_changed.connect(func(v): it["rot"] = v; items[sel]["node"].rotation_degrees.y = v); sv.add_child(rot)
-	var slb := Label.new(); slb.text = "ขนาด"; sv.add_child(slb)
-	var scl := HSlider.new(); scl.min_value = 0.4; scl.max_value = 3.0; scl.step = 0.1; scl.value = float(it.get("scale", 1))
-	scl.value_changed.connect(func(v): it["scale"] = v; items[sel]["node"].scale = Vector3(v, v, v); _place_highlight()); sv.add_child(scl)
-	var del := Button.new(); del.text = "🗑 ลบ"
+	# stepper rows (sliders were invisible on the dark theme) — clear value + buttons
+	var apply_rot := func(v): it["rot"] = wrapf(v, 0.0, 360.0); items[sel]["node"].rotation_degrees.y = it["rot"]; _refresh_sel()
+	sv.add_child(_stepper("หมุน", "%d°" % int(it.get("rot", 0)),
+		func(): apply_rot.call(float(it.get("rot", 0)) - 15.0),
+		func(): apply_rot.call(float(it.get("rot", 0)) + 15.0)))
+	var apply_scl := func(v): it["scale"] = clampf(v, 0.3, 4.0); items[sel]["node"].scale = Vector3(it["scale"], it["scale"], it["scale"]); _place_highlight(); _refresh_sel()
+	sv.add_child(_stepper("ขนาด", "%.1f" % float(it.get("scale", 1.0)),
+		func(): apply_scl.call(float(it.get("scale", 1.0)) - 0.1),
+		func(): apply_scl.call(float(it.get("scale", 1.0)) + 0.1)))
+	var del := Button.new(); del.text = "🗑 ลบวัตถุนี้"
 	del.pressed.connect(func():
 		items[sel]["node"].queue_free(); items.remove_at(sel); sel = -1
 		_place_highlight(); _refresh_sel(); _refresh_scene()); sv.add_child(del)
+
+func _stepper(label: String, value: String, on_minus: Callable, on_plus: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 4)
+	var l := Label.new(); l.text = label; l.custom_minimum_size = Vector2(48, 0); row.add_child(l)
+	var minus := Button.new(); minus.text = "−"; minus.custom_minimum_size = Vector2(34, 0)
+	minus.pressed.connect(on_minus); row.add_child(minus)
+	var v := Label.new(); v.text = value; v.custom_minimum_size = Vector2(50, 0); v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; row.add_child(v)
+	var plus := Button.new(); plus.text = "＋"; plus.custom_minimum_size = Vector2(34, 0)
+	plus.pressed.connect(on_plus); row.add_child(plus)
+	return row
 
 func _refresh_scene() -> void:
 	var box := ui.find_child("SceneList", true, false)
