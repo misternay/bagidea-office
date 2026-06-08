@@ -53,10 +53,64 @@ var ui_lang := "en"               # editor UI language (en default, th if set on
 var _ui_layer: CanvasLayer        # so we can rebuild the whole UI on a language switch
 var _billboard_path := ""         # user-uploaded billboard image (persisted in layout)
 
-## Pick the localized string. English is the default; Thai when the machine's
-## registry lang is "th".
+# the office's four languages (mirrors overlay.html LANGS)
+const LANGS := [["en", "🇬🇧 EN"], ["th", "🇹🇭 ไทย"], ["zh", "🇨🇳 中文"], ["ja", "🇯🇵 日本語"]]
+
+## Pick the localized string. English is the default; th passed inline, zh/ja
+## looked up by the English key so existing L(en, th) call sites need no change.
 func L(en: String, th: String) -> String:
-	return th if ui_lang == "th" else en
+	match ui_lang:
+		"th": return th
+		"zh": return _ZH.get(en, en)
+		"ja": return _JA.get(en, en)
+		_: return en
+
+const _ZH := {
+	"💾 Save": "💾 保存", "🏷 Billboard": "🏷 招牌",
+	"🔀 Room layout (click 2 rooms = swap)": "🔀 房间布局（点两个房间=交换）",
+	"👻 Ghost office (move)": "👻 幽灵办公室（移动）",
+	"＋ Add object": "＋ 添加物件",
+	"L-drag=pan · click=select · drag=move · R-drag=rotate · wheel=zoom": "左拖=平移 · 点击=选择 · 拖动=移动 · 右拖=旋转 · 滚轮=缩放",
+	"🔵 System (agents use)": "🔵 系统（代理使用）", "🟢 Decor (free to move)": "🟢 装饰（可自由移动）",
+	"📦 Furniture (Low Poly)": "📦 家具（低多边形）",
+	"🗃 LIBRARY — imported models/images": "🗃 素材库 — 导入的模型/图片",
+	"🗂 SCENE — placed objects": "🗂 场景 — 已放置物件",
+	"🖥 Workstation": "🖥 工位", "⭐ Director desk": "⭐ 主管桌", "👑 CEO desk": "👑 CEO 桌", "🛏 Bed": "🛏 床",
+	"Rotate": "旋转", "Size": "大小", "(none)": "(不播放)", "🗑 Delete this": "🗑 删除此物",
+	"(empty — use Import)": "(空 — 点击导入)",
+	"Picked first room — click another to swap": "已选第一个房间 — 再点一个进行交换",
+	"Cancelled": "已取消", "🔀 Rooms swapped — press 💾 Save to keep it": "🔀 已交换房间 — 按 💾 保存以记住",
+	"Added — drag to position": "已添加 — 拖动以摆放",
+	"Confirm save": "确认保存", "Save & close": "保存并关闭", "Cancel": "取消",
+	"Save this office layout, update the wallpaper, and close the editor?": "保存此办公室布局、更新壁纸并关闭编辑器？",
+	"💾 Saved — updating wallpaper, closing…": "💾 已保存 — 正在更新壁纸，即将关闭…",
+	"📁 Upload new image…": "📁 上传新图片…", "(library has no images yet)": "(素材库还没有图片)",
+	"🏷 Billboard set — Save to keep (best ratio ~6.7:1, e.g. 1380×207)": "🏷 已设置招牌 — 保存以记住（最佳比例约 6.7:1，例如 1380×207）",
+	"👻 moved ghost office": "👻 已移动幽灵办公室",
+}
+const _JA := {
+	"💾 Save": "💾 保存", "🏷 Billboard": "🏷 看板",
+	"🔀 Room layout (click 2 rooms = swap)": "🔀 部屋レイアウト（2部屋クリックで入替）",
+	"👻 Ghost office (move)": "👻 ゴーストオフィス（移動）",
+	"＋ Add object": "＋ オブジェクト追加",
+	"L-drag=pan · click=select · drag=move · R-drag=rotate · wheel=zoom": "左ドラッグ=移動 · クリック=選択 · ドラッグ=移動 · 右ドラッグ=回転 · ホイール=ズーム",
+	"🔵 System (agents use)": "🔵 システム（エージェント用）", "🟢 Decor (free to move)": "🟢 装飾（自由に移動）",
+	"📦 Furniture (Low Poly)": "📦 家具（ローポリ）",
+	"🗃 LIBRARY — imported models/images": "🗃 ライブラリ — 取込モデル/画像",
+	"🗂 SCENE — placed objects": "🗂 シーン — 配置オブジェクト",
+	"🖥 Workstation": "🖥 作業デスク", "⭐ Director desk": "⭐ ディレクター席", "👑 CEO desk": "👑 CEO席", "🛏 Bed": "🛏 ベッド",
+	"Rotate": "回転", "Size": "サイズ", "(none)": "(再生しない)", "🗑 Delete this": "🗑 これを削除",
+	"(empty — use Import)": "(空 — インポート)",
+	"Picked first room — click another to swap": "最初の部屋を選択 — もう一つで入替",
+	"Cancelled": "キャンセル", "🔀 Rooms swapped — press 💾 Save to keep it": "🔀 部屋を入替 — 💾 保存で確定",
+	"Added — drag to position": "追加 — ドラッグで配置",
+	"Confirm save": "保存の確認", "Save & close": "保存して閉じる", "Cancel": "キャンセル",
+	"Save this office layout, update the wallpaper, and close the editor?": "このレイアウトを保存し、壁紙を更新してエディタを閉じますか？",
+	"💾 Saved — updating wallpaper, closing…": "💾 保存しました — 壁紙を更新して閉じます…",
+	"📁 Upload new image…": "📁 新しい画像をアップロード…", "(library has no images yet)": "(ライブラリに画像がありません)",
+	"🏷 Billboard set — Save to keep (best ratio ~6.7:1, e.g. 1380×207)": "🏷 看板を設定 — 保存で確定（推奨比 約6.7:1 例 1380×207）",
+	"👻 moved ghost office": "👻 ゴーストオフィスを移動",
+}
 
 ## Read the persisted UI language straight off the daemon's registry.json (sync,
 ## so the UI builds in the right language with no async race).
@@ -552,7 +606,10 @@ func _build_ui() -> void:
 	var bbtn := Button.new(); bbtn.text = L("🏷 Billboard", "🏷 ป้าย"); bbtn.pressed.connect(_import_billboard); bh.add_child(bbtn)
 	var save := Button.new(); save.text = L("💾 Save", "💾 บันทึก"); save.pressed.connect(_save); bh.add_child(save)
 	bh.add_child(VSeparator.new())
-	var lng := Button.new(); lng.text = "🌐 " + ("ไทย" if ui_lang == "th" else "EN"); lng.pressed.connect(_toggle_lang); bh.add_child(lng)
+	var lcur := "🌐"
+	for e in LANGS:
+		if e[0] == ui_lang: lcur = String(e[1])
+	var lng := Button.new(); lng.text = lcur; lng.pressed.connect(_toggle_lang); bh.add_child(lng)
 	ui.add_child(bar)
 
 	# ── LEFT COLUMN — fills the left edge top-to-bottom: palette (scrolls) on
@@ -639,7 +696,10 @@ func _build_ui() -> void:
 	toast.position = Vector2(-120, -48); ui.add_child(toast)
 
 func _toggle_lang() -> void:
-	ui_lang = "en" if ui_lang == "th" else "th"
+	var i := 0
+	for k in LANGS.size():
+		if LANGS[k][0] == ui_lang: i = k; break
+	ui_lang = String(LANGS[(i + 1) % LANGS.size()][0])   # cycle en → th → zh → ja
 	var req := HTTPRequest.new(); add_child(req)
 	req.request_completed.connect(func(_a, _b, _c, _d): req.queue_free())
 	req.request("http://127.0.0.1:8787/registry/lang", ["content-type: application/json"],

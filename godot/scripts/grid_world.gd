@@ -41,23 +41,26 @@ const ROOM_DEFS := {
 # agent anchors per room kind — LOCAL offset from cell centre (y = 0.86 floor).
 # Names are exactly those agent_manager.gd already targets, so the brain is
 # untouched: only WHERE each anchor sits is now grid-driven.
+# All sub-anchors live in the FOUR QUADRANTS (|x|>=1.6 and |z|>=1.6) so the
+# central plus-corridor that links the four door gaps stays clear — agents and
+# the swap never drop furniture in a doorway. (cell is 10.5 x 8 → half 5.25 x 4)
 const ROOM_ANCHORS := {
-	"exec":  {"exec_c": Vector2(0, 0), "ceo_desk": Vector2(0, -2.3), "lead_desk": Vector2(2.2, -2.3),
-		"pace_a": Vector2(-1.5, -0.6), "pace_b": Vector2(1.5, -0.6)},
-	"ops":   {"ops_c": Vector2(0, 0), "desk1": Vector2(-2.3, -2.0), "desk2": Vector2(0, -2.0),
-		"desk3": Vector2(2.3, -2.0), "desk4": Vector2(-2.3, 1.4), "desk5": Vector2(0, 1.4),
-		"desk6": Vector2(2.3, 1.4), "ap1": Vector2(-2.3, 0), "ap2": Vector2(2.3, 0)},
+	"exec":  {"exec_c": Vector2(0, 0), "ceo_desk": Vector2(-3.0, -2.5), "lead_desk": Vector2(3.0, -2.5),
+		"pace_a": Vector2(-3.0, 2.4), "pace_b": Vector2(3.0, 2.4)},
+	"ops":   {"ops_c": Vector2(0, 0), "desk1": Vector2(-4.0, -2.5), "desk2": Vector2(-2.0, -2.5),
+		"desk3": Vector2(2.0, -2.5), "desk4": Vector2(4.0, -2.5), "desk5": Vector2(-2.5, 2.4),
+		"desk6": Vector2(2.5, 2.4), "ap1": Vector2(-4.2, 2.4), "ap2": Vector2(4.2, 2.4)},
 	"server": {"server_c": Vector2(0, 0)},
-	"lobby": {"lobby_c": Vector2(0, 0), "spawn": Vector2(0, 3.0), "sec_c": Vector2(-2.4, -2.2),
-		"sec_window": Vector2(-2.4, -1.0)},
-	"cafe":  {"cafe_c": Vector2(0, 0), "cafe_s1": Vector2(0.6, -1.4), "cafe_s2": Vector2(1.6, 1.8)},
-	"meeting": {"meeting_c": Vector2(0, 0), "m_s1": Vector2(-1.3, -1.3), "m_s2": Vector2(1.3, -1.3),
-		"m_s3": Vector2(-1.3, 1.3), "m_s4": Vector2(1.3, 1.3)},
-	"rec":   {"rec_c": Vector2(0, 0), "rec_s1": Vector2(-1.4, -0.5), "rec_s2": Vector2(0, 1.4),
-		"rec_s3": Vector2(-1.4, 0.6), "rec_s4": Vector2(1.6, 1.4)},
-	"dormx": {"dormx_c": Vector2(0, 0), "b3": Vector2(-2.7, -1.4), "b4": Vector2(-0.9, -1.4),
-		"b5": Vector2(0.9, -1.4), "b6": Vector2(2.7, -1.4), "b7": Vector2(-1.8, 1.4), "b8": Vector2(1.8, 1.4)},
-	"dorm":  {"dorm_c": Vector2(0, 0), "bed1": Vector2(-1.8, -1.5), "bed2": Vector2(1.8, -1.5)},
+	"lobby": {"lobby_c": Vector2(0, 0), "spawn": Vector2(0, 3.4), "sec_c": Vector2(-3.2, -2.5),
+		"sec_window": Vector2(-3.2, -1.7)},
+	"cafe":  {"cafe_c": Vector2(0, 0), "cafe_s1": Vector2(-3.0, 2.4), "cafe_s2": Vector2(3.0, -2.4)},
+	"meeting": {"meeting_c": Vector2(0, 0), "m_s1": Vector2(-2.6, -2.4), "m_s2": Vector2(2.6, -2.4),
+		"m_s3": Vector2(-2.6, 2.4), "m_s4": Vector2(2.6, 2.4)},
+	"rec":   {"rec_c": Vector2(0, 0), "rec_s1": Vector2(-3.2, -2.4), "rec_s2": Vector2(3.2, 2.4),
+		"rec_s3": Vector2(-3.2, 2.4), "rec_s4": Vector2(3.2, -2.4)},
+	"dormx": {"dormx_c": Vector2(0, 0), "b3": Vector2(-4.0, -2.5), "b4": Vector2(-2.0, -2.5),
+		"b5": Vector2(2.0, -2.5), "b6": Vector2(4.0, -2.5), "b7": Vector2(-2.5, 2.4), "b8": Vector2(2.5, 2.4)},
+	"dorm":  {"dorm_c": Vector2(0, 0), "bed1": Vector2(-3.0, -2.5), "bed2": Vector2(3.0, -2.5)},
 }
 const FLOOR_Y := 0.86
 
@@ -334,89 +337,90 @@ func _kit_node(room: Node3D, model: String, lpos: Vector3, roty: float, sv: Vect
 ## the cell centre so it rides the container when rooms swap.
 func _furnish(room: Node3D, kind: String, accent: String) -> void:
 	var kit := _kit_avail()
+	# the four quadrant anchor spots (clear of the central plus-corridor + doors)
+	var nw := Vector3(-3.0, 0, -2.5); var ne := Vector3(3.0, 0, -2.5)
+	var sw := Vector3(-3.0, 0, 2.4); var se := Vector3(3.0, 0, 2.4)
 	match kind:
 		"exec":
+			# CEO desk (NW) + Director desk (NE), orrery + plant in front corners
+			_desk_pod(room, nw, 180.0, kit)
+			if kit: _kit(room, "Command_Console", nw + Vector3(0, 0, -0.4), 0.0, 0.5)
+			_desk_pod(room, ne, 180.0, kit)
 			if kit:
-				_kit(room, "Command_Console", Vector3(0, 0, -2.5), 0.0, 0.5)
-				_kit(room, "Large_Monitor_Blue", Vector3(-2.2, 0, -3.0), 0.0, 0.5)
-				_kit(room, "Orrery", Vector3(2.7, 0, -2.4), 0.0, 0.35)
-				_kit(room, "Chair_1", Vector3(0, 0, -1.4), 180.0, 0.6)
-				_kit(room, "Plant_1", Vector3(3.0, 0, 2.8), 40.0, 1.4)
-			else:
-				room.add_child(_box(Vector3(0, 0.45, -2.4), Vector3(2.4, 0.9, 1.0), _m("2a2018", 0.5)))
+				_kit(room, "Orrery", sw, 0.0, 0.35)
+				_kit(room, "Plant_1", se, 40.0, 1.4)
 		"ops":
-			var spots := [Vector3(-2.3, 0, -2.0), Vector3(0, 0, -2.0), Vector3(2.3, 0, -2.0),
-				Vector3(-2.3, 0, 1.4), Vector3(0, 0, 1.4), Vector3(2.3, 0, 1.4)]
-			for sp in spots:
-				room.add_child(_box(sp + Vector3(0, 0.4, 0), Vector3(1.4, 0.8, 0.7), _m("23303f", 0.5)))
-				if kit:
-					_kit(room, "Large_Monitor_Blue", sp + Vector3(0, 0.8, 0.05), 0.0, 0.24)
-					_kit(room, "Chair_1", sp + Vector3(0, 0, -0.85), 180.0, 0.55)
+			# six desk pods on the six ops anchors (back row of 4, front pair)
+			for sp in [Vector3(-4.0, 0, -2.5), Vector3(-2.0, 0, -2.5), Vector3(2.0, 0, -2.5),
+					Vector3(4.0, 0, -2.5), Vector3(-2.5, 0, 2.4), Vector3(2.5, 0, 2.4)]:
+				_desk_pod(room, sp, 180.0 if sp.z < 0 else 0.0, kit)
 		"server":
+			# racks down both side walls (clear of the side doors at z=0), a glowing
+			# data core the server-agent tends, generators in a front corner
+			var rc := ["55ff9e", "4ec3ff", "ffd24a", "ff6a8a"]
+			for i in 2:
+				_server_rack(room, Vector3(-4.4, 0, -2.6 + i * 5.0), 90.0, rc[i])
+				_server_rack(room, Vector3(4.4, 0, -2.6 + i * 5.0), -90.0, rc[i + 2])
+			_holo_core(room, Vector3(0, 0, 0), accent)
 			if kit:
-				_kit(room, "Generator", Vector3(0, 0, 2.6), 0.0, 0.5)
-				_kit(room, "Battery_Green", Vector3(-1.2, 0, 2.7), 0.0, 0.7)
-				_kit(room, "Battery_Blue", Vector3(1.2, 0, 2.7), 0.0, 0.7)
-				_kit_node(room, "Wall_Display_Green", Vector3(0, 0.4, -3.4), 0.0, Vector3.ONE * 0.8)
-			# blinking server racks down both sides + a glowing data-core hologram
-			var rack_cols := ["55ff9e", "4ec3ff", "ffd24a", "ff6a8a"]
-			for i in 3:
-				_server_rack(room, Vector3(-2.7, 0, -2.0 + i * 1.9), 90.0, rack_cols[i % 4])
-				_server_rack(room, Vector3(2.7, 0, -2.0 + i * 1.9), -90.0, rack_cols[(i + 2) % 4])
-			_holo_core(room, Vector3(0, 0, -0.4), accent)
+				_kit(room, "Generator", sw, 0.0, 0.5)
+				_kit(room, "Battery_Blue", se, 0.0, 0.7)
 		"meeting":
+			# central table is the gather point (not a doorway) — seats in quadrants
 			if kit:
-				_kit(room, "Octo_Table", Vector3(0, 0, 0), 0.0, 0.45)
-				_kit(room, "Chair_1", Vector3(-1.3, 0, -1.3), 135.0, 0.6)
-				_kit(room, "Chair_1", Vector3(1.3, 0, -1.3), -135.0, 0.6)
-				_kit(room, "Chair_1", Vector3(-1.3, 0, 1.3), 45.0, 0.6)
-				_kit(room, "Chair_1", Vector3(1.3, 0, 1.3), -45.0, 0.6)
-				_kit(room, "Briefing_Screen_Purple", Vector3(0, 0, -3.0), 0.0, 0.5)
+				_kit(room, "Octo_Table", Vector3(0, 0, 0), 0.0, 0.5)
+				_kit(room, "Chair_1", nw, 135.0, 0.6); _kit(room, "Chair_1", ne, -135.0, 0.6)
+				_kit(room, "Chair_1", sw, 45.0, 0.6); _kit(room, "Chair_1", se, -45.0, 0.6)
 			else:
-				room.add_child(_box(Vector3(0, 0.4, 0), Vector3(2.2, 0.8, 2.2), _m("241d30", 0.5)))
+				room.add_child(_box(Vector3(0, 0.4, 0), Vector3(2.0, 0.8, 2.0), _m("241d30", 0.5)))
 		"cafe":
-			room.add_child(_box(Vector3(-2.6, 0.5, 0), Vector3(0.9, 1.0, 2.4), _m("2a1d10", 0.5)))   # counter
-			for tp in [Vector3(0.6, 0, -1.4), Vector3(1.6, 0, 1.8)]:
+			room.add_child(_box(Vector3(-4.4, 0.5, -2.5), Vector3(1.6, 1.0, 0.9), _m("2a1d10", 0.5)))   # counter (NW corner)
+			for tp in [sw, ne]:
 				if kit:
 					_kit(room, "Cafeteria_Table", tp, 0.0, 0.8)
-					_kit(room, "Chair_1", tp + Vector3(0.9, 0, 0.5), -120.0, 0.55)
-					_kit(room, "Chair_1", tp + Vector3(-0.9, 0, -0.5), 60.0, 0.55)
+					_kit(room, "Chair_1", tp + Vector3(0.85, 0, 0), -90.0, 0.55)
+					_kit(room, "Chair_1", tp + Vector3(-0.85, 0, 0), 90.0, 0.55)
 				else:
 					room.add_child(_box(tp + Vector3(0, 0.4, 0), Vector3(1.0, 0.8, 1.0), _m("3a2a18", 0.5)))
 		"dorm":
-			if kit:
-				_kit(room, "Bunk_Single_Blue", Vector3(-1.8, 0, -1.5), 0.0, 0.7)
-				_kit(room, "Bunk_Single_Red", Vector3(1.8, 0, -1.5), 0.0, 0.7)
-				_kit(room, "Cryo_Tube_ON", Vector3(2.8, 0, 2.2), 0.0, 0.45)
-				_kit(room, "Plant_1", Vector3(-2.8, 0, 2.4), 120.0, 1.5)
-			else:
-				room.add_child(_box(Vector3(-1.8, 0.3, -1.5), Vector3(1.0, 0.5, 2.0), _m("2a2d3a", 0.6)))
-				room.add_child(_box(Vector3(1.8, 0.3, -1.5), Vector3(1.0, 0.5, 2.0), _m("2a2d3a", 0.6)))
+			_bunk(room, nw, "Blue", kit); _bunk(room, ne, "Red", kit)
+			if kit: _kit(room, "Plant_1", se, 120.0, 1.5)
 		"dormx":
-			for i in 4:
-				var x := -2.7 + i * 1.8
-				if kit:
-					_kit(room, "Bunk_Single_" + ["Blue", "Green", "Orange", "Purple"][i], Vector3(x, 0, -1.4), 0.0, 0.7)
-				else:
-					room.add_child(_box(Vector3(x, 0.3, -1.4), Vector3(1.0, 0.5, 2.0), _m("242636", 0.6)))
+			# six bunks on the six dormx anchors
+			var cols := ["Blue", "Green", "Orange", "Purple", "Red", "Grey"]
+			var spots := [Vector3(-4.0, 0, -2.5), Vector3(-2.0, 0, -2.5), Vector3(2.0, 0, -2.5),
+				Vector3(4.0, 0, -2.5), Vector3(-2.5, 0, 2.4), Vector3(2.5, 0, 2.4)]
+			for i in spots.size(): _bunk(room, spots[i], cols[i], kit)
 		"rec":
 			if kit:
-				_kit(room, "Large_Monitor_White", Vector3(-3.0, 0, 0), 90.0, 0.5)
-				_kit(room, "Chair_1", Vector3(-1.4, 0, -0.5), 90.0, 0.6)
-				_kit(room, "Chair_1", Vector3(-1.4, 0, 0.6), 90.0, 0.6)
-				_kit(room, "Cafeteria_Table", Vector3(1.6, 0, 1.4), 90.0, 0.8)
-				_kit(room, "3D_Chess_Board", Vector3(1.6, 0.62, 1.4), 15.0, 0.35)
-				_kit(room, "Hydroponics_Full", Vector3(2.6, 0, -2.4), 0.0, 0.8)
-				_kit(room, "Plant_1", Vector3(-2.8, 0, 2.6), 60.0, 1.5)
+				_kit(room, "Large_Monitor_White", nw, 90.0, 0.5)
+				_kit(room, "Cafeteria_Table", se, 0.0, 0.8)
+				_kit(room, "3D_Chess_Board", se + Vector3(0, 0.62, 0), 15.0, 0.35)
+				_kit(room, "Hydroponics_Full", ne, 0.0, 0.8)
+				_kit(room, "Plant_1", sw, 60.0, 1.5)
 			else:
-				room.add_child(_box(Vector3(-3.0, 0.6, 0), Vector3(0.2, 1.2, 2.0), _m("101418", 0.3)))
+				room.add_child(_box(nw + Vector3(0, 0.6, 0), Vector3(0.2, 1.2, 1.6), _m("101418", 0.3)))
 		"lobby":
-			room.add_child(_box(Vector3(0, 1.2, 0), Vector3(0.5, 2.4, 0.5), _m("1a2025", 0.3, "ff2a20", 1.6)))   # totem
-			room.add_child(_box(Vector3(-2.4, 0.5, -2.2), Vector3(1.8, 1.0, 0.7), _m("2a1d18", 0.5)))            # reception
-			room.add_child(_box(Vector3(2.4, 0.35, 2.0), Vector3(0.9, 0.7, 0.9), _m("203038", 0.5)))            # armchair
+			room.add_child(_box(se + Vector3(0, 1.2, 0), Vector3(0.5, 2.4, 0.5), _m("1a2025", 0.3, "ff2a20", 1.6)))  # totem (corner)
+			room.add_child(_box(nw + Vector3(0, 0.5, 0), Vector3(1.8, 1.0, 0.7), _m("2a1d18", 0.5)))                 # reception
+			room.add_child(_box(sw + Vector3(0, 0.35, 0), Vector3(0.9, 0.7, 0.9), _m("203038", 0.5)))               # armchair
 			if kit:
-				_kit(room, "End_Table", Vector3(2.4, 0, -2.2), 0.0, 0.8)
-				_kit(room, "3D_Chess_Board", Vector3(2.4, 0.75, -2.2), 25.0, 0.35)
+				_kit(room, "End_Table", ne, 0.0, 0.8)
+				_kit(room, "3D_Chess_Board", ne + Vector3(0, 0.75, 0), 25.0, 0.35)
+
+## A desk pod: desk box + monitor + chair, facing roty (180 = faces +z/front).
+func _desk_pod(room: Node3D, pos: Vector3, roty: float, kit: bool) -> void:
+	room.add_child(_box(pos + Vector3(0, 0.4, 0), Vector3(1.4, 0.8, 0.7), _m("23303f", 0.5)))
+	if kit:
+		_kit(room, "Large_Monitor_Blue", pos + Vector3(0, 0.8, -0.05 if roty == 180.0 else 0.05), roty, 0.24)
+		_kit(room, "Chair_1", pos + Vector3(0, 0, 0.85 if roty == 180.0 else -0.85), roty, 0.55)
+
+## A single bunk (kit when present, else a block).
+func _bunk(room: Node3D, pos: Vector3, color: String, kit: bool) -> void:
+	if kit:
+		_kit(room, "Bunk_Single_" + color, pos, 0.0, 0.7)
+	else:
+		room.add_child(_box(pos + Vector3(0, 0.3, 0), Vector3(1.0, 0.5, 1.8), _m("2a2d3a", 0.6)))
 
 ## A blinking server rack: dark cabinet + a stack of glowing LED strips.
 func _server_rack(room: Node3D, pos: Vector3, roty: float, color: String) -> void:

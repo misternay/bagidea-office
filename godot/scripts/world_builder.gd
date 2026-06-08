@@ -812,8 +812,8 @@ var _icon_dusk: Node3D
 func _build_clock() -> void:
 	var rig := Node3D.new()
 	add_child(rig)
-	rig.position = Vector3(8.5, 4.7, -12.0)   # back-wall roofline, right of the billboard
-	rig.rotation_degrees.x = -40.0
+	rig.position = Vector3(8.5, 5.1, -12.1)   # back-wall roofline, right of the billboard
+	rig.rotation_degrees.x = -24.0
 
 	var frame := CSGBox3D.new()
 	frame.size = Vector3(3.5, 1.2, 0.14)
@@ -824,12 +824,11 @@ func _build_clock() -> void:
 	panel.material = _mat(Color(0.03, 0.045, 0.08), 0.3)
 	panel.position.z = 0.06
 	rig.add_child(panel)
-	for px in [-1.45, 1.45]:
-		var post := CSGBox3D.new()
-		post.size = Vector3(0.12, 1.5, 0.12)
-		post.material = _mat(Color(0.16, 0.18, 0.22), 0.55)
-		post.position = Vector3(px, -0.75, -0.25)
-		rig.add_child(post)
+	# vertical support posts planted on the back wall (like the billboard), not
+	# tilted with the panel
+	var cpost_mat := _mat(Color(0.3, 0.31, 0.34), 0.5)
+	_box(Vector3(8.5 - 1.3, 4.1, -12.0), Vector3(0.13, 1.7, 0.13), cpost_mat)
+	_box(Vector3(8.5 + 1.3, 4.1, -12.0), Vector3(0.13, 1.7, 0.13), cpost_mat)
 
 	_clock_label = Label3D.new()
 	_clock_label.text = "--:--"
