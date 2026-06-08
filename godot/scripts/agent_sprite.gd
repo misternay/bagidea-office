@@ -408,8 +408,9 @@ func teleport(pos: Vector3) -> void:
 	_walking = false
 	position = pos
 
-func walk_to(points: Array) -> float:
+func walk_to(points: Array, face_dir := -1) -> float:
 	if points.is_empty():
+		if face_dir >= 0: _dir = face_dir   # already there — just turn to face
 		return 0.0
 	follow_node = null  # an explicit walk always overrides tailing
 	if _walk_tween:
@@ -429,5 +430,7 @@ func walk_to(points: Array) -> float:
 	_walk_tween.finished.connect(func():
 		_bob_speed = 2.2
 		_walking = false
-		_dir = DIR_DOWN)  # face the camera when arriving
+		# default: face the camera on arrival; a caller can request another facing
+		# (e.g. DIR_UP to face the monitor when seating at a work desk).
+		_dir = face_dir if face_dir >= 0 else DIR_DOWN)
 	return total

@@ -15,6 +15,7 @@ var roster := {}  # id -> {name, role, avatar} — the daemon's persistent regis
 var ghosts := {}  # sub id ("pixel#s1") -> {node, desk: GHOST_DESKS index or -1}
 var meeting_ghosts := {}  # agent id -> stand-in clone (owner too busy to attend)
 var ghost_desks_free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+var _sec_pending := {}  # task -> a Security walk is scheduled but not yet committed
 var ceo_hold_until := 0.0  # the boss stands still while giving/receiving work
 var _tv_watchers := 0
 var supervising := {}  # delegate id -> {ghost: Sprite3D or null} (main keeps tabs)
@@ -244,11 +245,13 @@ func handle(evt: Dictionary) -> void:
 			_set_state(a, "blocked")
 			a.node.set_status("needs approval ⚠")
 			_fx(a, "alert", 3)
-			_walk(a.node, "sec_window")
-			_pulse_security()
-			if not theatrical:
-				world.board_set(task, "blocked", id)
+			# Don't bolt for Security yet — granted tools are auto-approved by the
+			# daemon almost instantly. Wait a beat; if approval/denial lands first,
+			# the agent never leaves its desk.
+			_sec_pending[task] = true
+			_security_walk_after_grace(a, id, task)
 		"perm.approved":
+			_sec_pending.erase(task)
 			if not theatrical:
 				Sfx.play("blip2")
 			_set_state(a, "working")
@@ -259,6 +262,7 @@ func handle(evt: Dictionary) -> void:
 			if not theatrical:
 				world.board_set(task, "running", id)
 		"perm.denied":
+			_sec_pending.erase(task)
 			if not theatrical:
 				Sfx.play("buzz")
 			a.tasks.erase(task)
@@ -536,6 +540,21 @@ func _despawn_ghost(sub: String, ok: bool) -> void:
 		Sfx.play("whoosh")
 		g.ghost_dissolve()
 
+## Walk to Security only if the request is STILL unresolved after a short
+## grace — granted tools get auto-approved within milliseconds, so the agent
+## should keep working at its desk instead of bolting for the window.
+func _security_walk_after_grace(a: Dictionary, id: String, task: String) -> void:
+	await get_tree().create_timer(0.5).timeout
+	if not _sec_pending.get(task, false):
+		return
+	_sec_pending.erase(task)
+	if not is_instance_valid(a.node) or a.state != "blocked":
+		return
+	_walk(a.node, "sec_window")
+	_pulse_security()
+	if not theatrical:
+		world.board_set(task, "blocked", id)
+
 ## The Ghost Deck moved (editor nudge) or rooms were swapped → re-target every
 ## working ghost to the deck's CURRENT desk world position, live, even mid-task.
 func reseat_ghosts() -> void:
@@ -624,7 +643,8 @@ func _to_desk(a: Dictionary) -> void:
 	# own computer can wait until the hand-overs are done.
 	if a.id == "main" and Time.get_ticks_msec() / 1000.0 < float(a.get("hold_at_ceo", 0.0)):
 		return
-	_walk(a.node, a.desk)
+	# Face the monitor (north) once seated — DIR_UP = 2 in agent_sprite.
+	_walk(a.node, a.desk, a.node.DIR_UP)
 
 ## Finished delegated work gets WALKED to the Director — a real hand-back.
 func _deliver_to_main(a: Dictionary) -> void:
@@ -682,14 +702,14 @@ func _clear_status_later(a: Dictionary, delay: float) -> void:
 	if a.state == "idle":
 		a.node.set_status("")
 
-func _walk(node: Sprite3D, target: String) -> float:
+func _walk(node: Sprite3D, target: String, face_dir := -1) -> float:
 	var path: Array = world.path_to(node.position, target)
 	# Shared gathering spots (room centres, café/rec/meeting seats, lobby) are
 	# visited by several characters — scatter the final step so they never stand
 	# on top of each other. Personal desks/beds stay exact (single occupant).
 	if path.size() > 0 and _is_shared_spot(target):
 		path[path.size() - 1] += Vector3(randf_range(-0.7, 0.7), 0, randf_range(-0.7, 0.7))
-	return node.walk_to(path)
+	return node.walk_to(path, face_dir)
 
 func _is_shared_spot(target: String) -> bool:
 	return target.ends_with("_c") or target.begins_with("cafe") \
