@@ -1,4 +1,4 @@
-// BagIdea AI Agents Office — daemon v3 (Layer 0).
+// BagIdea Office — daemon v3 (Layer 0).
 // Zero-dependency event hub + Claude Code adapter + permission broker:
 //   HTTP :8787  GET  /              → Layer-2 overlay (chat panel web app)
 //   WS   :8787  GET  /ws (upgrade)  → event stream for renderers + overlays
@@ -1458,7 +1458,7 @@ function checkUpdate() {
     const local = String(out).trim();
     require("https").get({
       host: "api.github.com",
-      path: "/repos/bagidea/bagidea-ai-agents-office/commits/main",
+      path: "/repos/bagidea/bagidea-office/commits/main",
       headers: { "user-agent": "bagidea-office" },
     }, (res) => {
       let b = "";
@@ -2984,7 +2984,7 @@ function handleLive(req, sock) {
           generationConfig: { responseModalities: ["AUDIO"],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: presetVoice } } } },
           systemInstruction: { parts: [{ text:
-            `คุณคือ "${a.name || "ผู้ช่วย"}" พนักงานใน BagIdea AI Agents Office คุยกับเจ้าของแบบเป็นกันเอง ` +
+            `คุณคือ "${a.name || "ผู้ช่วย"}" พนักงานใน BagIdea Office คุยกับเจ้าของแบบเป็นกันเอง ` +
             `ภาษาไทย กระชับ. ทีมงาน:\n${team}\nข้อมูลออฟฟิศ:\n${ctxNote}` }] },
         } }));
         toClient({ type: "ready" });

@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 
-config/name="BagIdea AI Agents Office - Visual Target"
+config/name="BagIdea Office"
 run/main_scene="res://scenes/office_floor.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://assets/brand/logo_ico_cute.png"

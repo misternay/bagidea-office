@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-// BagIdea AI Agents Office — THE program. One exe runs the whole stack:
+// BagIdea Office — THE program. One exe runs the whole stack:
 //   • spawns the event daemon (node) if not already running
 //   • spawns the Godot office and embeds it behind the desktop icons (WorkerW)
 //   • circular chat head (drag anywhere, click toggles the overlay)
@@ -609,7 +609,7 @@ fn main() {
     ]);
     let _tray = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
-        .with_tooltip("BagIdea AI Agents Office")
+        .with_tooltip("BagIdea Office")
         .with_icon(tray_app_icon().expect("tray icon"))
         .build()
         .expect("tray");

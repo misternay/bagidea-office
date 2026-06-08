@@ -4,7 +4,7 @@
 
 The user is a **CEO/Director**, not an operator. Everything in the UX reinforces this:
 
-| Traditional agent tool | BagIdea AI Agents Office |
+| Traditional agent tool | BagIdea Office |
 |---|---|
 | Session list | Office directory of employees |
 | Task queue | Mission board in Mission Control |
@@ -56,7 +56,7 @@ WALLPAPER ──── GLANCE ──── INTERACT ──── COMMAND ──�
 ## 1.4 Information Architecture
 
 ```
-BagIdea AI Agents Office
+BagIdea Office
 │
 ├── World (Layer 1)
 │   ├── Zones (14) ──── each zone = one system domain

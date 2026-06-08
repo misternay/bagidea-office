@@ -1,4 +1,4 @@
-// BagIdea AI Agents Office — external channel connectors (zero-dep).
+// BagIdea Office — external channel connectors (zero-dep).
 // The office answers the outside world through the Director (main):
 //   • Telegram — long-poll getUpdates (works behind any NAT, no public URL)
 //   • Discord  — real gateway connection (hand-rolled WSS client)

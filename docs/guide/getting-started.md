@@ -1,4 +1,4 @@
-# เริ่มต้นใช้งาน BagIdea AI Agents Office
+# เริ่มต้นใช้งาน BagIdea Office
 
 > ออฟฟิศ AI มีชีวิตบนวอลเปเปอร์ของคุณ — พนักงานทุกตัวคือ Claude agent ของจริง
 
@@ -9,7 +9,7 @@
 เปิด PowerShell แล้วรันบรรทัดเดียว:
 
 ```powershell
-irm https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/installer/install.ps1 | iex
+irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex
 ```
 
 ตัวติดตั้งจะจัดการให้ทั้งหมด: Git, Node.js, Rust, Godot 4.6.3, Claude Code CLI,

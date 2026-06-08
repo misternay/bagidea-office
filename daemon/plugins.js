@@ -1,4 +1,4 @@
-// BagIdea AI Agents Office — plugin host (zero-dep).
+// BagIdea Office — plugin host (zero-dep).
 // A plugin is a folder under plugins/<id>/ with a plugin.json manifest and an
 // optional index.js (server side). Plugins extend the office in real ways:
 //   • add HTTP routes under /plugin/<id>/...   (server-side power)

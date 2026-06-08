@@ -1,4 +1,4 @@
-# BagIdea AI Agents Office
+# BagIdea Office
 
 > **A living AI Agent Office Simulation that runs as your desktop wallpaper.**
 > Every AI agent on your machine becomes a character in an HD-2D office — they walk to their desks when real work starts, gather at Security to ask for permission, hold meetings, learn skills, and the lights follow your real local time.
@@ -189,7 +189,7 @@ clones the app to `%LOCALAPPDATA%\BagIdeaOffice`, builds it, wires the
 `bagidea` command into your PATH and creates a Start Menu shortcut:
 
 ```powershell
-irm https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/installer/install.ps1 | iex
+irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex
 ```
 
 > First time only: run `claude` once in a new terminal to log in to Claude,
@@ -198,8 +198,8 @@ irm https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/inst
 ### Manual
 
 ```powershell
-git clone https://github.com/bagidea/bagidea-ai-agents-office.git
-cd bagidea-ai-agents-office
+git clone https://github.com/bagidea/bagidea-office.git
+cd bagidea-office
 ```
 
 **1. Fix absolute paths** (one-time): the hook configs reference absolute paths. Update these to your clone location:

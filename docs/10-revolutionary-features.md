@@ -64,7 +64,7 @@ The entire system runs on one contract: **nothing tagged is fake** ([Behavior §
 
 ## 10.12 Summary Positioning
 
-| | Cockpits (OpenClaw, Hermes, Manus, …) | **BagIdea AI Agents Office** |
+| | Cockpits (OpenClaw, Hermes, Manus, …) | **BagIdea Office** |
 |---|---|---|
 | Resting state | closed window | living wallpaper |
 | State awareness | open app, read logs | ambient, preattentive |

@@ -1,4 +1,4 @@
-﻿# BagIdea AI Agents Office — installer (closed-source friendly).
+﻿# BagIdea Office — installer (closed-source friendly).
 # Installs from a RELEASE ZIP — no source repo access, no Rust build needed
 # (the shell binary is bundled). Get the zip from a URL you control or a
 # local file; the office app + deps land in %LOCALAPPDATA%\BagIdeaOffice.
@@ -24,7 +24,7 @@ function Warn($m) { Write-Host "      ! $m" -ForegroundColor Yellow }
 
 Write-Host ""
 Write-Host "  ===========================================" -ForegroundColor Cyan
-Write-Host "   BagIdea AI Agents Office — INSTALLER" -ForegroundColor Cyan
+Write-Host "   BagIdea Office — INSTALLER" -ForegroundColor Cyan
 Write-Host "  ===========================================" -ForegroundColor Cyan
 
 if (-not $Zip) {
@@ -100,7 +100,7 @@ if ((Test-Path $gexe) -and (Test-Path $ico)) {
   }
   Copy-Item $gexe $branded -Force
   if (Test-Path $rcedit) {
-    & $rcedit $branded --set-icon $ico --set-version-string "FileDescription" "BagIdea AI Agents Office" --set-version-string "ProductName" "BagIdea AI Agents Office" 2>$null
+    & $rcedit $branded --set-icon $ico --set-version-string "FileDescription" "BagIdea Office" --set-version-string "ProductName" "BagIdea Office" 2>$null
     Ok "ทำ exe แบรนด์แล้ว — taskbar เป็น BAG IDEA ตั้งแต่เปิด"
   } else { Warn "ดาวน์โหลด rcedit ไม่ได้ — จะใช้ icon Godot ปกติ" }
 } else { Skip "ข้าม (ไม่พบ Godot หรือ logo.ico)" }

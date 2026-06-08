@@ -1,4 +1,4 @@
-# BagIdea AI Agents Office — Wallpaper mode PoC helper.
+# BagIdea Office — Wallpaper mode PoC helper.
 #
 # Re-parents a running Godot window into the desktop's WorkerW layer so it
 # renders BEHIND desktop icons (same technique as Wallpaper Engine).

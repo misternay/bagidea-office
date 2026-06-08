@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bagidea — command line for the BagIdea AI Agents Office.
+// bagidea — command line for the BagIdea Office.
 // Zero dependencies. Talks to the daemon on :8787; can launch the suite.
 
 const http = require("http");
@@ -30,7 +30,7 @@ const head = (s) => console.log(`\n  ${c.bold}${s}${c.reset}`);
 
 function banner() {
   console.log("");
-  console.log(`  ${c.brand}${c.bold}◍ BAG IDEA${c.reset}  ${c.gray}·${c.reset}  ${c.bold}AI Agents Office${c.reset}`);
+  console.log(`  ${c.brand}${c.bold}◍ BAG IDEA${c.reset}  ${c.gray}·${c.reset}  ${c.bold}Office${c.reset}`);
   console.log(`  ${c.gray}your wallpaper, at work${c.reset}`);
 }
 

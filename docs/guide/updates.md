@@ -23,7 +23,7 @@
 ## ตัวติดตั้ง (สำหรับเครื่องใหม่)
 
 ```powershell
-irm https://raw.githubusercontent.com/bagidea/bagidea-ai-agents-office/main/installer/install.ps1 | iex
+irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex
 ```
 
 | ขั้น | ทำอะไร |
