@@ -31,6 +31,9 @@ var _pos_req: HTTPRequest
 var _pos_busy := false
 
 func _ready() -> void:
+	# Hold off ambient cinematic close-ups so the OPENING shot is the CEO intro,
+	# not whichever staffer happens to move first.
+	_focus_cd = Time.get_ticks_msec() / 1000.0 + 14.0
 	_spawn_ceo.call_deferred()
 	_main_wander_loop()
 	_idle_life_loop()
@@ -739,6 +742,17 @@ func _spawn_ceo() -> void:
 	get_parent().add_child(ceo)
 	ceo.set_state("idle")
 	_ceo_loop()
+	_intro_focus()
+
+## Opening shot: glide the camera to the CEO when the office boots.
+func _intro_focus() -> void:
+	await get_tree().create_timer(1.0).timeout
+	if not is_instance_valid(ceo): return
+	var rig := get_node_or_null("../CameraRig")
+	if rig and rig.has_method("focus_on"):
+		rig.focus_on(ceo, 9.0)
+		# keep ambient close-ups quiet until the intro has fully eased back
+		_focus_cd = Time.get_ticks_msec() / 1000.0 + 60.0
 
 func _ceo_loop() -> void:
 	# The boss inspects the WHOLE office — but spends most time on the

@@ -422,7 +422,10 @@ func _furnish(room: Node3D, kind: String, accent: String) -> void:
 func _desk_pod(room: Node3D, pos: Vector3, roty: float, kit: bool) -> void:
 	room.add_child(_box(pos + Vector3(0, 0.4, 0), Vector3(1.4, 0.8, 0.7), _m("23303f", 0.5)))
 	if kit:
-		_kit(room, "Large_Monitor_Blue", pos + Vector3(0, 0.8, -0.05 if roty == 180.0 else 0.05), roty, 0.24)
+		# the worker (chair) faces `roty` toward the monitor; the monitor's SCREEN
+		# must face back at them — i.e. roty + 180 — so they see the glowing screen,
+		# not its backside.
+		_kit(room, "Large_Monitor_Blue", pos + Vector3(0, 0.8, -0.05 if roty == 180.0 else 0.05), roty + 180.0, 0.24)
 		_kit(room, "Chair_1", pos + Vector3(0, 0, 0.85 if roty == 180.0 else -0.85), roty, 0.55)
 
 ## A single bunk (kit when present, else a block).
