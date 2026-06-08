@@ -1678,6 +1678,20 @@ function socialTick(now) {
   const pool = staff.length >= 2 ? staff : [...staff, "main"];
   if (pool.length < 2) return;
   lastSocial = now;
+  // Sometimes a bigger group drifts together for a real chat (3–4 people) — the
+  // kind of hangout that can spark a project idea. Otherwise it's a 2-person
+  // beat: mostly free canned banter, sometimes a real two-way conversation.
+  if (pool.length >= 3 && Math.random() < 0.4) {
+    const size = Math.min(pool.length, Math.random() < 0.4 ? 4 : 3);
+    const group = pool.sort(() => Math.random() - 0.5).slice(0, size);
+    const gtopics = [
+      "มารวมตัวคุยเล่นกันแบบสบายๆ เล่าเรื่องสนุกๆ ที่เจอระหว่างทำงาน หยอกล้อกันได้",
+      "ระดมไอเดียกันว่าทีมเราน่าจะทำ plugin อะไรเสริมออฟฟิศให้เจ้าของใช้ดีขึ้น",
+      "คุยกันว่าเจ้าของน่าจะชอบอะไร แล้วลองคิดโปรเจค/plugin สนุกๆ ที่ช่วยเขาได้"];
+    runDiscussion(group, gtopics[Math.floor(Math.random() * gtopics.length)],
+      size <= 3 ? 2 : 1, true);
+    return;
+  }
   const pick = pool.sort(() => Math.random() - 0.5).slice(0, 2);
   if (Math.random() < 0.7) {
     // canned banter — zero tokens, pure life.
@@ -1742,8 +1756,11 @@ async function runDiscussion(ids, topic, rounds, social) {
           `Give YOUR next contribution as ${a.name}: concrete, build on the others, ` +
           `max 3 sentences, plain text only, in the same language as the topic.` +
           (social ? `\nถ้าการคุยตกผลึกเป็นไอเดียโปรเจคที่ทีมอยากสร้างจริง ให้เพิ่มบรรทัดสุดท้าย:\n` +
-            `PROPOSAL: <ชื่อโปรเจค> :: <ทำอะไร สั้นๆ>\n(ใช้เฉพาะเมื่อไอเดียชัดและคุ้มจริง — ` +
-            `เจ้าของจะเป็นคนอนุมัติ)` : ""));
+            `PROPOSAL: <ชื่อโปรเจค> :: <ทำอะไร สั้นๆ>\n` +
+            `(ใช้เฉพาะเมื่อไอเดียชัดและคุ้มจริง — เจ้าของจะเป็นคนอนุมัติ).\n` +
+            `กติกาสำคัญ: โปรเจคต้องเป็นงานสร้างสรรค์อิสระ หรือถ้าอยากต่อยอดกับตัวโปรแกรม ` +
+            `BagIdea Office ให้เสนอเป็น "plugin" เท่านั้น (ดู docs/guide/plugins.md) — ` +
+            `ห้ามเสนอแก้ไขระบบหลัก (daemon/godot/shell) ตรงๆ เพราะจะทำให้โปรแกรมพัง` : ""));
         let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
         // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
         const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
@@ -2870,29 +2887,42 @@ const server = http.createServer((req, res) => {
     readBody(req, (body) => {
       try {
         if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
-        const { id, decision } = JSON.parse(body);
+        const { id, decision, message } = JSON.parse(body);
         const p = proposals.find((x) => x.id === id);
         if (!p) { res.writeHead(404); return res.end("unknown proposal"); }
         p.status = decision === "approve" ? "approved"
           : decision === "reject" ? "rejected" : "pending";
+        const note = String(message || "").slice(0, 600).trim();   // owner's optional note
+        if (note) p.message = note;
         saveProposals();
+        const noteLine = note ? `เจ้าของฝากข้อความ: "${note}"\n` : "";
         if (decision === "approve") {
           let proj = null;
+          // Approved projects are born in a DEFAULT projects folder (the
+          // playground) when no location was given — agents never scaffold loose.
+          const playDir = String(reg.playground || path.join(WORKSPACE, "projects"));
           try {
-            const playDir = String(reg.playground || path.join(WORKSPACE, "playground"));
             proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
           } catch (e) { /* duplicate name → Director routes to the existing one */ }
           queueDirectorTurn((release) => {
             runClaude("main",
               `CEO อนุมัติข้อเสนอโปรเจคของทีมแล้ว 🎉\n` +
-              `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` +
-              (proj ? `โปรเจคถูกสร้างไว้แล้วที่ ${proj.dir}\n` : "") +
+              `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` + noteLine +
+              (proj ? `โปรเจคถูกสร้างไว้แล้วที่ ${proj.dir} (ทำงานในโฟลเดอร์นี้เท่านั้น)\n` : "") +
+              `กติกา: ห้ามแก้ไขระบบหลักของโปรแกรม (daemon/godot/shell/cli) เด็ดขาด — ` +
+              `ถ้าเป็นการต่อยอดออฟฟิศ ให้ทำเป็น plugin ตาม docs/guide/plugins.md ` +
+              `(เริ่มจาก template: github.com/bagidea/bagidea-office-template).\n` +
               `จัดทีมเลย: DELEGATE: <agent> @ ${p.name} :: <งานชิ้นแรกที่ชัดเจน> ` +
-              `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ`,
+              `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ` +
+              (note ? ` และนำข้อความของเจ้าของไปปรับทิศทางงานด้วย` : ""),
               { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
                 filterText: makeDelegateFilter(0, undefined),
                 onDone: () => release() });
           });
+        } else if (decision === "reject" && note) {
+          // The team hears WHY — the owner's note lands in the office feed.
+          broadcast({ type: "chat.message", agent: "main",
+            text: `CEO ยังไม่อนุมัติ "${p.name}" — ${note}` });
         }
         broadcast({ type: "proposal." + p.status, agent: p.by, name: p.name, proposal: p.id });
         res.writeHead(200); res.end("ok");
@@ -3114,9 +3144,9 @@ function handleLive(req, sock) {
   const gm = (reg.apiKeys || {}).GEMINI_API_KEY;
   if (!gm) { toClient({ type: "error", text: "ต้องมี GEMINI_API_KEY (⚙ CONNECT) สำหรับ realtime" }); return; }
 
-  // The voice preset of the agent being talked to (default: first voiced one).
-  const agentId = (new URL(req.url, "http://x").searchParams.get("agent")) || "main";
-  const a = reg.agents[agentId] || {};
+  // Calling is for the MAIN agent only — it speaks for the whole office. Use the
+  // voice the owner assigned to main; if none, fall back to a default preset.
+  const a = reg.agents["main"] || {};
   const presetVoice = { sunny: "Aoede", sweet: "Leda", cool: "Kore", genki: "Zephyr",
     boyish: "Puck", warm: "Charon", serious: "Fenrir", polite: "Orus" }[a.voice] || "Aoede";
   const ctxNote = (() => {

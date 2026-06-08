@@ -1110,6 +1110,8 @@
     document.getElementById("inp").placeholder = id === "ceo"
       ? `สั่งงานในนาม CEO… (Director จะมารับคำสั่ง)`
       : `Message ${nameOf(id)}… (Enter to send)`;
+    // 📞 calling is for the MAIN agent only (it speaks for the office).
+    document.getElementById("liveBtn").style.display = (id === "main") ? "" : "none";
     renderRail();
     refreshThreadBar(true);  // clicking a seat always shows that agent's latest thread
   }
@@ -1380,7 +1382,8 @@
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } }); }
     catch { return addChip("📞 เปิดไมค์ไม่ได้ — กดอนุญาตไมค์ก่อน"); }
-    const ws = new WebSocket(`ws://127.0.0.1:8787/live?agent=${encodeURIComponent(target)}`);
+    // calls always go to the main agent (it uses its own voice, or a default preset)
+    const ws = new WebSocket(`ws://127.0.0.1:8787/live?agent=main`);
     const ctxIn = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     const playCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
     let playAt = 0;
@@ -3064,12 +3067,15 @@
                </span>
              </div>
              <div style="font-size:10.5px;color:var(--dim);margin:3px 0 6px">เสนอโดย ${(p.agents || []).map(nameOf).join(", ")}</div>
-             <div style="white-space:pre-wrap;font-size:11.5px;line-height:1.55;max-height:46vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${(p.detail || "").replace(/</g, "&lt;")}</div>`;
+             <div style="white-space:pre-wrap;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${(p.detail || "").replace(/</g, "&lt;")}</div>
+             <input class="prMsg" placeholder="ข้อความถึงทีม (ไม่บังคับ) — ใช้ทั้งตอนอนุมัติ/ไม่อนุมัติ"
+                    style="width:100%;margin-top:7px;font:inherit;font-size:11px;color:var(--text);background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:8px;padding:7px 9px;outline:none">`;
           const b = card.querySelectorAll(".winbtn");
-          b[0].onclick = () => api("/proposals/respond", { id: p.id, decision: "approve" })
+          const msgOf = () => (card.querySelector(".prMsg").value || "").trim();
+          b[0].onclick = () => api("/proposals/respond", { id: p.id, decision: "approve", message: msgOf() })
             .then(() => { addChip("✅ อนุมัติแล้ว — Director กำลังจัดทีม"); openOps("jobs"); });
-          b[1].onclick = () => api("/proposals/respond", { id: p.id, decision: "reject" })
-            .then(() => openOps("jobs"));
+          b[1].onclick = () => api("/proposals/respond", { id: p.id, decision: "reject", message: msgOf() })
+            .then(() => { addChip("ส่งคำตอบให้ทีมแล้ว"); openOps("jobs"); });
           box.appendChild(card);
         }
       });

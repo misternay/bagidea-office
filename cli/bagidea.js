@@ -97,7 +97,7 @@ function help() {
   row("jobs", "Scheduled / recurring agent jobs");
   row("proposals", "Team project pitches awaiting a verdict");
   row("proposal show <id>", "Read a pitch in full");
-  row("proposal <approve|reject> <id>", "Decide on a pitch");
+  row("proposal <approve|reject> <id> [message]", "Decide on a pitch (+ optional note)");
   row("memory <agent>", "Read an agent's memory");
   row("office", "Read OFFICE.md (shared brief)");
 
@@ -492,13 +492,15 @@ async function main() {
       console.log(`  ${c.gray}#${p.id} · by ${(p.agents || []).join(", ")} · ${p.status || "pending"}${c.reset}`);
       rule();
       console.log("  " + String(p.detail || "(no detail)").replace(/\n/g, "\n  "));
+      if (p.message) console.log(`\n  ${c.gray}your note:${c.reset} ${p.message}`);
       rule();
-      info("Decide: bagidea proposal approve " + p.id + "  |  reject " + p.id);
+      info("Decide: bagidea proposal approve " + p.id + " [message]  |  reject " + p.id + " [message]");
       return;
     }
     if (!["approve", "reject"].includes(sub) || !id)
-      return info("Usage: bagidea proposal <show|approve|reject> <id>");
-    await req("POST", "/proposals/respond", { id, decision: sub });
+      return info("Usage: bagidea proposal <show|approve|reject> <id> [message]");
+    const message = rest.slice(2).join(" ");   // optional note to the team
+    await req("POST", "/proposals/respond", { id, decision: sub, message });
     return ok(sub === "approve"
       ? `Approved #${id} — a project is being created and staffed 🎉`
       : `Rejected #${id}`);
