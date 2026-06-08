@@ -22,13 +22,13 @@ var sel: int = -1
 var _hi: MeshInstance3D            # selection highlight ring
 
 # camera: real framing + game-style controls (LMB pan, RMB orbit, wheel zoom)
-const BASE_TARGET := Vector3(2.5, 0.2, 0.8)
+const BASE_TARGET := Vector3(0.0, 0.3, 0.0)   # centre of the room grid
 const BASE_YAW := -12.0
 const BASE_PITCH := -45.0
 var target := BASE_TARGET
 var yaw := BASE_YAW
 const YAW_LIMIT := 32.0
-var dist := 58.0
+var dist := 52.0
 const DIST_MIN := 30.0
 const DIST_MAX := 64.0
 var _orbit := false               # RMB/MMB held → rotate
