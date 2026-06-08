@@ -85,7 +85,7 @@ func _ready() -> void:
 ## everything loads (so Godot's small centred boot splash floats over the desktop
 ## — no black box), then goes opaque + windowed after the first real frame.
 func _enter_editor_mode() -> void:
-	DisplayServer.window_set_title("BagIdea Office — 3D Editor")
+	DisplayServer.window_set_title("BagIdea Office Editor")
 	var icon := Image.new()
 	if icon.load(ProjectSettings.globalize_path("res://assets/brand/logo_ico_cute.png")) == OK:
 		DisplayServer.set_icon(icon)
@@ -135,6 +135,11 @@ func _enter_editor_mode() -> void:
 	DisplayServer.window_move_to_foreground()
 	get_tree().create_timer(0.6).timeout.connect(func():
 		DisplayServer.window_move_to_foreground(); get_window().grab_focus())
+	# re-assert the title AFTER the window is framed — Godot stamps
+	# "<project> (DEBUG)" on a debug run; setting it here overrides that suffix.
+	DisplayServer.window_set_title("BagIdea Office Editor")
+	get_tree().create_timer(0.8).timeout.connect(func():
+		DisplayServer.window_set_title("BagIdea Office Editor"))
 	Engine.max_fps = 60
 	# tell the shell the editor is on screen → it drops the circular logo splash
 	# (same handoff as the wallpaper's bagidea_world_ready flag)
