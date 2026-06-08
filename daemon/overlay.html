@@ -1790,6 +1790,18 @@
     for (const id of MENU_IDS)
       if (id !== except) document.getElementById(id).classList.remove("open");
   }
+  // Bulletproof closer: ANY pointer-down that isn't inside an open menu shuts
+  // the dropdowns — runs in the CAPTURE phase, so it fires even for buttons that
+  // call stopPropagation (settings, ops, the menu triggers themselves). The
+  // trigger's own menu is kept so its click handler can still toggle it.
+  const TRIG_MENU = { dayBtn: "dayMenu", langBtn: "langMenu", moreBtn: "moreMenu", sessBtn: "sessMenu" };
+  document.addEventListener("pointerdown", (e) => {
+    // Clicking inside ANY menu (incl. the ⋯ menu's own options) is left alone —
+    // hiding it mid-click would swallow the option's click.
+    if (e.target.closest("#dayMenu, #langMenu, #sessMenu, #moreMenu")) return;
+    const trig = e.target.closest("#dayBtn, #langBtn, #moreBtn, #sessBtn");
+    closeMenus(trig ? TRIG_MENU[trig.id] : null);
+  }, true);
   document.getElementById("dayBtn").onclick = (e) => {
     e.stopPropagation();
     closeMenus("dayMenu");
@@ -1813,7 +1825,7 @@
       const o = document.createElement("div");
       o.className = "opt" + (code === LANG ? " active" : "");
       o.textContent = (code === LANG ? "✓ " : "") + label;
-      o.onclick = () => { api("/registry/lang", { lang: code }); setLang(code); };
+      o.onclick = () => { langMenu.classList.remove("open"); api("/registry/lang", { lang: code }); setLang(code); };
       langMenu.appendChild(o);
     }
   }
