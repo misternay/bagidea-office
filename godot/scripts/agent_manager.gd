@@ -490,11 +490,12 @@ func _spawn_ghost(parent_id: String, sub: String, job: String) -> void:
 func _ghost_desk_route(g: Sprite3D, spot: Vector3) -> Array:
 	var pts: Array = []
 	if g.position.y <= 1.5:
-		# Walk straight to the stair FOOT (wherever the deck sits now) along the
-		# A* graph — not via a hardcoded server room, which caused the ghost to
-		# detour through the wrong room before finding the stairs.
+		# Coming from the ground: walk straight to the stair FOOT (wherever the
+		# deck sits now) along the A* graph — not via a hardcoded server room —
+		# then up to the stair top. Already on the deck? Go straight to the desk,
+		# no needless trip back up the stairs.
 		pts += world.path_between(g.position, world.ghost_stair_base())
-	pts.append(world.ghost_stair_top())
+		pts.append(world.ghost_stair_top())
 	pts.append(spot)
 	return pts
 
@@ -597,13 +598,16 @@ func _route_hook_to_ghost(id: String, type: String, evt: Dictionary) -> void:
 			_ghost_security_after_grace(id)
 		"perm.approved":
 			g.set_status("approved ✓")
-			# If it was still waiting (never left its desk), just keep working;
-			# only walk back if it actually went down to Security.
-			if not _sec_pending.erase("g:" + id):
+			_sec_pending.erase("g:" + id)
+			# Only walk back if it ACTUALLY left for Security. An auto-approved tool
+			# (granted / allow-forever) never moved it off the deck, so don't make
+			# it twitch up-and-down the stairs for nothing.
+			if g.position.distance_to(gh.spot) > 1.5:
 				g.walk_to(_ghost_desk_route(g, gh.spot))
 		"perm.denied":
 			g.set_status("denied ✗")
-			if not _sec_pending.erase("g:" + id):
+			_sec_pending.erase("g:" + id)
+			if g.position.distance_to(gh.spot) > 1.5:
 				g.walk_to(_ghost_desk_route(g, gh.spot))
 
 # ---------------------------------------------------------------- agents
