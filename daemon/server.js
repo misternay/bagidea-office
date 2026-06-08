@@ -50,6 +50,129 @@ const BUILTIN_TOOLS = {
   NotebookEdit: "แก้ไข Jupyter notebook",
 };
 
+// Starter skill library — the capability pack every office ships with, in the
+// spirit of the curated skills other agent stacks bundle. Each entry is plain
+// instruction content injected into an assigned agent's persona. They're
+// seeded into reg.skills as `builtin` (refreshed on update, never clobbering a
+// user's own skills) and assignable from the editor. Auto-learned skills
+// (maybeLearnSkill) grow the library further while the office runs.
+const SKILL_LIBRARY = {
+  "deep-research": {
+    name: "Deep Research",
+    description: "Methodical web research that ends in a sourced, decision-ready brief.",
+    content: [
+      "When asked to research a topic:",
+      "1. Restate the question and list the specific sub-questions to answer.",
+      "2. Use WebSearch broadly, then WebFetch the most authoritative 3-6 sources.",
+      "3. Cross-check every key claim in 2+ sources; flag anything you can't confirm.",
+      "4. Prefer primary sources, official docs and recent dates over blog summaries.",
+      "5. Deliver: a 3-5 line executive summary, then findings as bullets, each with",
+      "   its source URL, then open questions / risks, then a clear recommendation.",
+      "6. Never invent facts or URLs. If evidence is thin, say so plainly.",
+    ].join("\n"),
+  },
+  "office-control": {
+    name: "Office Control",
+    description: "Drive the live office through its local HTTP API and plugins.",
+    content: [
+      "The office daemon runs at http://127.0.0.1:8787. Use Bash + curl to drive it:",
+      "- GET /registry  -> the current roster, roles, skills, settings (JSON).",
+      "- Plugins you can command appear in the <office-plugins> note in your prompt;",
+      "  call them with POST /plugin/<id>/cmd  -d '{\"cmd\":\"...\",\"args\":\"...\"}'.",
+      "- To leave a note for the owner, append a '- <line>' to workspace/notes.md.",
+      "Read state before acting, make the smallest change that does the job, and",
+      "report exactly what you changed. Never call owner-only or destructive APIs.",
+    ].join("\n"),
+  },
+  "plugin-builder": {
+    name: "Plugin Builder",
+    description: "Scaffold a working office plugin from scratch.",
+    content: [
+      "To build an office plugin (full spec: docs/guide/plugins.md):",
+      "1. Create plugins/<id>/plugin.json (id, name, description, panel?, commands[]).",
+      "2. Add index.js exporting (ctx) => ({ onCommand?, routes? }) for server logic;",
+      "   ctx gives broadcast, feed, reg, runClaude, dataDir, pluginDir and more.",
+      "3. Add panel.html for a UI (dark theme #0c1322 / #5ec8ff) that calls your routes.",
+      "4. Keep private state in ctx.dataDir; broadcast {type:'plugin.event',plugin:'<id>'}.",
+      "5. Reload: curl -s -X POST http://127.0.0.1:8787/plugins/reload -H 'x-bagidea-ui: 1'.",
+      "6. Test: POST /plugin/<id>/cmd returns what you expect. Mirror the music/calculator plugins.",
+    ].join("\n"),
+  },
+  "code-review": {
+    name: "Code Review",
+    description: "Rigorous, actionable review of a change or codebase.",
+    content: [
+      "When reviewing code:",
+      "1. Read the surrounding code first so feedback matches the project's idioms.",
+      "2. Check, in order: correctness/edge cases, security, error handling,",
+      "   performance, readability, tests. Stop guessing — open the files.",
+      "3. Cite each issue as file:line with a concrete fix, not a vague concern.",
+      "4. Separate must-fix from nice-to-have; lead with the highest-impact items.",
+      "5. Call out what's already good. Never rewrite the author's style for taste alone.",
+    ].join("\n"),
+  },
+  "doc-writer": {
+    name: "Doc Writer",
+    description: "Turn work into clean, skimmable markdown deliverables.",
+    content: [
+      "When writing docs or reports:",
+      "1. Open with a one-paragraph TL;DR that stands on its own.",
+      "2. Structure with short headings; prefer bullets and tables over walls of text.",
+      "3. Show, don't tell: fenced code blocks, real examples, copy-pasteable commands.",
+      "4. Define jargon on first use; keep sentences tight and active.",
+      "5. End with next steps or a checklist. Match the owner's language.",
+    ].join("\n"),
+  },
+  "debug-detective": {
+    name: "Debug Detective",
+    description: "Systematic root-cause hunting instead of guess-and-check.",
+    content: [
+      "When chasing a bug:",
+      "1. Reproduce it reliably first; capture the exact error and the steps.",
+      "2. Form a hypothesis, then read the code path top-down to confirm or kill it.",
+      "3. Add targeted logging / minimal probes; change ONE thing at a time.",
+      "4. Find the root cause, not just the symptom; check for the same bug elsewhere.",
+      "5. Fix it, prove the fix with a test or a clean repro, and explain the cause.",
+    ].join("\n"),
+  },
+  "data-wrangler": {
+    name: "Data Wrangler",
+    description: "Parse, clean and transform CSV/JSON safely with small scripts.",
+    content: [
+      "When working with data files:",
+      "1. Inspect the shape first (columns, types, row count, encoding) before transforming.",
+      "2. Write a small, re-runnable script (node/python) — never hand-edit large files.",
+      "3. Validate: handle missing values, dedupe, and check totals against the source.",
+      "4. Keep the raw input untouched; write outputs to a new file.",
+      "5. Report row counts in vs out and any rows you dropped and why.",
+    ].join("\n"),
+  },
+  "project-kickoff": {
+    name: "Project Kickoff",
+    description: "Stand up a new project cleanly inside the office.",
+    content: [
+      "When starting a new project:",
+      "1. Confirm the goal, scope and the one success criterion in a sentence.",
+      "2. Create a sensible folder layout + a README (what, why, how to run).",
+      "3. git init, add a fitting .gitignore, make a first commit.",
+      "4. Sketch the milestones as a short checklist before writing feature code.",
+      "5. Keep work inside the project directory; note decisions in the README.",
+    ].join("\n"),
+  },
+  "diagram-maker": {
+    name: "Diagram Maker",
+    description: "Explain systems and flows with Mermaid diagrams.",
+    content: [
+      "When a diagram would clarify things:",
+      "1. Pick the right Mermaid type: flowchart (logic), sequenceDiagram (interactions),",
+      "   erDiagram (data), classDiagram (structure), gantt (timeline).",
+      "2. Output a fenced ```mermaid block that renders as-is — keep labels short.",
+      "3. Show only what matters; one focused diagram beats one giant one.",
+      "4. Follow it with a 2-3 line plain-language reading of the diagram.",
+    ].join("\n"),
+  },
+};
+
 function loadReg() {
   try { reg = JSON.parse(fs.readFileSync(REGISTRY, "utf8")); } catch { reg = {}; }
   reg.agents = reg.agents || {};
@@ -68,6 +191,13 @@ function loadReg() {
   reg.roles = reg.roles || ["Director", "Founder", "Researcher", "Engineer",
     "Designer", "Analyst", "Operator", "Specialist"];
   reg.skills = reg.skills || {};
+  // Seed / refresh the builtin starter library. We own entries flagged
+  // `builtin` (so updates propagate new wording), but never touch a user's
+  // own skills or auto-learned ones.
+  for (const [id, sk] of Object.entries(SKILL_LIBRARY)) {
+    const cur = reg.skills[id];
+    if (!cur || cur.builtin) reg.skills[id] = { ...sk, builtin: true };
+  }
   reg.tools = Object.keys(BUILTIN_TOOLS);
   reg.mcpServers = reg.mcpServers || {};
   reg.places = reg.places || {};  // shorthand locations: "ห้องสมุด" → folder
@@ -76,7 +206,8 @@ function loadReg() {
     prompt: "You are Claude, the Director of this AI agents office. You run " +
       "operations, make the calls the owner has not reserved for themselves, " +
       "and delegate to the team when that serves the work better.",
-    skills: [], tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
+    skills: ["deep-research", "office-control", "doc-writer"],
+    tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "WebSearch", "WebFetch"],
   };
   if (!reg.agents.ceo) reg.agents.ceo = {
     name: "CEO", role: "Founder", avatar: 8, protected: true, isUser: true,
