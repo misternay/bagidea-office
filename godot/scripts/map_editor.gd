@@ -536,7 +536,7 @@ func _build_ui() -> void:
 	# overlaps or clips regardless of window size.
 	var left := PanelContainer.new()
 	left.anchor_left = 0.0; left.anchor_right = 0.0; left.anchor_top = 0.0; left.anchor_bottom = 1.0
-	left.offset_left = M; left.offset_right = M + COLW; left.offset_top = 66.0; left.offset_bottom = -M
+	left.offset_left = M; left.offset_right = M + COLW; left.offset_top = 88.0; left.offset_bottom = -M
 	var lcol := VBoxContainer.new(); lcol.add_theme_constant_override("separation", 6); left.add_child(lcol)
 	# 🔀 ROOM SWAP — the jigsaw: click two rooms to trade their whole cells
 	var rlab := Label.new(); rlab.text = "🔀 จัดผังห้อง (คลิก 2 ห้อง = สลับ)"; rlab.add_theme_font_size_override("font_size", 10); lcol.add_child(rlab)
@@ -681,10 +681,16 @@ func _refresh_rooms() -> void:
 	for slot in order.size():
 		var b := Button.new()
 		var kind := String(order[slot])
-		b.text = String(ROOM_LABELS.get(kind, kind))
+		var picked := (slot == _swap_pick)
+		b.text = ("✪ " if picked else "") + String(ROOM_LABELS.get(kind, kind))
 		b.add_theme_font_size_override("font_size", 9)
-		b.custom_minimum_size = Vector2(60, 28)
-		b.toggle_mode = true; b.button_pressed = (slot == _swap_pick)
+		b.custom_minimum_size = Vector2(62, 30)
+		b.toggle_mode = true; b.button_pressed = picked
+		if picked:
+			# clearly mark the first pick: glowing cyan, awaiting the swap target
+			b.modulate = Color(0.45, 1.0, 1.0)
+			b.add_theme_color_override("font_color", Color(0.05, 0.1, 0.15))
+			b.add_theme_color_override("font_focus_color", Color(0.05, 0.1, 0.15))
 		var s := slot
 		b.pressed.connect(func(): _on_room_click(s))
 		g.add_child(b)
