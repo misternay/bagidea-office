@@ -36,6 +36,24 @@ func _on_layout(_result: int, code: int, _headers: PackedStringArray, body: Pack
 	for it in data["items"]:
 		if it is Dictionary:
 			_spawn(it)
+	_apply_system(data["items"])
+
+## System items carry an "anchor" (deskN / bedN / lead_desk / ceo_desk):
+## move the agent's waypoint there so characters work at the new desk, and
+## hide the matching baked ops desks so they don't double up.
+func _apply_system(arr: Array) -> void:
+	var wb := get_node_or_null("/root/OfficeFloor/World")
+	if wb == null or not wb.has_method("set_anchor"):
+		return
+	var has_custom_ops := false
+	for it in arr:
+		if it is Dictionary and it.get("system", false) and it.has("anchor"):
+			var name := String(it["anchor"])
+			wb.set_anchor(name, Vector3(float(it.get("x", 0)), 0.86, float(it.get("z", 0))))
+			if name.begins_with("desk"):
+				has_custom_ops = true
+	if wb.has_method("hide_ops_desks"):
+		wb.hide_ops_desks(has_custom_ops)
 
 func _mat(hex: String, rough := 0.8, metal := 0.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -141,12 +159,28 @@ func _spawn(it: Dictionary) -> void:
 			var p := _box(float(it.get("w", 3.0)), 1.15, 0.08, _mat(col if col != "" else "9aa3b2", 0.6))
 			p.position.y = 0.6
 			rig.add_child(p)
+		"sofa":
+			var sb := _box(1.6, 0.4, 0.7, _mat(col if col != "" else "44506b", 0.7)); sb.position.y = 0.25; rig.add_child(sb)
+			var sbk := _box(1.6, 0.5, 0.18, _mat(col if col != "" else "44506b", 0.7)); sbk.position = Vector3(0, 0.6, -0.26); rig.add_child(sbk)
+		"tv":
+			var scr := _box(1.5, 0.85, 0.08, _mat("0a0a0c", 0.3)); scr.position.y = 1.1; rig.add_child(scr)
+			var stnd := _box(0.1, 1.0, 0.1, _mat("222")); stnd.position.y = 0.5; rig.add_child(stnd)
+		"whiteboard":
+			var wb := _box(1.6, 1.0, 0.06, _mat("f0f2f5", 0.4)); wb.position.y = 1.2; rig.add_child(wb)
+		"cabinet":
+			var cb := _box(0.9, 1.1, 0.5, _mat(col if col != "" else "6b7280", 0.6)); cb.position.y = 0.55; rig.add_child(cb)
+		"cooler":
+			var cby := _box(0.4, 1.1, 0.4, _mat("dfe7ef", 0.4)); cby.position.y = 0.55; rig.add_child(cby)
+			var jug := _box(0.32, 0.4, 0.32, _mat("7ec8ff", 0.2)); jug.position.y = 1.25; rig.add_child(jug)
+		"bed":
+			var bmat := _box(2.0, 0.3, 1.0, _mat(col if col != "" else "5566aa", 0.7)); bmat.position.y = 0.25; rig.add_child(bmat)
+			var pil := _box(0.5, 0.18, 0.9, _mat("eef2f7", 0.6)); pil.position = Vector3(-0.7, 0.45, 0); rig.add_child(pil)
 		"poster":
 			# imported image → textured quad you can hang anywhere
 			_spawn_poster(rig, String(it.get("asset", "")), float(it.get("w", 1.2)), float(it.get("h", 0.8)))
 		"model":
 			# imported .glb/.gltf placed in the world
-			_spawn_model(rig, String(it.get("asset", "")))
+			_spawn_model(rig, String(it.get("asset", "")), String(it.get("anim", "")))
 		_:
 			var d := _box(0.6, 0.6, 0.6, _mat(col))
 			d.position.y = 0.3
@@ -181,26 +215,30 @@ func _spawn_poster(rig: Node3D, asset: String, w: float, h: float) -> void:
 	mi.position.y = h * 0.5 + 0.8
 	rig.add_child(mi)
 
-func _spawn_model(rig: Node3D, asset: String) -> void:
+func _spawn_model(rig: Node3D, asset: String, anim := "") -> void:
 	if asset == "":
 		return
 	var p := _abs_asset(asset)
 	var ext := p.get_extension().to_lower()
-	var doc
-	var state
+	var scene: Node = null
 	if ext == "glb" or ext == "gltf":
-		doc = GLTFDocument.new()
-		state = GLTFState.new()
-		if doc.append_from_file(p, state) != OK:
-			return
-		var scene: Node = doc.generate_scene(state)
-		if scene:
-			rig.add_child(scene)
+		var doc := GLTFDocument.new()
+		var state := GLTFState.new()
+		if doc.append_from_file(p, state) == OK:
+			scene = doc.generate_scene(state)
 	elif ext == "fbx":
-		doc = FBXDocument.new()
-		state = GLTFState.new()
-		if doc.append_from_file(p, state) != OK:
-			return
-		var scene2: Node = doc.generate_scene(state)
-		if scene2:
-			rig.add_child(scene2)
+		var doc2 := FBXDocument.new()
+		var state2 := GLTFState.new()
+		if doc2.append_from_file(p, state2) == OK:
+			scene = doc2.generate_scene(state2)
+	if scene:
+		rig.add_child(scene)
+		# play the animation the editor picked for this instance
+		var ap := scene.find_child("AnimationPlayer", true, false)
+		if ap and ap is AnimationPlayer:
+			var names: Array = (ap as AnimationPlayer).get_animation_list()
+			var pick := anim
+			if pick == "" and names.size() > 0:
+				pick = String(names[0])   # default: first clip
+			if pick != "" and pick in names:
+				(ap as AnimationPlayer).play(pick)

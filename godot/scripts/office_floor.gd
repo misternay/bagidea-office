@@ -93,6 +93,16 @@ func _enter_editor_mode() -> void:
 	var ss := DisplayServer.screen_get_size(scr)
 	DisplayServer.window_set_position(sp + (ss - win) / 2)
 	DisplayServer.window_set_title("BagIdea Office — 3D Editor")
+	# brand icon (no stray Godot logo) + bring the window to the front so it
+	# doesn't open hidden behind other apps.
+	var icon := Image.new()
+	if icon.load(ProjectSettings.globalize_path("res://assets/brand/logo_ico_cute.png")) == OK:
+		DisplayServer.set_icon(icon)
+	get_window().grab_focus()
+	DisplayServer.window_move_to_foreground()
+	# re-assert foreground a beat later (the first frame can steal it back)
+	get_tree().create_timer(0.6).timeout.connect(func():
+		DisplayServer.window_move_to_foreground(); get_window().grab_focus())
 	# Opaque window with the office SKY as the background — no black splash
 	# (the procedural sky fills any empty area; a see-through window just
 	# showed the desktop through the floor, which is useless for editing).

@@ -107,6 +107,24 @@ const BOARD_COLORS := {
 }
 
 var astar := AStar3D.new()
+var _ops_nodes: Array = []   # baked ops-desk visuals (hideable when the editor supplies custom workstations)
+
+var _anchor_override := {}   # name → moved position (WP is const/immutable)
+
+## Move a named agent anchor at runtime (editor → agents follow). path_to()
+## resolves targets through the A* point positions, so moving the point makes
+## characters walk to the new spot.
+func set_anchor(name: String, pos: Vector3) -> void:
+	_anchor_override[name] = pos
+	if _wp_ids.has(name):
+		astar.set_point_position(_wp_ids[name], pos)
+
+## Hide/show the baked ops desks (used when a custom layout provides its own
+## work desks so they don't double up).
+func hide_ops_desks(h: bool) -> void:
+	for n in _ops_nodes:
+		if is_instance_valid(n):
+			n.visible = not h
 var totem_mat: StandardMaterial3D
 var sec_light: OmniLight3D
 var sky_mat: StandardMaterial3D
@@ -1167,23 +1185,25 @@ func _build_geometry() -> void:
 	_omni(Vector3(-6, 2.5, -5.2), Color(1.0, 0.8, 0.6), 1.4, 7.0)
 
 	# ---- Ops Floor: 6 desk pods (east column faces the other way)
+	# Every node is tracked in _ops_nodes so the editor can hide them when a
+	# custom layout supplies its own workstations.
 	if kit:
-		_box(Vector3(8, 0.4, -8), Vector3(1.6, 0.8, 0.8), dark_wood)
-		_kit("Large_Monitor_Blue", Vector3(8, 0.8, -8.15), 180.0, 0.26)
-		_kit("Chair_1", Vector3(8, 0, -7.1), 0.0, 0.6)
-		_box(Vector3(8, 0.4, -5.5), Vector3(1.6, 0.8, 0.8), dark_wood)
-		_kit("Large_Monitor_Blue", Vector3(8, 0.8, -5.4), 0.0, 0.26)
-		_kit("Chair_1", Vector3(8, 0, -6.4), 180.0, 0.6)
+		_ops_nodes.append(_box(Vector3(8, 0.4, -8), Vector3(1.6, 0.8, 0.8), dark_wood))
+		_ops_nodes.append(_kit("Large_Monitor_Blue", Vector3(8, 0.8, -8.15), 180.0, 0.26))
+		_ops_nodes.append(_kit("Chair_1", Vector3(8, 0, -7.1), 0.0, 0.6))
+		_ops_nodes.append(_box(Vector3(8, 0.4, -5.5), Vector3(1.6, 0.8, 0.8), dark_wood))
+		_ops_nodes.append(_kit("Large_Monitor_Blue", Vector3(8, 0.8, -5.4), 0.0, 0.26))
+		_ops_nodes.append(_kit("Chair_1", Vector3(8, 0, -6.4), 180.0, 0.6))
 	for d in [Vector3(1, 0, -8), Vector3(5, 0, -8), Vector3(1, 0, -5.5), Vector3(5, 0, -5.5)]:
 		if kit:
-			_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), dark_wood)     # desk slab
-			_kit("Large_Monitor_Blue", Vector3(d.x, 0.8, d.z + 0.1), 0.0, 0.26) # kit monitor on top
-			_kit("Chair_1", Vector3(d.x, 0, d.z - 0.95), 180.0, 0.6)            # chair at the anchor side
+			_ops_nodes.append(_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), dark_wood))
+			_ops_nodes.append(_kit("Large_Monitor_Blue", Vector3(d.x, 0.8, d.z + 0.1), 0.0, 0.26))
+			_ops_nodes.append(_kit("Chair_1", Vector3(d.x, 0, d.z - 0.95), 180.0, 0.6))
 		else:
-			_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), wood)
-			_box(Vector3(d.x, 0.86, d.z + 0.08), Vector3(0.08, 0.16, 0.08), cap)
-			_box(Vector3(d.x, 1.05, d.z + 0.08), Vector3(0.74, 0.46, 0.05), screen)
-			_box(Vector3(d.x, 0.83, d.z - 0.22), Vector3(0.5, 0.03, 0.18), _mat(Color(0.1, 0.1, 0.12), 0.4))
+			_ops_nodes.append(_box(Vector3(d.x, 0.4, d.z), Vector3(1.6, 0.8, 0.8), wood))
+			_ops_nodes.append(_box(Vector3(d.x, 0.86, d.z + 0.08), Vector3(0.08, 0.16, 0.08), cap))
+			_ops_nodes.append(_box(Vector3(d.x, 1.05, d.z + 0.08), Vector3(0.74, 0.46, 0.05), screen))
+			_ops_nodes.append(_box(Vector3(d.x, 0.83, d.z - 0.22), Vector3(0.5, 0.03, 0.18), _mat(Color(0.1, 0.1, 0.12), 0.4)))
 	_pendant(Vector3(3, 0, -8), Color(0.8, 0.88, 1.0))
 	_pendant(Vector3(3, 0, -5.5), Color(0.8, 0.88, 1.0))
 	_omni(Vector3(3, 2.8, -6.5), Color(0.7, 0.8, 1.0), 1.8, 11.0)

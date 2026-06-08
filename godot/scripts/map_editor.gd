@@ -19,7 +19,6 @@ var cam: Camera3D
 var _root: Node3D
 var items: Array = []             # [{dict, node, body}]
 var sel: int = -1
-var play_anim := true
 var _hi: MeshInstance3D            # selection highlight ring
 
 # camera: real framing + game-style controls (LMB pan, RMB orbit, wheel zoom)
@@ -54,6 +53,14 @@ const TYPES := [
 	["rug", "🟫 Rug"], ["sofa", "🛋 Sofa"], ["tv", "📺 TV"],
 	["whiteboard", "📋 Board"], ["cabinet", "🗄 Cabinet"], ["cooler", "🚰 Cooler"],
 ]
+
+# system objects bind to an agent anchor. workstation cycles desk1..desk6.
+const SYS_TYPES := [
+	["workstation", "🖥 โต๊ะทำงาน"], ["director", "⭐ โต๊ะ Director"],
+	["ceo", "👑 โต๊ะ CEO"], ["bed", "🛏 เตียง"],
+]
+const WORK_ANCHORS := ["desk1", "desk2", "desk3", "desk4", "desk5", "desk6"]
+const BED_ANCHORS := ["bed1", "bed2"]
 
 const PRESETS := [
 	{ "name": "Classic grid", "items": [
@@ -188,6 +195,32 @@ func _floor_hit(screen: Vector2) -> Vector3:
 # Add an item from the palette / library: it appears at the camera focus,
 # gets selected, ready to drag into place. (Placement is via buttons now —
 # clicking empty space only unselects.)
+# add a system object bound to the next free anchor for its kind
+func _add_system(base: String) -> void:
+	var used := {}
+	for e in items:
+		if e["dict"].has("anchor"): used[e["dict"]["anchor"]] = true
+	var anchor := ""
+	var vis := "desk"
+	match base:
+		"workstation":
+			for a in WORK_ANCHORS:
+				if not used.has(a): anchor = a; break
+			if anchor == "": _flash("ครบ 6 โต๊ะทำงานแล้ว"); return
+		"director": anchor = "lead_desk"
+		"ceo": anchor = "ceo_desk"
+		"bed":
+			vis = "bed"
+			for a in BED_ANCHORS:
+				if not used.has(a): anchor = a; break
+			if anchor == "": _flash("ครบ 2 เตียงแล้ว"); return
+	if used.has(anchor): _flash("มี " + anchor + " แล้ว"); return
+	var it := { "type": vis, "system": true, "anchor": anchor,
+		"x": snappedf(target.x, 0.1), "z": snappedf(target.z, 0.1), "rot": 0.0, "scale": 1.0 }
+	_add_item(it); sel = items.size() - 1
+	_place_highlight(); _refresh_sel(); _refresh_scene()
+	_flash("เพิ่มของระบบ (" + anchor + ") — ลากไปวาง agents จะทำงานที่นั่น")
+
 func _add_at_focus(type: String, asset := "") -> void:
 	var it := { "type": type, "x": snappedf(target.x, 0.1), "z": snappedf(target.z, 0.1), "rot": 0.0, "scale": 1.0 }
 	if asset != "": it["asset"] = asset
@@ -306,10 +339,13 @@ func _spawn(it: Dictionary) -> Node3D:
 		"cooler":
 			var bdy := _box(0.4, 1.1, 0.4, _mat("dfe7ef", 0.4)); bdy.position.y = 0.55; rig2.add_child(bdy)
 			var jug := _box(0.32, 0.4, 0.32, _mat("7ec8ff", 0.2)); jug.position.y = 1.25; rig2.add_child(jug); foot = Vector3(0.45, 1.5, 0.45)
+		"bed":
+			var mat := _box(2.0, 0.3, 1.0, _mat(col if col != "" else "5566aa", 0.7)); mat.position.y = 0.25; rig2.add_child(mat)
+			var pil := _box(0.5, 0.18, 0.9, _mat("eef2f7", 0.6)); pil.position = Vector3(-0.7, 0.45, 0); rig2.add_child(pil); foot = Vector3(2.0, 0.6, 1.0)
 		"poster":
 			_spawn_poster(rig2, String(it.get("asset", ""))); foot = Vector3(1.3, 0.9, 0.2)
 		"model":
-			_spawn_model(rig2, String(it.get("asset", ""))); foot = Vector3(1.4, 1.4, 1.4)
+			_spawn_model(rig2, it); foot = Vector3(1.4, 1.4, 1.4)
 		_:
 			var dd := _box(0.6, 0.6, 0.6, _mat(col)); dd.position.y = 0.3; rig2.add_child(dd)
 	# pick collider (invisible) sized to the item
@@ -328,7 +364,8 @@ func _spawn_poster(rig2: Node3D, asset: String) -> void:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mi.material_override = m; mi.position.y = 1.4; rig2.add_child(mi)
 
-func _spawn_model(rig2: Node3D, asset: String) -> void:
+func _spawn_model(rig2: Node3D, it: Dictionary) -> void:
+	var asset := String(it.get("asset", ""))
 	if asset == "": return
 	var ext := asset.get_extension().to_lower()
 	var scene: Node = null
@@ -340,10 +377,15 @@ func _spawn_model(rig2: Node3D, asset: String) -> void:
 		if doc.append_from_file(asset, stt) == OK: scene = doc.generate_scene(stt)
 	if scene:
 		rig2.add_child(scene)
-		if play_anim:
-			var ap := scene.find_child("AnimationPlayer", true, false)
-			if ap and ap is AnimationPlayer and (ap as AnimationPlayer).get_animation_list().size() > 0:
-				(ap as AnimationPlayer).play((ap as AnimationPlayer).get_animation_list()[0])
+		var ap := scene.find_child("AnimationPlayer", true, false)
+		if ap and ap is AnimationPlayer:
+			var names: Array = (ap as AnimationPlayer).get_animation_list()
+			it["anims"] = names                    # remember clips for the picker
+			# default: play the first clip on a fresh import; honour a chosen one.
+			var chosen := String(it.get("anim", names[0] if names.size() > 0 else ""))
+			if not it.has("anim"): it["anim"] = chosen
+			if chosen != "" and chosen in names:
+				(ap as AnimationPlayer).play(chosen)
 
 # ---------------------------------------------------------------- UI
 # A brand-dark theme so the editor doesn't look like raw Godot greybox.
@@ -418,15 +460,20 @@ func _build_ui() -> void:
 	var title := Label.new(); title.text = "＋ เพิ่มวัตถุ"; vb.add_child(title)
 	var hint := Label.new(); hint.text = "ซ้ายลาก=เลื่อนกล้อง · คลิกวัตถุ=เลือก · ลาก=ย้าย · ขวา=หมุน"
 	hint.add_theme_font_size_override("font_size", 9); hint.autowrap_mode = TextServer.AUTOWRAP_WORD; vb.add_child(hint)
+	# 🔵 system objects — bound to an agent anchor; moving one makes agents
+	# work at the new spot (and hides the matching baked desk).
+	var syslab := Label.new(); syslab.text = "🔵 ของระบบ (agents ใช้)"; syslab.add_theme_font_size_override("font_size", 10); vb.add_child(syslab)
+	for s in SYS_TYPES:
+		var b := Button.new(); b.text = "＋ " + s[1]; b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var base: String = s[0]
+		b.pressed.connect(func(): _add_system(base))
+		vb.add_child(b)
 	var catlab := Label.new(); catlab.text = "🟢 ของตกแต่ง"; catlab.add_theme_font_size_override("font_size", 10); vb.add_child(catlab)
 	for t in TYPES:
 		var b := Button.new(); b.text = "＋ " + t[1]; b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var ty: String = t[0]
 		b.pressed.connect(func(): _add_at_focus(ty))
 		vb.add_child(b)
-	var ac := CheckButton.new(); ac.text = "เล่น animation โมเดล"; ac.button_pressed = true
-	ac.add_theme_font_size_override("font_size", 10)
-	ac.toggled.connect(func(on): play_anim = on); vb.add_child(ac)
 	ui.add_child(panel)
 
 	# right top: selected item
@@ -479,10 +526,30 @@ func _refresh_sel() -> void:
 	sv.add_child(_stepper("ขนาด", "%.1f" % float(it.get("scale", 1.0)),
 		func(): apply_scl.call(float(it.get("scale", 1.0)) - 0.1),
 		func(): apply_scl.call(float(it.get("scale", 1.0)) + 0.1)))
+	# imported-model animation picker — choose which clip plays for THIS item
+	if String(it.get("type", "")) == "model" and it.get("anims") is Array and (it["anims"] as Array).size() > 0:
+		var al := Label.new(); al.text = "🎬 Animation"; sv.add_child(al)
+		var ab := OptionButton.new(); ab.add_item("(ไม่เล่น)")
+		var names: Array = it["anims"]
+		for i in names.size(): ab.add_item(String(names[i]))
+		var chosen := String(it.get("anim", ""))
+		ab.select(0 if chosen == "" else (names.find(chosen) + 1))
+		ab.item_selected.connect(func(i):
+			it["anim"] = "" if i == 0 else String(names[i - 1])
+			_respawn(sel))
+		sv.add_child(ab)
 	var del := Button.new(); del.text = "🗑 ลบวัตถุนี้"
 	del.pressed.connect(func():
 		items[sel]["node"].queue_free(); items.remove_at(sel); sel = -1
 		_place_highlight(); _refresh_sel(); _refresh_scene()); sv.add_child(del)
+
+func _respawn(i: int) -> void:
+	if i < 0 or i >= items.size(): return
+	var dict: Dictionary = items[i]["dict"]
+	items[i]["node"].queue_free()
+	var node := _spawn(dict)
+	_root.add_child(node)
+	items[i]["node"] = node
 
 func _stepper(label: String, value: String, on_minus: Callable, on_plus: Callable) -> HBoxContainer:
 	var row := HBoxContainer.new(); row.add_theme_constant_override("separation", 4)
