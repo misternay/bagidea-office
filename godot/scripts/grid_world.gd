@@ -142,7 +142,11 @@ func _build_graph() -> void:
 	# anchors → their slot hub
 	for aname in WP:
 		_add_point(aname, WP[aname])
-		astar.connect_points(_wp_ids[aname], _wp_ids["hub_%d" % _anchor_slot[aname]])
+		var hk := "hub_%d" % int(_anchor_slot.get(aname, -1))
+		if _wp_ids.has(hk):
+			astar.connect_points(_wp_ids[aname], _wp_ids[hk])
+		else:
+			push_warning("grid: anchor %s has no hub (%s)" % [aname, hk])
 
 func _link_slots(a: int, b: int) -> void:
 	var mid: Vector3 = (_cell_center[a] + _cell_center[b]) * 0.5 + Vector3(0, FLOOR_Y, 0)
@@ -215,13 +219,13 @@ func _reslot_anchor(aname: String, from_slot: int, to_slot: int) -> void:
 	var center: Vector3 = _cell_center[to_slot]
 	var loc: Vector2 = _anchor_local[aname]
 	WP[aname] = center + Vector3(loc.x, FLOOR_Y, loc.y)
-	if _wp_ids.has(aname):
+	var fh := "hub_%d" % from_slot
+	var th := "hub_%d" % to_slot
+	if _wp_ids.has(aname) and _wp_ids.has(fh) and _wp_ids.has(th):
 		astar.set_point_position(_wp_ids[aname], WP[aname])
-		var from_hub: int = _wp_ids["hub_%d" % from_slot]
-		var to_hub: int = _wp_ids["hub_%d" % to_slot]
-		if astar.are_points_connected(_wp_ids[aname], from_hub):
-			astar.disconnect_points(_wp_ids[aname], from_hub)
-		astar.connect_points(_wp_ids[aname], to_hub)
+		if astar.are_points_connected(_wp_ids[aname], _wp_ids[fh]):
+			astar.disconnect_points(_wp_ids[aname], _wp_ids[fh])
+		astar.connect_points(_wp_ids[aname], _wp_ids[th])
 
 ## Build one room's contents at LOCAL origin (cell centre = 0,0,0).
 ## Matches the original art: polished tinted metal floor + LOW glass railings
