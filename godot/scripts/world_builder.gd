@@ -121,6 +121,30 @@ func set_anchor(name: String, pos: Vector3) -> void:
 	if _wp_ids.has(name):
 		astar.set_point_position(_wp_ids[name], pos)
 
+## Swap two grid rooms (jigsaw). Editor + wallpaper both call this.
+func swap_cells(a: int, b: int) -> void:
+	if _grid: _grid.swap_slots(a, b)
+
+## Current room kind per slot (for the editor UI + saving to layout.json).
+func get_room_order() -> Array:
+	return _grid.room_order.duplicate() if _grid else []
+
+## Number of grid slots (cols*rows).
+func grid_slots() -> int:
+	return _grid.GRID_COLS * _grid.GRID_ROWS if _grid else 0
+
+func grid_cols() -> int:
+	return _grid.GRID_COLS if _grid else 3
+
+## Rearrange rooms to match a saved order (list of kind strings per slot).
+func apply_room_order(target: Array) -> void:
+	if _grid == null or target.is_empty(): return
+	for i in range(min(target.size(), _grid.room_order.size())):
+		if _grid.room_order[i] == target[i]: continue
+		for j in range(i + 1, _grid.room_order.size()):
+			if _grid.room_order[j] == target[i]:
+				_grid.swap_slots(i, j); break
+
 ## Hide/show the baked ops desks (used when a custom layout provides its own
 ## work desks so they don't double up).
 func hide_ops_desks(h: bool) -> void:
@@ -397,6 +421,9 @@ func _build_ghost_deck() -> void:
 	var deck := Node3D.new()
 	deck.name = "GhostDeck"
 	add_child(deck)
+	# shift the whole deck so it floats above the grid (built around old east
+	# coords ~x14,z-4; grid server slot sits near x8,z-8)
+	deck.position = Vector3(-7.0, 0.4, -3.6)
 
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.62, 0.78, 1.0, 0.2)

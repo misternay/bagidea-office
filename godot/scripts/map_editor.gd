@@ -47,6 +47,14 @@ var ui: Control
 var custom_presets: Array = []
 var library: Array = []           # [{path, kind, name}]
 var _decor_cache := {}            # {category: [name…]} bundled Low Poly furniture
+var world: Node3D                 # the live grid world (room swapping)
+var _swap_pick := -1              # first slot clicked in the room-swap panel
+
+# pretty labels for the room kinds (mirrors grid_world ROOM_DEFS)
+const ROOM_LABELS := {
+	"exec": "⭐ EXEC", "ops": "🖥 OPS", "server": "🗄 SERVER", "lobby": "🛎 LOBBY",
+	"cafe": "☕ CAFE", "meeting": "📋 MEETING", "rec": "🎮 REC", "dormx": "🛏 DORM XL", "dorm": "🛏 DORM",
+}
 
 const TYPES := [
 	["desk", "🪑 Desk"], ["table", "🍽 Table"], ["chair", "💺 Chair"],
@@ -101,6 +109,9 @@ func setup(camera_rig: Node3D, camera: Camera3D) -> void:
 	cam = camera
 
 func _ready() -> void:
+	world = get_node_or_null("/root/OfficeFloor/World")
+	if world == null:
+		world = get_tree().get_root().find_child("World", true, false)
 	_root = Node3D.new(); _root.name = "EditorLayout"; add_child(_root)
 	_req = HTTPRequest.new(); add_child(_req); _req.request_completed.connect(_on_layout)
 	_save_req = HTTPRequest.new(); add_child(_save_req)
@@ -108,6 +119,7 @@ func _ready() -> void:
 	_assets_req = HTTPRequest.new(); add_child(_assets_req); _assets_req.request_completed.connect(_on_assets)
 	_make_highlight()
 	_build_ui()
+	_refresh_rooms()
 	_update_cam()
 	_req.request(LAYOUT_URL)
 	_preset_req.request(PRESETS_URL)
@@ -283,7 +295,11 @@ func _on_layout(_r: int, code: int, _h: PackedStringArray, body: PackedByteArray
 	if data is Dictionary and data.get("items") is Array:
 		for it in data["items"]:
 			if it is Dictionary: _add_item(it.duplicate(true))
+	# restore a saved room arrangement, then refresh the swap panel
+	if data is Dictionary and data.get("rooms") is Array and world and world.has_method("apply_room_order"):
+		world.apply_room_order(data["rooms"])
 	_refresh_scene()
+	_refresh_rooms()
 
 func _add_item(it: Dictionary) -> void:
 	var node := _spawn(it)
@@ -522,6 +538,12 @@ func _build_ui() -> void:
 	left.anchor_left = 0.0; left.anchor_right = 0.0; left.anchor_top = 0.0; left.anchor_bottom = 1.0
 	left.offset_left = M; left.offset_right = M + COLW; left.offset_top = 66.0; left.offset_bottom = -M
 	var lcol := VBoxContainer.new(); lcol.add_theme_constant_override("separation", 6); left.add_child(lcol)
+	# 🔀 ROOM SWAP — the jigsaw: click two rooms to trade their whole cells
+	var rlab := Label.new(); rlab.text = "🔀 จัดผังห้อง (คลิก 2 ห้อง = สลับ)"; rlab.add_theme_font_size_override("font_size", 10); lcol.add_child(rlab)
+	var rgrid := GridContainer.new(); rgrid.name = "RoomGrid"; rgrid.columns = 3
+	rgrid.add_theme_constant_override("h_separation", 3); rgrid.add_theme_constant_override("v_separation", 3)
+	lcol.add_child(rgrid)
+	lcol.add_child(HSeparator.new())
 	var title := Label.new(); title.text = "＋ เพิ่มวัตถุ"; lcol.add_child(title)
 	var hint := Label.new(); hint.text = "ลากซ้าย=เลื่อนกล้อง · คลิกวัตถุ=เลือก · ลาก=ย้าย · คลิกขวา=หมุน · ล้อ=ซูม"
 	hint.add_theme_font_size_override("font_size", 9); hint.autowrap_mode = TextServer.AUTOWRAP_WORD; lcol.add_child(hint)
@@ -651,6 +673,33 @@ func _stepper(label: String, value: String, on_minus: Callable, on_plus: Callabl
 	plus.pressed.connect(on_plus); row.add_child(plus)
 	return row
 
+func _refresh_rooms() -> void:
+	var g := ui.find_child("RoomGrid", true, false)
+	if g == null or world == null or not world.has_method("get_room_order"): return
+	for c in g.get_children(): c.queue_free()
+	var order: Array = world.get_room_order()
+	for slot in order.size():
+		var b := Button.new()
+		var kind := String(order[slot])
+		b.text = String(ROOM_LABELS.get(kind, kind))
+		b.add_theme_font_size_override("font_size", 9)
+		b.custom_minimum_size = Vector2(60, 28)
+		b.toggle_mode = true; b.button_pressed = (slot == _swap_pick)
+		var s := slot
+		b.pressed.connect(func(): _on_room_click(s))
+		g.add_child(b)
+
+func _on_room_click(slot: int) -> void:
+	if world == null: return
+	if _swap_pick < 0:
+		_swap_pick = slot; _flash("เลือกห้องแรก — คลิกอีกห้องเพื่อสลับ")
+	elif _swap_pick == slot:
+		_swap_pick = -1; _flash("ยกเลิก")
+	else:
+		world.swap_cells(_swap_pick, slot); _swap_pick = -1
+		_flash("🔀 สลับห้องแล้ว — กด 💾 บันทึก ให้วอลเปเปอร์จำ")
+	_refresh_rooms()
+
 func _refresh_scene() -> void:
 	var box := ui.find_child("SceneList", true, false)
 	if box == null: return
@@ -704,7 +753,9 @@ func _current_items() -> Array:
 	return out
 
 func _save() -> void:
-	_save_req.request(LAYOUT_URL, ["content-type: application/json"], HTTPClient.METHOD_POST, JSON.stringify({ "items": _current_items() }))
+	var payload := { "items": _current_items() }
+	if world and world.has_method("get_room_order"): payload["rooms"] = world.get_room_order()
+	_save_req.request(LAYOUT_URL, ["content-type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(payload))
 	_flash("💾 บันทึกแล้ว — วอลเปเปอร์อัปเดต")
 
 func _save_as_preset() -> void:

@@ -2361,7 +2361,9 @@ const server = http.createServer((req, res) => {
       try {
         const j = JSON.parse(body);
         if (!Array.isArray(j.items)) throw new Error("items must be an array");
-        fs.writeFileSync(LAYOUT_FILE, JSON.stringify({ items: j.items.slice(0, 500) }, null, 1));
+        const out = { items: j.items.slice(0, 500) };
+        if (Array.isArray(j.rooms)) out.rooms = j.rooms.slice(0, 64);  // jigsaw room arrangement
+        fs.writeFileSync(LAYOUT_FILE, JSON.stringify(out, null, 1));
         broadcast({ type: "layout.changed" }, false);
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }

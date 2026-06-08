@@ -29,7 +29,14 @@ func _on_layout(_result: int, code: int, _headers: PackedStringArray, body: Pack
 	if code != 200:
 		return
 	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
-	if not (data is Dictionary) or not (data.get("items") is Array):
+	if not (data is Dictionary):
+		return
+	# restore the saved room arrangement (jigsaw swap) before placing decor
+	if data.get("rooms") is Array:
+		var wb := get_node_or_null("/root/OfficeFloor/World")
+		if wb and wb.has_method("apply_room_order"):
+			wb.apply_room_order(data["rooms"])
+	if not (data.get("items") is Array):
 		return
 	for c in _root.get_children():
 		c.queue_free()
