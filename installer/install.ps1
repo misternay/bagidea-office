@@ -88,8 +88,25 @@ if (Test-Path $backup) {
 }
 Ok "ติดตั้งที่ $APP"
 
+Step 5 "ทำ exe แบรนด์ (icon BAG IDEA — ไม่ให้เห็น Godot)"
+$bindir = Join-Path $APP "godot\bin"
+$branded = Join-Path $bindir "BagIdeaOffice.exe"
+$ico = Join-Path $APP "godot\assets\brand\logo.ico"
+if ((Test-Path $gexe) -and (Test-Path $ico)) {
+  New-Item -ItemType Directory -Force $bindir | Out-Null
+  $rcedit = Join-Path $env:TEMP "rcedit-x64.exe"
+  if (-not (Test-Path $rcedit)) {
+    try { Invoke-WebRequest -Uri "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe" -OutFile $rcedit } catch {}
+  }
+  Copy-Item $gexe $branded -Force
+  if (Test-Path $rcedit) {
+    & $rcedit $branded --set-icon $ico --set-version-string "FileDescription" "BagIdea AI Agents Office" --set-version-string "ProductName" "BagIdea AI Agents Office" 2>$null
+    Ok "ทำ exe แบรนด์แล้ว — taskbar เป็น BAG IDEA ตั้งแต่เปิด"
+  } else { Warn "ดาวน์โหลด rcedit ไม่ได้ — จะใช้ icon Godot ปกติ" }
+} else { Skip "ข้าม (ไม่พบ Godot หรือ logo.ico)" }
+
 # ---- hook paths: the permission/notify hooks use absolute paths --------------
-Step 5 "ตั้งค่า hooks ให้ตรงเครื่องนี้"
+Step 6 "ตั้งค่า hooks ให้ตรงเครื่องนี้"
 foreach ($cfg in @("$APP\.claude\settings.json", "$APP\workspace\.claude\settings.json")) {
   if (Test-Path $cfg) {
     $txt = Get-Content $cfg -Raw
@@ -102,7 +119,7 @@ foreach ($cfg in @("$APP\.claude\settings.json", "$APP\workspace\.claude\setting
 Ok "hooks ชี้มาที่ตำแหน่งติดตั้งแล้ว"
 
 # ---- CLI on PATH + Start Menu shortcut ---------------------------------------
-Step 6 "คำสั่ง bagidea + shortcut"
+Step 7 "คำสั่ง bagidea + shortcut"
 $exe = Join-Path $APP "shell\target\release\bagidea-office-shell.exe"
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$APP*") {
