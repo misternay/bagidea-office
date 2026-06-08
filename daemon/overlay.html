@@ -2544,7 +2544,11 @@
 
   // ---- 🧩 plugins: list + open a plugin's panel inside the modal -----------
   document.getElementById("pluginBtn").onclick = () => openPlugins();
-  document.getElementById("editBtn").onclick = () => openEditor3d();
+  // 🎨 opens the full standalone 3D editor window (the daemon launches Godot).
+  document.getElementById("editBtn").onclick = () => {
+    api("/editor/open", {});
+    addChip("🎨 กำลังเปิด 3D Editor (หน้าต่างแยก)… จัดของเสร็จกดบันทึก แล้ววอลเปเปอร์อัปเดตทันที");
+  };
   async function openPlugins() {
     modal.classList.add("open");
     const r = await fetch("/plugins").then((x) => x.json()).catch(() => ({ plugins: [] }));

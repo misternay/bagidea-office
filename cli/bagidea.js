@@ -75,6 +75,7 @@ ${C.bold}ทีมและงาน${C.off}
   ${C.cyan}agents${C.off}                      รายชื่อพนักงาน + เสียง + เครื่องมือ
   ${C.cyan}projects${C.off}                    รายชื่อโปรเจค + ใครกำลังทำงาน
   ${C.cyan}open "<โปรเจค>"${C.off}              เปิดหน้าต่างโปรเจค (= ปุ่ม ▶)
+  ${C.cyan}editor${C.off}                      เปิด 3D Office Editor (จัดออฟฟิศ)
   ${C.cyan}memory <agent>${C.off}              อ่านสมุดความจำของ agent
   ${C.cyan}office${C.off}                      อ่าน OFFICE.md (ข้อมูลกลาง)
 
@@ -131,6 +132,12 @@ async function main() {
       "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'node.exe' -and $_.CommandLine -match 'server\\.js') -or $_.Name -eq 'bagidea-office-shell.exe' -or $_.Name -like 'Godot*' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F } | Out-Null"],
       { stdio: "ignore" }).on("close", () => ok("ปิดออฟฟิศแล้ว"));
     return;
+  }
+
+  if (cmd === "editor") {
+    if (!(await daemonUp())) return bad(`โปรแกรมยังไม่เปิด — สั่ง ${C.cyan}bagidea start${C.off} ก่อน`);
+    await req("POST", "/editor/open", {});
+    return ok("เปิด 3D Office Editor แล้ว (หน้าต่างแยก) — จัดของเสร็จกดบันทึก");
   }
 
   if (cmd === "fixmic") {

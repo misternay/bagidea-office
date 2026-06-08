@@ -35,6 +35,14 @@ func _ready() -> void:
 	$Sun.rotation_degrees = Vector3(-46.0, 150.0, 0.0)
 	_apply_daylight()
 
+	# 🎨 3D EDITOR MODE — a normal window for arranging the office. Skip the
+	# wallpaper attach / splash / live agents / cinematic drift; drive the
+	# camera and editing through map_editor.gd. The procedural world stays as
+	# locked context.
+	if "--editor3d" in OS.get_cmdline_user_args():
+		_enter_editor_mode()
+		return
+
 	if "--shot" in OS.get_cmdline_user_args():
 		_take_shot()
 
@@ -71,6 +79,39 @@ func _ready() -> void:
 		var cam: Camera3D = $CameraRig/Camera3D
 		cam.attributes.dof_blur_far_enabled = false
 		cam.attributes.dof_blur_near_enabled = false
+
+## 🎨 Switch this instance into the standalone 3D Office Editor.
+func _enter_editor_mode() -> void:
+	# a normal, framed, resizable window (NOT the wallpaper)
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+	DisplayServer.window_set_size(Vector2i(1280, 800))
+	DisplayServer.window_set_title("BagIdea Office — 3D Editor")
+	get_viewport().transparent_bg = false
+	Engine.max_fps = 60
+	# bright, fixed daylight for clear editing
+	_cli_pinned = true
+	_hour_override = 12.0
+	_apply_daylight()
+	# silence the live office: no cinematic drift, no agents, no overlays
+	var rig := get_node_or_null("CameraRig")
+	if rig:
+		rig.set_process(false)
+		rig.set_physics_process(false)
+		if rig.has_method("set_process_input"):
+			rig.set_process_input(false)
+	var ec := get_node_or_null("EventClient")
+	if ec:
+		ec.set_process(false)
+	for n in ["CinemaLayer", "GrainLayer", "Hud"]:
+		var node := get_node_or_null(n)
+		if node:
+			node.visible = false
+	# drive the camera + editing
+	var ed: Node = load("res://scripts/map_editor.gd").new()
+	ed.name = "MapEditor"
+	add_child(ed)
+	ed.setup($CameraRig/Camera3D)
 
 ## Manual atmosphere from the overlay: {"hour": 17.5} pins the clock for
 ## debugging/beauty shots; {"hour": "auto"} hands it back to real time.

@@ -2324,6 +2324,18 @@ const server = http.createServer((req, res) => {
     broadcast({ type: "plugins.changed" }, false);
     res.writeHead(200); res.end("ok");
 
+  } else if (req.method === "POST" && req.url === "/editor/open") {
+    // 🎨 launch the standalone 3D Office Editor (its own Godot window).
+    try {
+      const godot = process.env.BAGIDEA_GODOT ||
+        "E:\\Tools\\Godot\\Godot_v4.6.3-stable_win64.exe";
+      const gdir = path.join(__dirname, "..", "godot");
+      if (!fs.existsSync(godot)) { res.writeHead(500); return res.end("ไม่พบ Godot — ตั้ง env BAGIDEA_GODOT"); }
+      spawn(godot, ["--path", gdir, "--", "--editor3d"],
+        { detached: true, stdio: "ignore", windowsHide: false }).unref();
+      res.writeHead(200); res.end("ok");
+    } catch (e) { res.writeHead(500); res.end(String(e.message)); }
+
   } else if (req.method === "POST" && req.url === "/plugins/install") {
     // 📦 one-click install: git clone a plugin repo into plugins/ then reload.
     readBody(req, (body) => {
