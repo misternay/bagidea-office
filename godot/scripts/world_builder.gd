@@ -432,14 +432,14 @@ func _build_ghost_deck() -> void:
 	glass.metallic = 0.2
 	glass.emission_enabled = true
 	glass.emission = Color(0.5, 0.65, 1.0)
-	glass.emission_energy_multiplier = 0.12
+	glass.emission_energy_multiplier = 0.05
 	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var trim := _mat(Color(0.2, 0.12, 0.4), 0.4, Color(0.6, 0.4, 1.0), 2.2)
+	var trim := _mat(Color(0.2, 0.12, 0.4), 0.4, Color(0.6, 0.4, 1.0), 0.7)
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = Color(0.12, 0.14, 0.26, 0.72)
 	dark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	dark.roughness = 0.3
-	var screen := _mat(Color(0.06, 0.1, 0.2), 0.3, Color(0.45, 0.8, 1.0), 2.6)
+	var screen := _mat(Color(0.06, 0.1, 0.2), 0.3, Color(0.45, 0.8, 1.0), 1.2)
 
 	# Glass slab: x 11..17.2, z -8.2..-0.6, hovering over the server room.
 	_deck_box(deck, Vector3(14.1, 3.4, -4.4), Vector3(6.2, 0.12, 7.6), glass)
@@ -454,7 +454,7 @@ func _build_ghost_deck() -> void:
 		var disc := CSGCylinder3D.new()
 		disc.radius = 0.32
 		disc.height = 0.06
-		disc.material = _mat(Color(0.2, 0.3, 0.5), 0.4, Color(0.45, 0.8, 1.0), 2.6)
+		disc.material = _mat(Color(0.2, 0.3, 0.5), 0.4, Color(0.45, 0.8, 1.0), 0.8)
 		deck.add_child(disc)
 		disc.position = corner
 
