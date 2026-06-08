@@ -78,6 +78,7 @@ function help() {
   head("Suite");
   row("start", "Launch the office (if not already running)");
   row("stop", "Shut it all down — shell · wallpaper · daemon");
+  row("restart", "Stop everything, then start it fresh");
   row("status", "System overview · agents · projects");
   row("stats", "7-day activity + cost report");
   row("update", "Update to the latest version + restart");
@@ -141,25 +142,42 @@ async function main() {
     return;
   }
 
-  if (cmd === "start") {
-    if (await daemonUp()) return ok("The office is already running");
+  // --- process control shared by start / stop / restart -----------------------
+  const KILL_PS = "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'node.exe' -and $_.CommandLine -match 'server\\.js') -or $_.Name -eq 'bagidea-office-shell.exe' -or $_.Name -like 'Godot*' -or $_.Name -eq 'BagIdeaOffice.exe' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F } | Out-Null";
+  const killAll = () => new Promise((res) =>
+    spawn("powershell", ["-NoProfile", "-Command", KILL_PS], { stdio: "ignore" }).on("close", res));
+  const startOffice = async (verb) => {
     const exe = findShellExe();
-    if (!exe) return bad(`shell exe not found — run ${c.accent}cargo build --release${c.reset} in shell/`);
+    if (!exe) { bad(`shell exe not found — run ${c.accent}cargo build --release${c.reset} in shell/`); return false; }
     spawn(exe, [], { cwd: path.dirname(exe), detached: true, stdio: "ignore" }).unref();
-    process.stdout.write(`  ${c.gray}starting the office${c.reset}`);
+    process.stdout.write(`  ${c.gray}${verb}${c.reset}`);
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       process.stdout.write(`${c.gray}.${c.reset}`);
-      if (await daemonUp()) { console.log(""); return ok("The office is ready 🏢"); }
+      if (await daemonUp()) { console.log(""); return true; }
     }
     console.log("");
-    return warn("Started, but the daemon isn't answering yet — check the screen");
+    warn("Started, but the daemon isn't answering yet — check the screen");
+    return false;
+  };
+
+  if (cmd === "start") {
+    if (await daemonUp()) return ok("The office is already running");
+    if (await startOffice("starting the office")) ok("The office is ready 🏢");
+    return;
   }
 
   if (cmd === "stop") {
-    spawn("powershell", ["-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'node.exe' -and $_.CommandLine -match 'server\\.js') -or $_.Name -eq 'bagidea-office-shell.exe' -or $_.Name -like 'Godot*' -or $_.Name -eq 'BagIdeaOffice.exe' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F } | Out-Null"],
-      { stdio: "ignore" }).on("close", () => ok("The office is closed"));
+    await killAll();
+    return ok("The office is closed");
+  }
+
+  if (cmd === "restart") {
+    const wasUp = await daemonUp();
+    if (wasUp) { info("Stopping the office…"); await killAll(); }
+    // let Windows release the processes + port 8787 before relaunching
+    await new Promise((r) => setTimeout(r, wasUp ? 2500 : 600));
+    if (await startOffice("restarting the office")) ok("The office is back 🏢");
     return;
   }
 
