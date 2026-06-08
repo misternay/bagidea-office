@@ -650,15 +650,35 @@ func _rebuild_ui() -> void:
 	if _ui_layer: _ui_layer.queue_free()
 	_build_ui(); _refresh_rooms(); _refresh_scene(); _refresh_lib(); _refresh_sel()
 
-## Upload an image to use as the company billboard (recommended ~1380×207, the
-## same wide ratio as the default sign).
+## Choose the company billboard image — from the LIBRARY or a fresh upload.
+## Recommended ~1380×207 (the wide 6.7:1 ratio of the default sign).
 func _import_billboard() -> void:
-	_pick_file(PackedStringArray(["*.png", "*.jpg", "*.jpeg", "*.webp"]), func(p):
-		_billboard_path = p
-		if world and world.has_method("set_billboard_texture"):
-			world.set_billboard_texture(p)
-		_flash(L("🏷 Billboard set — Save to keep (best ratio ~6.7:1, e.g. 1380×207)",
-			"🏷 ตั้งป้ายแล้ว — กดบันทึกเพื่อจำ (อัตราส่วน ~6.7:1 เช่น 1380×207)")))
+	var menu := PopupMenu.new()
+	add_child(menu)
+	menu.add_item(L("📁 Upload new image…", "📁 อัปโหลดรูปใหม่…"), 0)
+	var imgs: Array = []
+	for a in library:
+		if String(a.get("kind", "")) == "image":
+			imgs.append(a)
+			menu.add_item("🖼 " + String(a.get("name", "")), imgs.size())
+	if imgs.is_empty():
+		menu.add_separator(L("(library has no images yet)", "(ยังไม่มีรูปใน library)"))
+	menu.id_pressed.connect(func(id):
+		if id == 0:
+			_pick_file(PackedStringArray(["*.png", "*.jpg", "*.jpeg", "*.webp"]), func(p):
+				_register_asset(p, "image"); _set_billboard(p))
+		elif id >= 1 and id <= imgs.size():
+			_set_billboard(String(imgs[id - 1].get("path", "")))
+		menu.queue_free())
+	menu.popup(Rect2i(Vector2i(230, 92), Vector2i(240, 10)))
+
+func _set_billboard(p: String) -> void:
+	if p == "": return
+	_billboard_path = p
+	if world and world.has_method("set_billboard_texture"):
+		world.set_billboard_texture(p)
+	_flash(L("🏷 Billboard set — Save to keep (best ratio ~6.7:1, e.g. 1380×207)",
+		"🏷 ตั้งป้ายแล้ว — กดบันทึกเพื่อจำ (อัตราส่วน ~6.7:1 เช่น 1380×207)"))
 
 func _fill_decor(cat: String) -> void:
 	var box := ui.find_child("DecorList", true, false)

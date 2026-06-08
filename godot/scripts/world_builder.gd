@@ -531,7 +531,7 @@ func _build_ghost_deck() -> void:
 	plate.pixel_size = 0.004
 	plate.modulate = Color(0.78, 0.62, 1.0)
 	deck.add_child(plate)
-	plate.position = Vector3(14.1, 4.75, -7.9)
+	plate.position = Vector3(14.1, 4.5, -1.2)   # front edge of the deck — clear of the back-wall clock/billboard
 	plate.rotation_degrees = Vector3(-42, 0, 0)
 
 	# Cool spectral light, masked to layer 2 — the rooms below stay untinted.
@@ -1639,10 +1639,11 @@ func _build_countryside() -> void:
 	rng.seed = 77
 	var placements: Array[Transform3D] = []
 	while placements.size() < 4200:
-		var px := rng.randf_range(-34.0, 40.0)
-		var pz := rng.randf_range(-22.0, 32.0)
-		# keep the building footprint clear
-		if px > -11.0 and px < 17.0 and pz > -11.0 and pz < 13.8:
+		var px := rng.randf_range(-40.0, 40.0)
+		var pz := rng.randf_range(-26.0, 34.0)
+		# keep the (origin-centred, rectangular) office footprint clear so no
+		# grass pokes through the floor inside
+		if px > -16.6 and px < 16.6 and pz > -12.8 and pz < 12.8:
 			continue
 		var t := Transform3D(Basis(Vector3.UP, rng.randf_range(0.0, TAU))
 			.scaled(Vector3.ONE * rng.randf_range(0.7, 1.4)), Vector3(px, 0.16, pz))
