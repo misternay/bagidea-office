@@ -148,7 +148,7 @@ Served by the daemon at `http://127.0.0.1:8787/` — best experienced through th
 - **🗺 Live map**: a real orthographic floorplan render with live agent icons (face, state ring, name) — click one to chat with it
 - **🧵 Threads**: per-conversation chat panes — switching threads or agents loads that conversation's history; a thread bar shows where you are; meetings (🗣 with participant faces) and sub-agent jobs (👻 with the owner's face + ✓/✗/⏳ status) are readable forever, streaming live while they run
 - **🗣 Discussions**: launch agent-to-agent meetings
-- **🗂 OFFICE OPS**: projects (create / register / open / live-view / hide / delete, with an in-house Blender-style folder picker), standing tasks, calendar, the shared note board, and the org chart by tier
+- **🗂 OFFICE OPS**: projects (create / register / open / stop-agent-to-take-over / hide / delete, with an in-house Blender-style folder picker), standing tasks, calendar, the shared note board, and the org chart by tier
 - **🔵 NOW WORKING strip**: one calm line under the header — "กำลังทำ N งาน · latest…" — expandable into the full live task list; visible in feed mode too
 - **🔗 CONNECT tab**: API key vault (masked) + Telegram/Discord/LINE channel setup with live status dots
 - **📡 Feed mode**: right-click the chat head — the panel becomes a translucent right-edge activity stream (scrollback, hover-to-focus, 🧹 clear, actionable permission cards); the wallpaper stays clean for streaming/recording
@@ -392,9 +392,11 @@ Granted tools run silently.
 the Director: *"สร้างโปรเจค Calculator ในห้องเรียน แล้วให้ Flamingo สร้างเว็บเครื่องคิดเลข"* —
 the project folder is created, registered, and the assignee works **inside** it
 with a real resumable session. The row lights up with who's working; ▶ opens
-*the* project window (a live view while an agent works, your interactive
-session the moment they finish). ✕ unregisters; 🗑 really deletes (created-by-app
-folders only, leftover dev servers are swept first).
+*the* project window. **One occupant at a time:** while an agent works it you
+can't open it (a **⏹ stop-agent** button with a two-click confirm lets you take
+over), and while you have it open an agent won't enter. ✕ unregisters (and
+closes the window); 🗑 really deletes (created-by-app folders only, leftover dev
+servers are swept first).
 
 ### Talk to it from your phone
 ⚙ → 🔗 CONNECT: paste a Telegram bot token (60 seconds with @BotFather) and your
@@ -464,7 +466,7 @@ Full reference: [`docs/guide/cli.md`](docs/guide/cli.md).
 | `GET /map/bg` · `POST /pos` | live map plumbing |
 | `POST /perm/request` (long-poll) · `POST /perm/respond` `{id, decision, always?}` | permission broker |
 | `GET /projects` · `POST /projects` `{name, place\|path \| remove \| removeDisk}` | projects (removals are human-UI-only) |
-| `POST /projects/open` `{id, mode: play\|shell\|folder}` · `/projects/hide` · `/projects/resume` · `/projects/stop` | project windows (▶ = smart open / live view) |
+| `POST /projects/open` `{id, mode: play\|shell\|folder}` · `/projects/hide` · `/projects/resume` · `/projects/stop` · `/projects/stopwork` | project windows (▶ = smart open; locked while an agent works — `stopwork` takes over) |
 | `GET /fs?dir=` · `POST /fs/mkdir` | in-house folder picker |
 | `POST /places` `{name, folder \| remove}` | PLACE shorthands |
 | `POST /registry/key` `{name, value \| remove}` | API key vault (env injection) |
@@ -564,7 +566,7 @@ this makes them employable"*).
 - [x] **Sub-agents** — agents split into parallel ghost clones on the floating
       Ghost Deck (`SUB:` protocol, per-ghost sessions, auto-synthesis)
 - [x] **Projects** — agents work inside real folders with resumable sessions;
-      one window per project with a live view + hand-over
+      one window per project, one occupant at a time (stop-agent-to-take-over lock)
 - [x] Permission policies — granted tools run silently, ✓✓ forever grants
 - [x] Voice — F6 push-to-talk over Windows Voice Typing (Thai works)
 - [x] 📡 Feed mode, NOW-WORKING strip, Office Ops (jobs/calendar/notes/org)
