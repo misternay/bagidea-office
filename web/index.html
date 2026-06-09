@@ -4,197 +4,248 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BagIdea Office — your wallpaper goes to work</title>
-<meta name="description" content="A living HD-2D AI agent office that runs as your Windows wallpaper. Every character is a real Claude agent — delegate work, watch them work, talk by voice.">
+<meta name="description" content="A living HD-2D AI agent office that runs as your Windows wallpaper. Every character is a real Claude agent — delegate work, watch it happen, talk by voice. Open source.">
 <meta property="og:title" content="BagIdea Office">
 <meta property="og:description" content="Your desktop wallpaper is a living office of real AI agents.">
 <meta property="og:image" content="img/world.png">
+<meta property="og:type" content="website">
 <link rel="icon" href="img/logo.png">
-<style>
-  :root {
-    --bg:#070b13; --bg2:#0c1322; --card:#111c30; --line:rgba(255,255,255,0.09);
-    --accent:#5ec8ff; --accent2:#a882ff; --text:#e6edf7; --dim:#8a99b3;
-  }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  html { scroll-behavior:smooth; }
-  body { font-family:'Segoe UI',system-ui,'Noto Sans Thai',sans-serif; background:var(--bg);
-    color:var(--text); line-height:1.6; overflow-x:hidden; }
-  a { color:var(--accent); text-decoration:none; }
-  .wrap { max-width:1100px; margin:0 auto; padding:0 22px; }
-  .btn { display:inline-block; padding:12px 24px; border-radius:12px; font-weight:600;
-    cursor:pointer; transition:transform .15s, filter .15s; border:1px solid var(--line); }
-  .btn:hover { transform:translateY(-2px); filter:brightness(1.15); }
-  .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#05101f; border:none; }
-  .btn.ghost { background:rgba(255,255,255,0.04); color:var(--text); }
-
-  /* nav */
-  nav { position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
-    background:rgba(7,11,19,0.75); border-bottom:1px solid var(--line); }
-  nav .wrap { display:flex; align-items:center; gap:10px; height:60px; }
-  nav img { width:30px; height:30px; border-radius:7px; }
-  nav b { font-size:16px; letter-spacing:0.5px; }
-  nav b span { color:var(--accent); }
-  nav .links { margin-left:auto; display:flex; gap:22px; align-items:center; font-size:14px; }
-  nav .links a { color:var(--dim); } nav .links a:hover { color:var(--text); }
-  @media(max-width:640px){ nav .links a:not(.btn){ display:none; } }
-
-  /* hero */
-  .hero { position:relative; padding:80px 0 40px; text-align:center; overflow:hidden; }
-  .hero::before { content:""; position:absolute; inset:0; z-index:-1;
-    background:radial-gradient(900px 400px at 50% -10%, rgba(94,200,255,0.18), transparent 70%),
-               radial-gradient(700px 360px at 80% 10%, rgba(168,130,255,0.14), transparent 70%); }
-  .hero h1 { font-size:clamp(34px,6vw,60px); line-height:1.1; font-weight:800; letter-spacing:-0.5px; }
-  .hero h1 .grad { background:linear-gradient(120deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .hero p.sub { font-size:clamp(16px,2.4vw,21px); color:var(--dim); max-width:680px; margin:18px auto 0; }
-  .hero .cta { margin-top:28px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-  .shot { margin:46px auto 0; max-width:960px; border-radius:16px; overflow:hidden;
-    border:1px solid var(--line); box-shadow:0 30px 80px rgba(0,0,0,0.6); }
-  .shot img { width:100%; display:block; }
-  .badges { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:22px;
-    color:var(--dim); font-size:13px; }
-  .badges span { background:rgba(255,255,255,0.04); border:1px solid var(--line);
-    padding:5px 12px; border-radius:999px; }
-
-  /* sections */
-  section { padding:70px 0; }
-  h2.title { font-size:clamp(26px,4vw,38px); font-weight:800; text-align:center; }
-  h2.title + .lead { text-align:center; color:var(--dim); max-width:600px; margin:12px auto 0; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; margin-top:46px; }
-  .feat { background:linear-gradient(160deg,var(--card),var(--bg2)); border:1px solid var(--line);
-    border-radius:16px; padding:24px; transition:transform .18s, border-color .18s; }
-  .feat:hover { transform:translateY(-4px); border-color:var(--accent); }
-  .feat .ic { font-size:30px; }
-  .feat h3 { font-size:17px; margin:12px 0 7px; }
-  .feat p { color:var(--dim); font-size:14px; }
-
-  .split { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; }
-  @media(max-width:760px){ .split{ grid-template-columns:1fr; } }
-  .split img { width:100%; border-radius:14px; border:1px solid var(--line); box-shadow:0 20px 50px rgba(0,0,0,0.5); }
-  .split h3 { font-size:24px; margin-bottom:12px; }
-  .split ul { list-style:none; color:var(--dim); }
-  .split li { padding:6px 0 6px 26px; position:relative; }
-  .split li::before { content:"✦"; position:absolute; left:0; color:var(--accent); }
-
-  /* install */
-  .install { background:linear-gradient(160deg,#0e1830,#0a1120); border:1px solid var(--line);
-    border-radius:18px; padding:34px; text-align:center; }
-  .code { display:block; margin:18px auto; max-width:760px; background:#060a12; border:1px solid var(--line);
-    border-radius:10px; padding:16px 18px; font-family:'Cascadia Code',Consolas,monospace; font-size:13.5px;
-    color:#bfe4ff; text-align:left; overflow-x:auto; }
-  .steps { display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:24px; color:var(--dim); font-size:13px; }
-  .steps div { max-width:200px; }
-  .steps b { color:var(--text); }
-
-  footer { border-top:1px solid var(--line); padding:34px 0; color:var(--dim); font-size:13px; text-align:center; }
-  footer a { color:var(--dim); margin:0 8px; }
-  .reveal { opacity:0; transform:translateY(20px); transition:opacity .6s, transform .6s; }
-  .reveal.in { opacity:1; transform:none; }
-</style>
+<link rel="stylesheet" href="assets/site.css">
+<script defer src="assets/i18n.js"></script>
 </head>
 <body>
 
-<nav><div class="wrap">
-  <img src="img/logo.png" alt="logo"><b>BAG<span>IDEA</span> Office</b>
-  <div class="links">
-    <a href="#features">Features</a>
-    <a href="#how">How it works</a>
-    <a href="docs.html">Docs</a>
-    <a href="https://github.com/bagidea/bagidea-office">GitHub</a>
-    <a class="btn primary" href="#install">Get it</a>
-  </div>
-</div></nav>
-
-<header class="hero"><div class="wrap">
-  <h1>Your wallpaper just<br><span class="grad">went to work.</span></h1>
-  <p class="sub">A living HD-2D office that runs behind your desktop icons — and every
-    character in it is a <b>real AI agent</b>. Delegate work, watch them do it, talk by voice.</p>
-  <div class="cta">
-    <a class="btn primary" href="#install">⬇ Install</a>
-    <a class="btn ghost" href="docs.html">📖 Read the docs</a>
-  </div>
-  <div class="badges">
-    <span>🖼 Live Windows wallpaper</span><span>🤖 Real Claude agents</span>
-    <span>🎤 Voice & realtime</span><span>🧩 Plugins</span><span>🎨 Editable office</span>
-  </div>
-  <div class="shot reveal"><img src="img/world.png" alt="The office, alive on a real desktop"></div>
-</div></header>
-
-<section id="features"><div class="wrap">
-  <h2 class="title">An office that actually works</h2>
-  <p class="lead">Not a dashboard. Not a chat box. A world that renders the real state of your AI agents.</p>
-  <div class="grid">
-    <div class="feat reveal"><div class="ic">👑</div><h3>Chain of command</h3><p>Talk to the Director — he plans, delegates to the team, and walks the summary back to you.</p></div>
-    <div class="feat reveal"><div class="ic">👻</div><h3>Sub-agent ghosts</h3><p>Big jobs split into parallel translucent clones on a floating Ghost Deck, then merge.</p></div>
-    <div class="feat reveal"><div class="ic">📁</div><h3>Real projects</h3><p>Agents work inside real folders with resumable Claude sessions. Press ▶ to watch live.</p></div>
-    <div class="feat reveal"><div class="ic">🎤</div><h3>Voice & realtime</h3><p>Speak commands (Whisper/Gemini), give agents anime voices, or hold a live voice call.</p></div>
-    <div class="feat reveal"><div class="ic">📨</div><h3>Channels</h3><p>Run your office from Telegram, Discord or LINE — replies come back on the same channel.</p></div>
-    <div class="feat reveal"><div class="ic">🧠</div><h3>Memory that grows</h3><p>A shared office brain + per-agent memory, distilled automatically, kept token-lean.</p></div>
-    <div class="feat reveal"><div class="ic">🧩</div><h3>Plugins</h3><p>Extend the office — a built-in music player agents control, and an SDK to write your own.</p></div>
-    <div class="feat reveal"><div class="ic">🎨</div><h3>Editable office</h3><p>Place furniture, walls and decor; import your own models and images.</p></div>
-    <div class="feat reveal"><div class="ic">📊</div><h3>Dashboard</h3><p>Runs, cost, a 7-day chart, busiest agents — the whole office at a glance.</p></div>
-  </div>
-</div></section>
-
-<section id="how" style="background:var(--bg2)"><div class="wrap">
-  <h2 class="title">How it works</h2>
-  <div class="split reveal" style="margin-top:46px">
-    <img src="img/overlay.png" alt="chat overlay">
-    <div>
-      <h3>Talk like a boss</h3>
-      <ul>
-        <li>Type or speak into the CEO seat — that's you</li>
-        <li>The Director walks over, plans, and dispatches the team</li>
-        <li>Watch the hand-offs happen on the wallpaper in real time</li>
-        <li>Results report back; the final summary comes to you in person</li>
-      </ul>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><img src="img/logo.png" alt="BagIdea Office logo"> BAG<span>IDEA</span> Office</a>
+    <div class="links">
+      <a class="nav-hide" href="#features" data-i18n="nav_features">Features</a>
+      <a class="nav-hide" href="docs.html" data-i18n="nav_docs">Docs</a>
+      <a class="nav-hide" href="#install" data-i18n="nav_install">Install</a>
+      <a class="nav-hide" href="#sponsors" data-i18n="nav_sponsors">Sponsors</a>
+      <a class="btn ghost" href="https://github.com/bagidea/bagidea-office" target="_blank" rel="noopener" data-i18n="cta_github">GitHub</a>
+      <div class="langpick"><button class="toggle">🌐 <span class="cur">EN</span></button></div>
     </div>
   </div>
-  <div class="split reveal" style="margin-top:50px">
-    <div>
-      <h3>Three layers, one exe</h3>
-      <ul>
-        <li>A zero-dependency Node daemon — the event hub + Claude adapter</li>
-        <li>A Godot 4 world embedded behind your desktop icons</li>
-        <li>A Rust shell with the chat head, overlay and tray</li>
-        <li>Agents are real headless <code>claude</code> sessions</li>
-      </ul>
-    </div>
-    <img src="img/world.png" alt="the world">
-  </div>
-</div></div></section>
+</nav>
 
-<section id="install"><div class="wrap">
-  <div class="install reveal">
-    <h2 class="title" style="font-size:28px">Get the installer</h2>
-    <p class="lead">Windows 11 · a private beta — request access and you'll get the installer + release.</p>
-    <code class="code"># With the release you receive:
-.\install.ps1 -Zip .\BagIdeaOffice-latest.zip</code>
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap">
+    <h1 data-i18n-html="hero_title">Your wallpaper <span class="grad">goes to work</span>.</h1>
+    <p class="sub" data-i18n="hero_sub">BagIdea Office turns your Windows desktop into a living HD-2D office where every AI agent is a real Claude that walks to its desk, asks permission, holds meetings, and gets work done — behind your icons.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install" data-i18n="cta_get">Get started</a>
+      <a class="btn ghost" href="docs.html" data-i18n="cta_docs">Read the docs</a>
+    </div>
+    <div class="badges">
+      <span data-i18n="badge_win">Windows 11</span>
+      <span data-i18n="badge_open">Open source</span>
+      <span data-i18n="badge_free">Free to run</span>
+      <span data-i18n="badge_langs">14 languages</span>
+    </div>
+    <div class="shot"><img src="img/world.png" alt="The BagIdea Office wallpaper" loading="lazy"></div>
+    <p class="muted" style="font-size:13px;margin-top:14px" data-i18n="shot_cap">A real desktop, captured live — agents at their desks, the brand billboard, the day/night cycle following your local time.</p>
+  </div>
+</header>
+
+<!-- WHAT -->
+<section>
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="what_eyebrow">What is it</p>
+    <h2 class="title" data-i18n="what_title">Not a dashboard. A world.</h2>
+    <p class="lead" data-i18n="what_lead">Most AI tools give you a chat box. BagIdea Office gives your agents a place to live — and shows you the true state of every Claude Code session as a pixel-art employee at work.</p>
+    <div class="grid c3">
+      <div class="feat"><div class="ic">🤖</div><h3 data-i18n="what_p1_h">Real agents, real work</h3><p data-i18n="what_p1_p">Every character is a real Claude Code session running inside real project folders. When you delegate, you watch the work actually happen — desks, hand-offs, meetings, approvals.</p></div>
+      <div class="feat"><div class="ic">🔍</div><h3 data-i18n="what_p2_h">Truth, not theatre</h3><p data-i18n="what_p2_p">Nothing on screen is faked. A walk to Security is a real permission request; a glowing screen is a live tool call; a finished task really finished. The wallpaper renders the truth.</p></div>
+      <div class="feat"><div class="ic">🖥️</div><h3 data-i18n="what_p3_h">It lives on your desktop</h3><p data-i18n="what_p3_p">It renders behind your desktop icons like a real wallpaper — calm when idle, alive when working. A chat head and tray icon keep it one click away.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="feat_eyebrow">Features</p>
+    <h2 class="title" data-i18n="feat_title">Everything your office can do</h2>
+    <p class="lead" data-i18n="feat_lead">A full agent-operations product — rendered as a place.</p>
+    <div class="grid c3">
+      <div class="feat"><div class="ic">🏢</div><h3 data-i18n="f_world_t">Living wallpaper world</h3><p data-i18n="f_world_d">HD-2D office behind your icons: agents walk an A* graph, glowing monitors, auras, a roofline clock, countryside with grass, clouds and fireflies, and a real day/night cycle tied to your clock.</p></div>
+      <div class="feat"><div class="ic">👑</div><h3 data-i18n="f_ceo_t">CEO chain of command</h3><p data-i18n="f_ceo_d">You are the CEO. Give an order and the Director walks over, takes it, plans, and delegates real work to the team — every hand-off acted out on the wallpaper, then the summary walked back to you.</p></div>
+      <div class="feat"><div class="ic">👻</div><h3 data-i18n="f_ghost_t">Self-splitting ghosts</h3><p data-i18n="f_ghost_d">When work parallelizes, an agent splits into translucent ghost clones that hurry up the glass staircase to the floating Ghost Deck, work in parallel, then merge back with a synthesis.</p></div>
+      <div class="feat"><div class="ic">🧩</div><h3 data-i18n="f_grid_t">Swappable 3×3 office</h3><p data-i18n="f_grid_d">Rearrange the whole floor in the 3D Editor — click two rooms to swap. Furniture, agent seats, navigation and even the cat and dogs follow their room.</p></div>
+      <div class="feat"><div class="ic">🎤</div><h3 data-i18n="f_voice_t">Voice, channels & memory</h3><p data-i18n="f_voice_d">Talk by voice (F6 push-to-talk), call the office (realtime Gemini Live), give agents one of 16 ♀/♂ voices, and run it from Telegram, Discord or LINE. Hermes-style memory grows token-lean.</p></div>
+      <div class="feat"><div class="ic">🔌</div><h3 data-i18n="f_plugin_t">Plugins, skills & tools</h3><p data-i18n="f_plugin_d">Extend the office with plugins (install from any GitHub repo), assign agents from a library of builtin skills, and add new capability via MCP servers — humans and agents can build plugins.</p></div>
+      <div class="feat"><div class="ic">🛡️</div><h3 data-i18n="f_security_t">Spatialized security</h3><p data-i18n="f_security_d">When an agent needs a tool you haven't granted, it physically walks to the Security Center and waits. You Allow / ✓✓ Forever / Deny. Granted tools run silently and never leave the desk.</p></div>
+      <div class="feat"><div class="ic">📁</div><h3 data-i18n="f_projects_t">Real projects</h3><p data-i18n="f_projects_d">Register real folders as projects; the Director creates and routes work into them. Each assignee's Claude session lives inside the directory and is resumable by you — one window per project.</p></div>
+      <div class="feat"><div class="ic">🌐</div><h3 data-i18n="f_i18n_t">14 languages</h3><p data-i18n="f_i18n_d">The whole UI speaks 14 languages — English, ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch, Français, 한국어, Indonesia, Tiếng Việt — auto-translated and switchable office-wide.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TOUR -->
+<section>
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="tour_eyebrow">A look around</p>
+    <h2 class="title" data-i18n="tour_title">See it in action</h2>
+
+    <div class="split">
+      <div class="txt"><h3 data-i18n="tour1_h">A live desktop wallpaper</h3><p data-i18n="tour1_p">It runs behind your real desktop icons with an optional activity feed down the side — clean for streaming, alive while agents work.</p></div>
+      <img src="img/desktop.png" alt="BagIdea Office as a desktop wallpaper" loading="lazy">
+    </div>
+    <div class="split">
+      <div class="txt"><h3 data-i18n="tour2_h">Talk to your office</h3><p data-i18n="tour2_p">Open on the CEO seat and give orders; the Director takes them and dispatches the team. Every conversation is a resumable thread with full history.</p></div>
+      <img src="img/overlay.png" alt="The chat overlay focused on the CEO" loading="lazy">
+    </div>
+    <div class="split">
+      <div class="txt"><h3 data-i18n="tour3_h">Rearrange it in 3D</h3><p data-i18n="tour3_p">The 3D Office Editor lets you swap rooms on a 3×3 grid, move the Ghost Deck, place furniture, and import your own models and images.</p></div>
+      <img src="img/editor.png" alt="The 3D Office Editor" loading="lazy">
+    </div>
+    <div class="split">
+      <div class="txt"><h3 data-i18n="tour4_h">Drive it from the terminal</h3><p data-i18n="tour4_p">The bagidea CLI controls everything — start/stop, ask, status, projects, plugins, proposals, voice and more.</p></div>
+      <img src="img/cli.png" alt="The bagidea CLI help screen" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="inst_eyebrow">Installation</p>
+    <h2 class="title" data-i18n="inst_title">Up and running in minutes</h2>
+    <p class="lead" data-i18n="inst_lead">One command installs every dependency, builds the app, and wires it onto your PATH.</p>
+    <div class="note warn" data-i18n="inst_plat">Currently supported: Windows 11. Linux &amp; macOS wallpaper backends are planned and will land in a later update.</div>
     <div class="steps">
-      <div><b>1.</b> Run <b>install.ps1</b> — it sets up Node, Godot &amp; the Claude CLI (the app is prebuilt, no compiler needed)</div>
-      <div><b>2.</b> Run <b>claude</b> once to log in</div>
-      <div><b>3.</b> <b>bagidea start</b> — your wallpaper goes to work 🏢</div>
+      <div class="step">
+        <h4 data-i18n="inst_s1_h">Run the one-shot installer</h4>
+        <p data-i18n="inst_s1_p">Open PowerShell and paste this. It installs Git, Node LTS, Rust, Godot 4.6.3 and the Claude Code CLI, clones the app, builds the shell, brands the icon, and adds the bagidea command to your PATH.</p>
+        <pre><code>irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex</code></pre>
+      </div>
+      <div class="step">
+        <h4 data-i18n="inst_s2_h">Log in to Claude (first time only)</h4>
+        <p data-i18n="inst_s2_p">Open a new terminal and run claude once to sign in with your existing Claude account or subscription — that's the brain of every agent.</p>
+        <pre><code>claude</code></pre>
+      </div>
+      <div class="step">
+        <h4 data-i18n="inst_s3_h">Start the office</h4>
+        <p data-i18n="inst_s3_p">Run bagidea start (or use the Start Menu shortcut). Your wallpaper becomes the office, with the chat head and tray icon ready.</p>
+        <pre><code>bagidea start</code></pre>
+      </div>
     </div>
-    <div class="cta" style="justify-content:center;margin-top:26px">
-      <a class="btn primary" href="https://github.com/bagidea/bagidea-office">⭐ Star on GitHub</a>
-      <a class="btn ghost" href="docs.html">📖 Full documentation</a>
+    <div class="note">
+      <b data-i18n="inst_req_h">Requirements</b> —
+      <span data-i18n="inst_req">Windows 11 · a Vulkan-capable GPU (verified on a GTX 1060) · a Claude account (Claude Code CLI). Node, Rust and Godot are installed for you by the installer.</span>
+    </div>
+    <p class="lead" style="font-size:15px;margin-top:18px" data-i18n="inst_manual">Prefer manual? Clone the repo, build the Rust shell with cargo build --release, and run it. Full steps are in the docs.</p>
+  </div>
+</section>
+
+<!-- CLI -->
+<section>
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="cli_eyebrow">Command line</p>
+    <h2 class="title" data-i18n="cli_title">The bagidea CLI</h2>
+    <p class="lead" data-i18n="cli_lead">Run the whole office from your terminal — and script it into anything.</p>
+    <div class="cli">
+      <div class="row"><code>bagidea start | stop | restart</code><span class="d">launch / stop / restart the whole suite</span></div>
+      <div class="row"><code>bagidea status · stats</code><span class="d">health + who's working · runs/cost dashboard</span></div>
+      <div class="row"><code>bagidea ask "&lt;message&gt;"</code><span class="d">order the Director and wait for the answer</span></div>
+      <div class="row"><code>bagidea chat &lt;agent&gt; "&lt;msg&gt;"</code><span class="d">hand a task to a specific agent</span></div>
+      <div class="row"><code>bagidea agents · projects</code><span class="d">roster · projects with live status</span></div>
+      <div class="row"><code>bagidea proposal approve|reject &lt;id&gt;</code><span class="d">decide on a team pitch (+ a note)</span></div>
+      <div class="row"><code>bagidea plugin install &lt;git-url&gt;</code><span class="d">add a plugin from any repo</span></div>
+      <div class="row"><code>bagidea lang &lt;code&gt;</code><span class="d">set the office language (14)</span></div>
+      <div class="row"><code>bagidea say · voices · image</code><span class="d">TTS · voice presets · AI image</span></div>
+      <div class="row"><code>bagidea update</code><span class="d">pull latest, rebuild what changed, relaunch</span></div>
+    </div>
+    <p class="center" style="margin-top:22px"><a href="docs.html#cli" data-i18n="cli_more">See the full CLI reference in the docs →</a></p>
+  </div>
+</section>
+
+<!-- SPONSORS -->
+<section id="sponsors">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="sp_eyebrow">Sponsors</p>
+    <h2 class="title" data-i18n="sp_title">Back an open AI-agent workspace</h2>
+    <p class="lead" data-i18n="sp_lead">BagIdea Office is built in the open. Sponsorship funds development, art licenses, cross-platform backends, and keeps it free to run. Your brand is shown here and in the app's credits.</p>
+    <div class="tiers">
+      <div class="tier gold">
+        <div class="crown">👑</div>
+        <h3 data-i18n="sp_gold_t">Gold Partner</h3>
+        <ul>
+          <li data-i18n="sp_gold_1">Logo on the site &amp; in-app credits</li>
+          <li data-i18n="sp_gold_2">Top placement, largest size</li>
+          <li data-i18n="sp_gold_3">Roadmap input &amp; early builds</li>
+          <li data-i18n="sp_gold_4">Shout-out in release notes</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="crown">🥈</div>
+        <h3 data-i18n="sp_silver_t">Silver Partner</h3>
+        <ul>
+          <li data-i18n="sp_silver_1">Logo on the website</li>
+          <li data-i18n="sp_silver_2">Mention in release notes</li>
+          <li data-i18n="sp_silver_3">Early access to builds</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="crown">🥉</div>
+        <h3 data-i18n="sp_bronze_t">Bronze / Backer</h3>
+        <ul>
+          <li data-i18n="sp_bronze_1">Name on the supporters list</li>
+          <li data-i18n="sp_bronze_2">Our heartfelt thanks</li>
+          <li data-i18n="sp_bronze_3">A good-karma boost</li>
+        </ul>
+      </div>
+    </div>
+    <div class="sponsor-cta">
+      <a class="btn primary" href="mailto:wrxbgid@warrix.co.th?subject=BagIdea%20Office%20Sponsorship" data-i18n="sp_cta">Become a sponsor</a>
+      <p class="muted" style="margin-top:12px"><a href="mailto:wrxbgid@warrix.co.th?subject=BagIdea%20Office%20Sponsorship" data-i18n="sp_contact">Reach out and let's talk →</a></p>
+    </div>
+
+    <div class="founder">
+      <div class="av">TS</div>
+      <div>
+        <div class="name" data-i18n="founder_name">Mr. Thanawat Suriya</div>
+        <div class="role" data-i18n="founder_role">CEO &amp; Founder · BagIdea Innovation Co., Ltd.</div>
+      </div>
     </div>
   </div>
-</div></section>
+</section>
 
-<footer><div class="wrap">
-  <p>Built with 🩵 by <a href="https://github.com/bagidea">BAG IDEA</a> · powered by
-    <a href="https://claude.com/claude-code">Claude</a></p>
-  <p style="margin-top:8px">
-    <a href="docs.html">Docs</a>·<a href="https://github.com/bagidea/bagidea-office">GitHub</a>·<a href="https://github.com/bagidea/bagidea-office/blob/main/REQUIREMENT.md">Roadmap</a>
-  </p>
-</div></footer>
+<footer>
+  <div class="wrap">
+    <div class="col" style="max-width:280px">
+      <a class="brand" href="index.html" style="display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;color:var(--text)"><img src="img/logo.png" alt="" style="width:28px;height:28px;border-radius:6px"> BAG<span style="color:var(--accent)">IDEA</span> Office</a>
+      <p style="margin-top:12px" data-i18n="foot_tag">Your wallpaper goes to work.</p>
+      <p style="margin-top:8px;font-size:13px" data-i18n="foot_made">Built with Claude Code.</p>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_product">Product</h4>
+      <a href="#features" data-i18n="foot_features">Features</a>
+      <a href="#install" data-i18n="foot_install">Install</a>
+      <a href="docs.html" data-i18n="foot_docs">Documentation</a>
+      <a href="docs.html#cli" data-i18n="foot_cli">CLI reference</a>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_resources">Resources</h4>
+      <a href="https://github.com/bagidea/bagidea-office" target="_blank" rel="noopener" data-i18n="foot_github">GitHub repo</a>
+      <a href="https://github.com/bagidea/bagidea-office-template" target="_blank" rel="noopener" data-i18n="foot_template">Plugin template</a>
+      <a href="https://github.com/bagidea/bagidea-office/issues" target="_blank" rel="noopener" data-i18n="foot_issues">Report an issue</a>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_company">Company</h4>
+      <a href="#sponsors" data-i18n="foot_sponsors">Sponsors</a>
+      <a href="mailto:wrxbgid@warrix.co.th" data-i18n="foot_contact">Contact</a>
+    </div>
+  </div>
+  <div class="copyright" data-i18n="copyright">© 2026 BagIdea Innovation Co., Ltd. · MIT-licensed open source.</div>
+</footer>
 
+<a href="#" class="toplink" aria-label="Back to top">↑</a>
 <script>
-  // reveal-on-scroll
-  const io = new IntersectionObserver((es) => es.forEach((e) => {
-    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-  }), { threshold: 0.12 });
-  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+  const top = document.querySelector(".toplink");
+  addEventListener("scroll", () => top.classList.toggle("show", scrollY > 600));
 </script>
 </body>
 </html>
