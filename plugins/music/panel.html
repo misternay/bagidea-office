@@ -12,6 +12,12 @@
 <style>
   :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
   * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Noto Sans Thai',sans-serif; }
+  /* slim on-theme scrollbar (matches the office overlay) */
+  html { scrollbar-width: thin; scrollbar-color: rgba(110,180,255,.3) transparent; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(110,180,255,.22); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(110,180,255,.45); }
   html, body { height:100%; }
   body { background:var(--bg); color:var(--fg); padding:14px; user-select:none;
     display:flex; flex-direction:column; gap:0; overflow:hidden; }

@@ -2717,8 +2717,28 @@
   function openPluginPanel(p) {
     modal.classList.add("open");
     modalCard.innerHTML = hdr(p.name) +
-      `<iframe src="/plugin/${p.id}/panel" style="width:100%;height:60vh;border:none;border-radius:10px;background:#0c1322"></iframe>` +
+      `<iframe id="plgFrame" src="/plugin/${p.id}/panel" style="width:100%;height:60vh;border:none;border-radius:10px;background:#0c1322"></iframe>` +
       `<button class="bigbtn" id="plgBack" style="margin-top:8px">← ${t("กลับ")}</button>`;
+    // Inject the office's themed scrollbar into the panel iframe so EVERY plugin
+    // (even ones whose author forgot the CSS) gets the slim on-theme scrollbar
+    // instead of the chunky default one. Same-origin, so this is allowed.
+    const frame = modalCard.querySelector("#plgFrame");
+    frame.onload = () => {
+      try {
+        const d = frame.contentDocument;
+        if (!d || d.getElementById("bagidea-sb")) return;
+        const st = d.createElement("style");
+        st.id = "bagidea-sb";
+        st.textContent =
+          "::-webkit-scrollbar{width:9px;height:9px}" +
+          "::-webkit-scrollbar-track{background:transparent}" +
+          "::-webkit-scrollbar-thumb{background:rgba(110,180,255,0.22);border-radius:6px}" +
+          "::-webkit-scrollbar-thumb:hover{background:rgba(110,180,255,0.45)}" +
+          "::-webkit-scrollbar-corner{background:transparent}" +
+          "html{scrollbar-width:thin;scrollbar-color:rgba(110,180,255,.3) transparent}";
+        (d.head || d.documentElement).appendChild(st);
+      } catch {}
+    };
     modalCard.querySelector("#plgBack").onclick = () => openPlugins();
   }
 
