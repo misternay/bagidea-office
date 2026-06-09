@@ -32,6 +32,11 @@ func focus_on(node: Node3D, dur := 7.0) -> void:
 	_focus_node = node
 	_focus_until = Time.get_ticks_msec() / 1000.0 + dur
 
+## Is a close-up currently playing? Lets callers fire a "guaranteed" focus on
+## a fresh order only when the camera is otherwise idle (no event running).
+func is_focusing() -> bool:
+	return is_instance_valid(_focus_node) and Time.get_ticks_msec() / 1000.0 < _focus_until
+
 func _process(delta: float) -> void:
 	if not drift or drift_amount <= 0.0:
 		return

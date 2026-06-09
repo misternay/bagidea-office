@@ -286,6 +286,7 @@ function loadReg() {
   // Default office rhythms for a fresh install (owner can change in settings).
   if (reg.heartbeatMin === undefined) reg.heartbeatMin = 30; // Director check-in
   if (reg.socialMin === undefined) reg.socialMin = 60;       // agents socialize
+  if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
@@ -317,6 +318,7 @@ function rosterEvt() {
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
+    proposalMin: Number(reg.proposalMin !== undefined ? reg.proposalMin : 120),
     maxStaff: MAX_STAFF, staffCount: staffCount(),
     lang: reg.lang || "en" };
 }
@@ -1266,6 +1268,14 @@ function makeDelegateFilter(depth, session, onHit) {
             : (ml.length ? ml.reduce((a, b) => (a.ts > b.ts ? a : b)) : null);
           const proj = (projName && projectByName(projName)) || (me && me.proj) ||
             projectFromPrompt(inst);
+          // LOCK (reverse): if the owner has this project's window open, an
+          // agent must NOT enter it — report back so the Director re-plans
+          // (and the two never collide inside one working tree).
+          if (proj && projWin[proj]) {
+            reportToMain(t, `โปรเจค "${projName || proj}" เจ้าของกำลังเปิดทำงานอยู่ — ` +
+              `เข้าไปทำตอนนี้ไม่ได้ รอจนเจ้าของปิดหน้าต่างก่อน`, false, depth, session);
+            return;
+          }
           const tl = sess[t] || [];
           const te = tl.length ? tl.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
           runClaude(t, inst, {
@@ -1899,7 +1909,14 @@ function ambientTick(now) {
     broadcast({ type: "voice.say", agent: id, text });
 }
 
+// Proposals are rate-limited so the team can't bury the CEO: at most one new
+// pitch per `proposalMin` minutes (configurable; 0 = unlimited). Agents still
+// discuss freely — only the pitches that REACH the owner are throttled.
+let lastProposalAt = 0;
 function addProposal(by, agents, name, detail) {
+  const gap = Number(reg.proposalMin !== undefined ? reg.proposalMin : 120);
+  if (gap && Date.now() - lastProposalAt < gap * 60000) return null;  // too soon
+  lastProposalAt = Date.now();
   const p = { id: "pr" + Date.now(), by, agents, name: String(name).slice(0, 60),
     detail: String(detail).slice(0, 500), ts: Date.now(), status: "pending" };
   proposals.push(p);
@@ -2316,8 +2333,12 @@ const server = http.createServer((req, res) => {
         const humanUI = !!req.headers["x-bagidea-ui"];
         if (p.remove) {
           if (!humanUI) { res.writeHead(403); return res.end("human UI only"); }
+          // Closing/removing a project must also close its real OS window —
+          // otherwise the terminal lingers, orphaned from a project that's gone.
+          winproj("stop", String(p.remove).replace(/[^\w-]/g, ""), () => {});
           projects = projects.filter((x) => x.id !== p.remove);
           saveProjects();
+          broadcast({ type: "projects.changed" }, false);
           res.writeHead(200); return res.end("ok");
         }
         if (p.removeDisk) {
@@ -2386,24 +2407,20 @@ const server = http.createServer((req, res) => {
           // surface THAT — never spawn a second one on top of it.
           winproj("show", id, () => sweepProjects());
         } else {
-          ensureTrusted(dir);  // no trust dialog ambush in the new window
+          // LOCK (one occupant at a time): while an agent is working inside this
+          // project you can't open it — opening would fork its live session. Stop
+          // the agent (⏹) to take over, or wait for it to finish. The reverse
+          // also holds: an agent won't be dispatched into a project you have open.
           if ((projRuns[id] || 0) > 0) {
-            // An agent is working RIGHT NOW. Resuming its session mid-run
-            // would fork the thread — instead the window opens as a LIVE
-            // VIEW of the agent's session, and the moment the run ends it
-            // hands the SAME session over to the user (claude --resume).
-            const sd = claudeSessionDir(dir).replace(/'/g, "''");
-            launch(`-Command "& '${LIVEVIEW.replace(/'/g, "''")}' -Dir '${sd}' -Proj '${id}' #BAGIDEA_PROJ_${id}"`,
-              `BAGIDEA_PROJ_${id}`);
-          } else {
-            // Smart entry: resume the NEWEST session explicitly — straight
-            // into where the work happened (claude -c ignores headless-born
-            // sessions and -r dumps a picker nobody asked for). Fresh claude
-            // only when the project has no sessions yet.
-            const sid = newestSid(dir);
-            const cmd = sid ? `claude --resume ${sid}` : "claude";
-            launch(`-Command "${cmd} #BAGIDEA_PROJ_${id}"`, `BAGIDEA_PROJ_${id}`);
+            res.writeHead(409, { "content-type": "text/plain; charset=utf-8" });
+            return res.end("agent กำลังทำงานในโปรเจคนี้อยู่ — กด ⏹ หยุดก่อนเพื่อเข้าไปดู/ทำเอง หรือรอจนงานเสร็จ");
           }
+          ensureTrusted(dir);  // no trust dialog ambush in the new window
+          // Smart entry: resume the NEWEST session explicitly — straight into
+          // where the work happened. Fresh claude only when there's no session.
+          const sid = newestSid(dir);
+          const cmd = sid ? `claude --resume ${sid}` : "claude";
+          launch(`-Command "${cmd} #BAGIDEA_PROJ_${id}"`, `BAGIDEA_PROJ_${id}`);
           setTimeout(sweepProjects, 2500);
         }
         res.writeHead(200); res.end("ok");
@@ -3246,6 +3263,16 @@ const server = http.createServer((req, res) => {
     readBody(req, (body) => {
       try {
         reg.socialMin = Math.max(0, Number(JSON.parse(body).min) || 0);
+        saveReg();
+        pushRoster();
+        res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/proposalmin") {
+    readBody(req, (body) => {
+      try {
+        reg.proposalMin = Math.max(0, Number(JSON.parse(body).min) || 0);
         saveReg();
         pushRoster();
         res.writeHead(200); res.end("ok");

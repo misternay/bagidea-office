@@ -1010,10 +1010,12 @@ func _build_tv_glow() -> void:
 	quad.position = Vector3(-9.18, 1.06, 8.4)
 	var l := OmniLight3D.new()
 	l.light_color = Color(0.6, 0.82, 1.0)
-	l.light_energy = 1.6
-	l.omni_range = 3.2
+	l.light_energy = 1.5
+	l.omni_range = 2.4
 	_tv_glow.add_child(l)
-	l.position = Vector3(-8.6, 1.2, 8.4)
+	# Sit the light right at the screen (matches the glow quad at x -9.18) so the
+	# glow hugs the TV instead of pooling out in the middle of the room.
+	l.position = Vector3(-9.05, 1.12, 8.4)
 	_tv_glow.visible = false
 	# The OFF panel: near-black, barely reflective — clearly powered down.
 	_tv_dark = MeshInstance3D.new()

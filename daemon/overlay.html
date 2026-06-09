@@ -445,10 +445,10 @@
      modes show a single line ("N งาน · latest…") and the full list opens
      on demand in a bounded, scrollable panel. */
   #nowStrip, #feedTasks { display: none; }
-  /* Normal + mini mode: a floating card under the header — it OVERLAYS the
-     chat (like the feed strip) instead of pushing content down. */
+  /* Normal + mini mode: sits in normal flow BELOW the agents rail and pushes
+     the chat down — so it never covers the per-agent edit (✏) buttons. */
   #nowStrip.on {
-    display: block; position: absolute; top: 38px; left: 8px; right: 8px; z-index: 30;
+    display: block; flex: none; margin: 6px 8px 0; z-index: 5;
     background: rgba(10, 16, 28, 0.94); border: 1px solid rgba(94,200,255,0.3);
     border-radius: 10px; box-shadow: 0 8px 22px rgba(0,0,0,0.4);
   }
@@ -489,7 +489,7 @@
   @keyframes nowpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
   /* mini mode keeps the strip too — it floats, so it costs no space */
   @media (max-width: 480px), (max-height: 460px) {
-    #nowStrip.on { top: 34px; left: 6px; right: 6px; }
+    #nowStrip.on { margin: 5px 6px 0; }
     .nowlist { max-height: 110px; }
   }
   #feedEmpty {
@@ -722,12 +722,13 @@
 </div>
 <div id="langMenu"></div>
 
-<!-- 🔵 live work strip: every running task, front and center -->
-<div id="nowStrip"></div>
-<!-- 🔄 update banner: appears when GitHub main is ahead of this install -->
+<!-- 🔄 update banner: appears when a newer release is on main -->
 <div id="updBar">🔄 มีเวอร์ชันใหม่ <b id="updSha"></b> — คลิกที่นี่เพื่ออัปเดต (โปรแกรมจะรีสตาร์ทเอง)</div>
 
 <div id="rail"></div>
+<!-- 🔵 live work strip: sits BELOW the agents rail so it never covers the
+     per-agent edit buttons (it pushed them down in normal/mini mode before) -->
+<div id="nowStrip"></div>
 
 <main>
   <div id="chatwrap">
@@ -998,7 +999,7 @@
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true;
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
-  let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18;
+  let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
@@ -2006,6 +2007,13 @@
             <option value="60">~ทุก 1 ชั่วโมง</option>
             <option value="120">~ทุก 2 ชั่วโมง</option>
           </select></div>
+        <div class="field" style="margin-top:8px"><label>💡 PROPOSALS — เว้นระยะอย่างน้อยเท่าไรต่อข้อเสนอโปรเจคที่ส่งถึงคุณ (กันเสนอถี่เกินไป)</label>
+          <select id="propSel">
+            <option value="0">ไม่จำกัด</option>
+            <option value="60">อย่างน้อยทุก 1 ชั่วโมง</option>
+            <option value="120">อย่างน้อยทุก 2 ชั่วโมง</option>
+            <option value="240">อย่างน้อยทุก 4 ชั่วโมง</option>
+          </select></div>
         <div class="field" style="margin-top:8px"><label>🎤 HOTKEY สั่งงานด้วยเสียง — กด = เริ่มอัด · กดอีกครั้ง = ถอดเสียง + ส่งหา Director (ถอดด้วย Whisper/Gemini จาก key ใน CONNECT)</label>
           <select id="pttSel">
             <option value="f6">F6 (แนะนำ)</option>
@@ -2128,6 +2136,11 @@
       const socSel = modalCard.querySelector("#socSel");
       socSel.value = String(SOCIALMIN);
       socSel.onchange = () => api("/registry/social", { min: Number(socSel.value) });
+      const propSel = modalCard.querySelector("#propSel");
+      if (propSel) {
+        propSel.value = String(PROPOSALMIN);
+        propSel.onchange = () => api("/registry/proposalmin", { min: Number(propSel.value) });
+      }
       const hbSel = modalCard.querySelector("#hbSel");
       hbSel.value = String(HEARTBEAT);
       hbSel.onchange = async () => {
@@ -3007,7 +3020,13 @@
           const refresh = () => setTimeout(opsRefresh, 2600);
           const metaSpan = () => row.querySelector(".meta span");
           if (!p.open) {
-            b[0].onclick = () => api("/projects/open", { id: p.id, mode: "play" }).then(refresh);
+            b[0].onclick = async () => {
+              const r = await fetch("/projects/open", { method: "POST",
+                headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+                body: JSON.stringify({ id: p.id, mode: "play" }) });
+              if (!r.ok) addChip("🔒 " + (await r.text()).slice(0, 140));  // agent busy → locked
+              refresh();
+            };
           } else if (p.visible) {
             b[0].onclick = () => api("/projects/hide", { id: p.id }).then(refresh);
             b[1].onclick = () => api("/projects/stop", { id: p.id }).then(refresh);
@@ -3644,6 +3663,7 @@
       if (ev.features) FEATURES = ev.features;
       TTSON = ev.tts !== false;
       SOCIALMIN = Number(ev.socialMin !== undefined ? ev.socialMin : 60);
+      PROPOSALMIN = Number(ev.proposalMin !== undefined ? ev.proposalMin : 120);
       MAXSTAFF = Number(ev.maxStaff || 18);
       // Machine default language (registry) applies only when the user hasn't
       // pinned one in this webview. Reload once so the UI re-renders in it.

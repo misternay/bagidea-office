@@ -101,6 +101,17 @@ func _set_state(a: Dictionary, state: String) -> void:
 ## the wallpaper keeps its calm diorama feel between shots.
 var _focus_cd := 0.0
 
+## A guaranteed camera move for a fresh order: if the camera isn't already
+## focusing, snap to `node` so the scene never sits dead-still while
+## something important kicks off (a new task, an order from the CEO).
+func _focus_kick(node: Node3D, dur := 7.0) -> void:
+	if not is_instance_valid(node):
+		return
+	var rig := get_node_or_null("../CameraRig")
+	if rig and rig.has_method("is_focusing") and not rig.is_focusing():
+		rig.focus_on(node, dur)
+		_focus_cd = Time.get_ticks_msec() / 1000.0 + randf_range(18.0, 38.0)
+
 func _maybe_focus(node: Node3D, chance := 0.45, dur := 7.0) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now < _focus_cd or randf() > chance or not is_instance_valid(node):
@@ -206,6 +217,7 @@ func handle(evt: Dictionary) -> void:
 			if not theatrical:
 				Sfx.play("blip", 600)
 				_maybe_focus(a.node, 0.3)
+				_focus_kick(a.node, 6.0)
 				world.board_set(task, "running", id)
 		"task.progress":
 			if a.state != "working":
@@ -278,6 +290,7 @@ func handle(evt: Dictionary) -> void:
 			if not theatrical:
 				Sfx.play("blip2")
 				_maybe_focus(a.node, 0.7)
+				_focus_kick(a.node, 7.0)
 			_set_state(a, "working")
 			a.node.set_status("รับคำสั่งจาก CEO 📋")
 			a["hold_at_ceo"] = Time.get_ticks_msec() / 1000.0 + 28.0
@@ -299,6 +312,9 @@ func handle(evt: Dictionary) -> void:
 			if agents.has(tgt) and not supervising.has(tgt):
 				agents[tgt].node.set_status("รับงานใหม่ ✏")
 				awaiting_delivery[tgt] = true  # they'll walk the result back
+				# Head to the SHARED ops floor at once — never the Director's desk.
+				if tgt != "main":
+					_to_desk(agents[tgt])
 				if supervising.is_empty():
 					supervising[tgt] = {"ghost": null}
 					_supervise(tgt, a.node)
@@ -742,7 +758,12 @@ func _walk(node: Sprite3D, target: String, face_dir := -1) -> float:
 	# visited by several characters — scatter the final step so they never stand
 	# on top of each other. Personal desks/beds stay exact (single occupant).
 	if path.size() > 0 and _is_shared_spot(target):
-		path[path.size() - 1] += Vector3(randf_range(-0.7, 0.7), 0, randf_range(-0.7, 0.7))
+		# Deterministic ring offset per agent: different people never stack on
+		# the same spot, and the same person is stable across visits.
+		var hh: int = abs(hash(node.agent_name))
+		var ang := float(hh % 360) * 0.01745329
+		var rad := 0.8 + float((hh / 360) % 100) * 0.01   # 0.8 .. 1.8
+		path[path.size() - 1] += Vector3(cos(ang) * rad, 0, sin(ang) * rad)
 	return node.walk_to(path, face_dir)
 
 func _is_shared_spot(target: String) -> bool:
