@@ -41,6 +41,8 @@ the office truly comes alive.
 | ![Chat panel focused on the CEO](docs/img/overlay.png) | ![The 3D Office Editor](docs/img/editor.png) |
 | 👥 Agents at their desks, auras lit | ⌨️ The `bagidea` CLI |
 | ![Agents working at their desks](docs/img/agents.png) | ![The bagidea CLI help](docs/img/cli.png) |
+| 🔌 Plugins — agents build & run their own | 📰 A live briefing panel (a plugin in action) |
+| ![The PLUGINS panel listing installed plugins, with install-from-GitHub](docs/img/plugins.png) | ![A morning briefing rendered inside a plugin panel](docs/img/briefing.png) |
 
 > ✅ **Status: working product — Windows 11 (stable) + macOS 13+ (beta, new this release).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions working *inside real project folders* → spatialized approvals → agent management UI → Telegram/Discord/LINE channels → CLI → self-updater. All visuals and sounds **ship in the repo** (free / CC0 art — see [Art assets](#art-assets)), so a fresh install and `bagidea update` carry the full look out of the box.
 

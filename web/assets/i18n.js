@@ -14,7 +14,7 @@ const I18N = {
     nav_features:"Features", nav_docs:"Docs", nav_install:"Install", nav_sponsors:"Sponsors",
     cta_get:"Get started", cta_docs:"Read the docs", cta_github:"GitHub",
     hero_title:'Your wallpaper <span class="grad">goes to work</span>.',
-    hero_sub:"BagIdea Office turns your Windows desktop into a living 2.5D office where every AI agent is a real Claude — they walk to their desks, ask permission, hold meetings, learn new skills, propose their own projects, and grow with you. A whole AI team living behind your icons.",
+    hero_sub:"BagIdea Office turns your desktop into a living HD-2D office where every AI agent is a real Claude that walks to its desk, asks permission, holds meetings, and gets work done — behind your icons.",
     badge_win:"Windows 11 · macOS (beta)", badge_open:"Open source", badge_free:"Free to run",
     badge_langs:"14 languages",
     shot_cap:"A real desktop, captured live — agents at their desks, the brand billboard, the day/night cycle following your local time.",
@@ -81,7 +81,7 @@ const I18N = {
     dn_features:"Features", dn_plugins:"Plugins & skills", dn_lang:"Languages",
     dn_cli:"CLI reference", dn_faq:"FAQ",
 
-    d_intro_h:"Introduction", d_intro_p1:"BagIdea Office is a living AI-agent office that runs as your Windows desktop wallpaper. Every AI agent on your machine becomes a pixel-art employee in an HD-2D office: they walk to their desks when real work starts, gather at Security to ask permission, hold meetings, learn skills, and the lights follow your real local time.",
+    d_intro_h:"Introduction", d_intro_p1:"BagIdea Office is a living AI-agent office that runs as your desktop wallpaper. Every AI agent on your machine becomes a pixel-art employee in an HD-2D office: they walk to their desks when real work starts, gather at Security to ask permission, hold meetings, learn skills, and the lights follow your real local time.",
     d_intro_p2:"It is not a dashboard and not a chat window — it is a world that renders the true state of your Claude Code sessions, headless agent runs and custom scripts as living characters, behind your desktop icons.",
     d_intro_p3:"Three independent layers keep it robust: a zero-dependency Node daemon (the source of truth), a Godot 4 renderer (the wallpaper), and a lightweight overlay UI (chat, settings, approvals). The daemon keeps agents running even if rendering restarts.",
 
@@ -132,7 +132,7 @@ const I18N = {
     d_faq_h:"FAQ",
     d_faq_q1:"Does it cost money to run?", d_faq_a1:"The app is free and open source (MIT). Agents run through your own Claude Code login, so usage follows your existing Claude account or subscription — there is no separate BagIdea fee.",
     d_faq_q2:"Is my code/data sent anywhere?", d_faq_a2:"The daemon runs locally on 127.0.0.1. Agents are Claude Code sessions, so they use Claude like any Claude Code project. Optional features (voice, image, realtime) use your own OpenAI/Gemini keys only when you enable them.",
-    d_faq_q3:"Which platforms are supported?", d_faq_a3:"Windows 11 today. Linux and macOS wallpaper backends are on the roadmap.",
+    d_faq_q3:"Which platforms are supported?", d_faq_a3:"Windows 11 and macOS 13+ (beta) today. A Linux wallpaper backend is on the roadmap.",
     d_faq_q4:"Can I build my own plugin?", d_faq_a4:"Yes — fork the official template repo. A person or an agent can build a working plugin from it in minutes; the full spec is in the plugin guide.",
   },
 
@@ -140,8 +140,8 @@ const I18N = {
     nav_features:"Funktionen", nav_docs:"Dokumentation", nav_install:"Installieren", nav_sponsors:"Sponsoren",
     cta_get:"Loslegen", cta_docs:"Dokumentation lesen", cta_github:"GitHub",
     hero_title:'Ihr Hintergrundbild <span class="grad">geht arbeiten</span>.',
-    hero_sub:"BagIdea Office verwandelt Ihren Windows-Desktop in ein lebendiges HD-2D-Büro, in dem jeder KI-Agent ein echter Claude ist, der zu seinem Schreibtisch geht, um Erlaubnis bittet, Meetings abhält und Arbeit erledigt — hinter Ihren Icons.",
-    badge_win:"Windows 11", badge_open:"Open Source", badge_free:"Kostenlos nutzbar",
+    hero_sub:"BagIdea Office verwandelt deinen Desktop in ein lebendiges HD-2D-Büro, in dem jeder KI-Agent ein echter Claude ist, der an seinen Schreibtisch geht, um Erlaubnis bittet, Meetings abhält und Arbeit erledigt – hinter deinen Icons.",
+    badge_win:"Windows 11 · macOS (beta)", badge_open:"Open Source", badge_free:"Kostenlos nutzbar",
     badge_langs:"14 Sprachen",
     shot_cap:"Ein echter Desktop, live aufgenommen — Agents an ihren Schreibtischen, das Marken-Billboard, der Tag-Nacht-Zyklus nach Ihrer lokalen Zeit.",
 
@@ -171,11 +171,11 @@ const I18N = {
 
     inst_eyebrow:"Installation", inst_title:"In Minuten einsatzbereit",
     inst_lead:"Ein Befehl installiert alle Abhängigkeiten, baut die App und fügt sie zu Ihrem PATH hinzu.",
-    inst_plat:"Derzeit unterstützt: Windows 11. Linux- und macOS-Wallpaper-Backends sind geplant und werden in einem späteren Update veröffentlicht.",
+    inst_plat:"Windows 11 (stabil) und macOS 13+ (beta) werden unterstützt. Ein Linux-Hintergrundbild-Backend ist für ein späteres Update geplant.",
     inst_s1_h:"Den Einzel-Installer ausführen", inst_s1_p:"Öffnen Sie PowerShell und fügen Sie dies ein. Es installiert Git, Node LTS, Rust, Godot 4.6.3 und die Claude Code-CLI, klont die App, baut die Shell, versieht das Icon mit dem Markenzeichen und fügt den bagidea-Befehl zu Ihrem PATH hinzu.",
     inst_s2_h:"Bei Claude anmelden (nur beim ersten Mal)", inst_s2_p:"Öffnen Sie ein neues Terminal und führen Sie claude einmal aus, um sich mit Ihrem bestehenden Claude-Konto oder -Abonnement anzumelden — das ist das Gehirn jedes Agents.",
     inst_s3_h:"Das Büro starten", inst_s3_p:"Führen Sie bagidea start aus (oder verwenden Sie die Startmenü-Verknüpfung). Ihr Hintergrundbild wird zum Büro, mit Chat-Kopf und Tray-Icon bereit.",
-    inst_req_h:"Systemanforderungen", inst_req:"Windows 11 · eine Vulkan-fähige GPU (getestet auf einer GTX 1060) · ein Claude-Konto (Claude Code CLI). Node, Rust und Godot werden vom Installer für Sie installiert.",
+    inst_req_h:"Systemanforderungen", inst_req:"Windows 11 oder macOS 13+ (beta) · eine Vulkan-fähige GPU (verifiziert auf einer GTX 1060) · ein Claude-Konto (Claude Code CLI). Node, Rust und Godot werden vom Installer für Sie installiert.",
     inst_manual:"Lieber manuell? Klonen Sie das Repo, bauen Sie die Rust-Shell mit cargo build --release und führen Sie sie aus. Vollständige Schritte sind in der Dokumentation.",
 
     cli_eyebrow:"Befehlszeile", cli_title:"Die bagidea-CLI",
@@ -205,7 +205,7 @@ const I18N = {
     dn_features:"Funktionen", dn_plugins:"Plugins & Fähigkeiten", dn_lang:"Sprachen",
     dn_cli:"CLI-Referenz", dn_faq:"FAQ",
 
-    d_intro_h:"Einführung", d_intro_p1:"BagIdea Office ist ein lebendiges KI-Agent-Büro, das als Ihr Windows-Desktop-Hintergrundbild läuft. Jeder KI-Agent auf Ihrem Rechner wird zu einem Pixel-Art-Mitarbeiter in einem HD-2D-Büro: Er geht zu seinem Schreibtisch, wenn echte Arbeit beginnt, versammelt sich bei der Sicherheitszentrale, um Erlaubnis zu bitten, hält Meetings ab, lernt Fähigkeiten, und die Lichter folgen Ihrer echten lokalen Zeit.",
+    d_intro_h:"Einführung", d_intro_p1:"BagIdea Office ist ein lebendiges KI-Agenten-Büro, das als dein Desktop-Hintergrund läuft. Jeder KI-Agent auf deinem Rechner wird zu einem Pixel-Art-Mitarbeiter in einem HD-2D-Büro: Sie gehen an ihre Schreibtische, wenn die echte Arbeit beginnt, versammeln sich an der Security, um um Erlaubnis zu bitten, halten Meetings ab, erlernen Fähigkeiten, und das Licht folgt deiner realen Ortszeit.",
     d_intro_p2:"Es ist kein Dashboard und kein Chatfenster — es ist eine Welt, die den wahren Zustand Ihrer Claude Code-Sitzungen, kopflosen Agent-Läufe und benutzerdefinierten Skripte als lebendige Figuren hinter Ihren Desktop-Icons rendert.",
     d_intro_p3:"Drei unabhängige Schichten sorgen für Robustheit: ein abhängigkeitsfreier Node-Daemon (die einzige Wahrheitsquelle), ein Godot 4-Renderer (das Hintergrundbild) und eine leichtgewichtige Overlay-UI (Chat, Einstellungen, Genehmigungen). Der Daemon hält Agents am Laufen, auch wenn der Renderer neu startet.",
 
@@ -228,7 +228,7 @@ const I18N = {
     d_install_manual_p:"Klonen Sie das Repository, zeigen Sie die Claude-Hook-Pfade auf Ihren Klon und bauen Sie dann die Rust-Shell:",
     d_install_first_h:"Erste Ausführung",
     d_install_first_p:"Melden Sie sich einmal bei Claude an, dann starten Sie das Büro. Ihr Hintergrundbild wird zum live Büro; ein Chat-Kopf und ein Tray-Icon erscheinen.",
-    d_install_plat:"Plattformunterstützung: Windows 11 heute (Wallpaper-Einbettung verwendet die WorkerW-Technik). Linux- und macOS-Backends sind für ein späteres Update geplant.",
+    d_install_plat:"Plattformunterstützung: Windows 11 (stabil, die Einbettung des Hintergrundbilds nutzt die WorkerW-Technik) und macOS 13+ (beta, neu in dieser Version). Ein Linux-Backend ist für ein späteres Update geplant.",
 
     d_using_h:"Nutzung",
     d_chat_h:"Chat & CEO", d_chat_p:"Das Chat-Panel öffnet sich auf Ihrem CEO-Sitz. Geben Sie einen Befehl auf dem CEO-Sitz ein und der Director kommt herüber, um ihn entgegenzunehmen, plant und delegiert — Sie sehen die Übergaben auf dem Hintergrundbild, und die Zusammenfassung wird zu Ihnen zurückgebracht. Um direkt mit einem Agent zu sprechen, klicken Sie auf sein Gesicht in der Leiste oder auf der Live-Karte. Jedes Gespräch ist ein fortsetzbarer Thread mit vollständigem Verlauf.",
@@ -246,7 +246,7 @@ const I18N = {
     d_faq_h:"FAQ",
     d_faq_q1:"Kostet es Geld, es zu betreiben?", d_faq_a1:"Die App ist kostenlos und Open Source (MIT). Agents laufen über Ihr eigenes Claude Code-Login, sodass die Nutzung Ihrem bestehenden Claude-Konto oder -Abonnement folgt — es gibt keine separate BagIdea-Gebühr.",
     d_faq_q2:"Werden mein Code/meine Daten irgendwohin gesendet?", d_faq_a2:"Der Daemon läuft lokal auf 127.0.0.1. Agents sind Claude Code-Sitzungen, daher verwenden sie Claude wie jedes Claude Code-Projekt. Optionale Funktionen (Sprache, Bild, Echtzeit) verwenden nur Ihre eigenen OpenAI/Gemini-Schlüssel, wenn Sie sie aktivieren.",
-    d_faq_q3:"Welche Plattformen werden unterstützt?", d_faq_a3:"Windows 11 heute. Linux- und macOS-Wallpaper-Backends sind auf der Roadmap.",
+    d_faq_q3:"Welche Plattformen werden unterstützt?", d_faq_a3:"Windows 11 und macOS 13+ (beta) heute. Ein Linux-Hintergrundbild-Backend steht auf der Roadmap.",
     d_faq_q4:"Kann ich mein eigenes Plugin bauen?", d_faq_a4:"Ja — forken Sie das offizielle Vorlagen-Repo. Eine Person oder ein Agent kann in Minuten ein funktionierendes Plugin daraus erstellen; die vollständige Spezifikation befindet sich im Plugin-Leitfaden.",
   },
 
@@ -254,8 +254,8 @@ const I18N = {
     nav_features:"ฟีเจอร์", nav_docs:"คู่มือ", nav_install:"ติดตั้ง", nav_sponsors:"สปอนเซอร์",
     cta_get:"เริ่มใช้งาน", cta_docs:"อ่านคู่มือ", cta_github:"GitHub",
     hero_title:'วอลเปเปอร์ของคุณ <span class="grad">ทำงานได้จริง</span>',
-    hero_sub:"BagIdea Office เปลี่ยนเดสก์ท็อป Windows ของคุณให้เป็นออฟฟิศ 2.5D ที่มีชีวิต — ทุก AI agent คือ Claude ตัวจริงที่เดินไปนั่งโต๊ะ ขออนุญาต ประชุม เรียนรู้สกิลใหม่ เสนอโปรเจคของตัวเอง และเติบโตไปพร้อมคุณ ทีม AI ทั้งทีมที่อยู่หลังไอคอนของคุณ",
-    badge_win:"Windows 11", badge_open:"โอเพนซอร์ส", badge_free:"ใช้ฟรี",
+    hero_sub:"BagIdea Office เปลี่ยนเดสก์ท็อปของคุณให้เป็นออฟฟิศ HD-2D ที่มีชีวิตชีวา ซึ่งเอเจนต์ AI ทุกตัวคือ Claude ตัวจริงที่เดินไปที่โต๊ะทำงานของตัวเอง ขออนุญาต จัดประชุม และทำงานจนเสร็จสิ้น — อยู่เบื้องหลังไอคอนต่างๆ ของคุณ",
+    badge_win:"Windows 11 · macOS (beta)", badge_open:"โอเพนซอร์ส", badge_free:"ใช้ฟรี",
     badge_langs:"14 ภาษา",
     shot_cap:"เดสก์ท็อปจริง ถ่ายสด — agents นั่งทำงานที่โต๊ะ, ป้ายแบรนด์, วงจรกลางวัน-กลางคืนตามเวลาเครื่องคุณ",
 
@@ -285,11 +285,11 @@ const I18N = {
 
     inst_eyebrow:"การติดตั้ง", inst_title:"พร้อมใช้ในไม่กี่นาที",
     inst_lead:"คำสั่งเดียวติดตั้ง dependency ทั้งหมด, build แอป, และผูกคำสั่งเข้า PATH ให้",
-    inst_plat:"ตอนนี้รองรับ Windows 11 ส่วน Linux และ macOS อยู่ในแผนและจะอัปเดตตามมาภายหลัง",
+    inst_plat:"รองรับ Windows 11 (stable) และ macOS 13+ (beta) สำหรับแบ็กเอนด์วอลเปเปอร์ของ Linux มีแผนจะเพิ่มเข้ามาในการอัปเดตภายหลัง",
     inst_s1_h:"รันตัวติดตั้งคำสั่งเดียว", inst_s1_p:"เปิด PowerShell แล้ววางคำสั่งนี้ มันจะติดตั้ง Git, Node LTS, Rust, Godot 4.6.3 และ Claude Code CLI, clone แอป, build shell, ทำไอคอนแบรนด์ และเพิ่มคำสั่ง bagidea เข้า PATH",
     inst_s2_h:"ล็อกอิน Claude (ครั้งแรกครั้งเดียว)", inst_s2_p:"เปิดเทอร์มินัลใหม่ รัน claude หนึ่งครั้งเพื่อเข้าสู่ระบบด้วยบัญชี/แพ็กเกจ Claude ที่คุณมีอยู่ — นั่นคือสมองของทุก agent",
     inst_s3_h:"เปิดออฟฟิศ", inst_s3_p:"รัน bagidea start (หรือใช้ทางลัด Start Menu) วอลเปเปอร์จะกลายเป็นออฟฟิศ พร้อมหัวแชทและไอคอนถาดระบบ",
-    inst_req_h:"ความต้องการของระบบ", inst_req:"Windows 11 · การ์ดจอที่รองรับ Vulkan (ทดสอบบน GTX 1060) · บัญชี Claude (Claude Code CLI) ส่วน Node, Rust, Godot ตัวติดตั้งจัดการให้",
+    inst_req_h:"ความต้องการของระบบ", inst_req:"Windows 11 หรือ macOS 13+ (beta) · GPU ที่รองรับ Vulkan (ผ่านการตรวจสอบแล้วบน GTX 1060) · บัญชี Claude (Claude Code CLI) โดย Node, Rust และ Godot จะถูกติดตั้งให้คุณโดยตัวติดตั้ง",
     inst_manual:"อยากติดตั้งเอง? clone repo, build Rust shell ด้วย cargo build --release แล้วรัน ขั้นตอนเต็มอยู่ในคู่มือ",
 
     cli_eyebrow:"คอมมานด์ไลน์", cli_title:"คำสั่ง bagidea",
@@ -320,7 +320,7 @@ const I18N = {
     dn_features:"ฟีเจอร์", dn_plugins:"Plugin & สกิล", dn_lang:"ภาษา",
     dn_cli:"คำสั่ง CLI", dn_faq:"คำถามที่พบบ่อย",
 
-    d_intro_h:"แนะนำ", d_intro_p1:"BagIdea Office คือออฟฟิศ AI agent ที่มีชีวิต ทำงานเป็นวอลเปเปอร์เดสก์ท็อป Windows ของคุณ ทุก AI agent ในเครื่องจะกลายเป็นพนักงานพิกเซลอาร์ตในออฟฟิศ HD-2D เดินไปนั่งโต๊ะเมื่อมีงานจริง ไปขออนุญาตที่ห้องสิทธิ์ ประชุม เรียนรู้สกิล และแสงไฟตามเวลาจริงของเครื่องคุณ",
+    d_intro_h:"แนะนำ", d_intro_p1:"BagIdea Office คือออฟฟิศเอเจนต์ AI ที่มีชีวิตชีวาซึ่งทำงานเป็นวอลเปเปอร์เดสก์ท็อปของคุณ เอเจนต์ AI ทุกตัวบนเครื่องของคุณจะกลายเป็นพนักงานพิกเซลอาร์ตในออฟฟิศ HD-2D พวกเขาจะเดินไปที่โต๊ะทำงานเมื่อเริ่มงานจริง รวมตัวกันที่ฝ่ายรักษาความปลอดภัยเพื่อขออนุญาต จัดประชุม เรียนรู้ทักษะต่างๆ และแสงไฟจะเปลี่ยนไปตามเวลาท้องถิ่นจริงของคุณ",
     d_intro_p2:"มันไม่ใช่แดชบอร์ดและไม่ใช่หน้าต่างแชท — แต่เป็นโลกที่เรนเดอร์สถานะจริงของ Claude Code session, การรัน agent แบบ headless และสคริปต์ของคุณ เป็นตัวละครมีชีวิต อยู่หลังไอคอนเดสก์ท็อป",
     d_intro_p3:"สามชั้นอิสระทำให้ระบบทนทาน: Node daemon แบบไม่มี dependency (แหล่งความจริง), ตัวเรนเดอร์ Godot 4 (วอลเปเปอร์), และ UI overlay เบา ๆ (แชท ตั้งค่า อนุมัติ) daemon ทำให้ agents ทำงานต่อแม้ตัวเรนเดอร์รีสตาร์ต",
 
@@ -351,7 +351,7 @@ const I18N = {
     d_install_manual_p:"clone repo, ชี้ path ของ Claude hook มาที่ clone ของคุณ แล้ว build Rust shell:",
     d_install_first_h:"เปิดครั้งแรก",
     d_install_first_p:"ล็อกอิน Claude หนึ่งครั้ง แล้วเปิดออฟฟิศ วอลเปเปอร์จะกลายเป็นออฟฟิศสด พร้อมหัวแชทและไอคอนถาดระบบ",
-    d_install_plat:"การรองรับแพลตฟอร์ม: ตอนนี้ Windows 11 (ฝังวอลเปเปอร์ด้วยเทคนิค WorkerW) ส่วน Linux และ macOS อยู่ในแผนอัปเดตภายหลัง",
+    d_install_plat:"แพลตฟอร์มที่รองรับ: Windows 11 (stable, การฝังวอลเปเปอร์ใช้เทคนิค WorkerW) และ macOS 13+ (beta, ใหม่ในรุ่นนี้) สำหรับแบ็กเอนด์ของ Linux มีแผนจะเพิ่มเข้ามาในการอัปเดตภายหลัง",
 
     d_using_h:"การใช้งาน",
     d_chat_h:"แชท & CEO", d_chat_p:"หน้าต่างแชทเปิดที่ที่นั่ง CEO ของคุณ พิมพ์สั่งงานในนาม CEO แล้ว Director จะเดินมารับ วางแผน และมอบหมาย — คุณเห็นการส่งงานบนวอลเปเปอร์ แล้วเขาเดินกลับมารายงานสรุป จะคุยกับ agent ตัวไหนตรง ๆ ก็คลิกหน้าในแถบหรือบนแผนที่สด ทุกบทสนทนาเป็น thread ที่กลับมาต่อได้พร้อมประวัติ",
@@ -371,7 +371,7 @@ const I18N = {
     d_faq_h:"คำถามที่พบบ่อย",
     d_faq_q1:"รันแล้วเสียเงินไหม?", d_faq_a1:"ตัวแอปฟรีและโอเพนซอร์ส (MIT) agents รันผ่าน Claude Code login ของคุณเอง การใช้งานจึงเป็นไปตามบัญชี/แพ็กเกจ Claude ที่คุณมี — ไม่มีค่าธรรมเนียม BagIdea แยกต่างหาก",
     d_faq_q2:"โค้ด/ข้อมูลของฉันถูกส่งไปไหนไหม?", d_faq_a2:"daemon รันในเครื่องที่ 127.0.0.1 agents คือ Claude Code session จึงใช้ Claude เหมือนโปรเจค Claude Code ทั่วไป ฟีเจอร์เสริม (เสียง รูป เรียลไทม์) ใช้ key OpenAI/Gemini ของคุณเองเฉพาะเมื่อเปิดใช้",
-    d_faq_q3:"รองรับแพลตฟอร์มไหน?", d_faq_a3:"ตอนนี้ Windows 11 ส่วน Linux และ macOS อยู่ใน roadmap",
+    d_faq_q3:"รองรับแพลตฟอร์มไหน?", d_faq_a3:"Windows 11 และ macOS 13+ (beta) ในปัจจุบัน สำหรับแบ็กเอนด์วอลเปเปอร์ของ Linux อยู่ในแผนงานพัฒนา",
     d_faq_q4:"เขียน plugin เองได้ไหม?", d_faq_a4:"ได้ — fork เทมเพลตทางการ ทั้งคนและ agent สร้าง plugin ที่ใช้งานได้จากมันในไม่กี่นาที spec เต็มอยู่ในคู่มือ plugin",
   },
 };
