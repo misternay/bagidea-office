@@ -112,6 +112,11 @@ var _ghost_deck: Node3D     # the floating sub-ops platform (movable from the ed
 var _billboard_logo: MeshInstance3D   # the brand sign face (user can swap its image)
 var _billboard_pending := ""          # billboard image requested before the sign was built
 const GRID_SCRIPT := preload("res://scripts/grid_world.gd")
+# The rec TV: LOCAL position of Large_Monitor_White in its cell (mirrors
+# grid_world's `nw` for "rec"), and the screen-centre offset from that base.
+# Used to park the TV glow on the live monitor so it tracks room swaps.
+const TV_LOCAL := Vector3(-3.0, 0, -2.5)
+const TV_SCREEN_OFF := Vector3(0.27, 1.06, 0)
 var _ops_nodes: Array = []   # baked ops-desk visuals (hideable when the editor supplies custom workstations)
 
 var _anchor_override := {}   # name → moved position (WP is const/immutable)
@@ -147,6 +152,7 @@ func _reposition_rec_life() -> void:
 		var rc: Vector3 = _grid.slot_center(rec_slot)
 		if is_instance_valid(pet) and pet.has_method("set_home"): pet.set_home(rc)
 		if is_instance_valid(ball) and ball.has_method("set_home"): ball.set_home(rc)
+	_position_tv()   # the TV glow rides the rec cell too
 	var cafe_slot: int = _grid.room_order.find("cafe")
 	if cafe_slot >= 0:
 		var cc: Vector3 = _grid.slot_center(cafe_slot)
@@ -999,23 +1005,25 @@ func tv_set(on: bool) -> void:
 func _build_tv_glow() -> void:
 	_tv_glow = Node3D.new()
 	add_child(_tv_glow)
-	# The rec TV (Large_Monitor_White) sits at x -9.45 facing east.
+	# Children sit at LOCAL offsets from the node origin so the whole glow rides
+	# the RECREATION cell when rooms swap — _position_tv() moves the node onto the
+	# live monitor (was hardcoded to the old static office spot, which left the
+	# glow pooled in mid-room after the grid rewrite).
 	var quad := MeshInstance3D.new()
 	var qm := QuadMesh.new()
 	qm.size = Vector2(0.96, 0.6)
 	quad.mesh = qm
 	quad.material_override = _mat(Color(0.6, 0.8, 1.0), 0.4, Color(0.55, 0.8, 1.0), 2.4)
 	quad.rotation_degrees = Vector3(0, 90, 0)
+	quad.position = TV_SCREEN_OFF
 	_tv_glow.add_child(quad)
-	quad.position = Vector3(-9.18, 1.06, 8.4)
 	var l := OmniLight3D.new()
 	l.light_color = Color(0.6, 0.82, 1.0)
 	l.light_energy = 1.5
 	l.omni_range = 2.4
+	# Right at the screen so the glow hugs the TV instead of pooling in the room.
+	l.position = Vector3(0.4, 1.12, 0)
 	_tv_glow.add_child(l)
-	# Sit the light right at the screen (matches the glow quad at x -9.18) so the
-	# glow hugs the TV instead of pooling out in the middle of the room.
-	l.position = Vector3(-9.05, 1.12, 8.4)
 	_tv_glow.visible = false
 	# The OFF panel: near-black, barely reflective — clearly powered down.
 	_tv_dark = MeshInstance3D.new()
@@ -1025,8 +1033,21 @@ func _build_tv_glow() -> void:
 	_tv_dark.material_override = _mat(Color(0.045, 0.05, 0.065), 0.25)
 	_tv_dark.rotation_degrees = Vector3(0, 90, 0)
 	add_child(_tv_dark)
-	_tv_dark.position = Vector3(-9.18, 1.06, 8.4)
 	_tv_dark.visible = true
+	_position_tv()
+
+## Park the TV glow + OFF panel on the RECREATION cell's actual monitor, so they
+## track the screen on room swaps instead of stranding at a fixed world spot.
+func _position_tv() -> void:
+	var base := Vector3(-9.45, 0, 8.4)   # fallback before the grid exists
+	if _grid != null:
+		var rs: int = _grid.room_order.find("rec")
+		if rs >= 0:
+			base = _grid.slot_center(rs) + TV_LOCAL
+	if is_instance_valid(_tv_glow):
+		_tv_glow.position = base
+	if is_instance_valid(_tv_dark):
+		_tv_dark.position = base + TV_SCREEN_OFF
 
 ## Classic black-patch football texture (equirect-wrapped on the CSG sphere).
 func _soccer_texture() -> ImageTexture:
