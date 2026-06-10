@@ -82,7 +82,7 @@
     <p data-i18n="d_c_grid_p">The floor is a 3×3 jigsaw of identical rooms; any room fits any slot, so you can rearrange the whole office in the editor.</p>
 
     <h2 id="install-win" data-i18n="d_install_h">Installation</h2>
-    <div class="note warn" data-i18n="d_install_plat">Platform support: Windows 11 today (wallpaper embedding uses the WorkerW technique). Linux and macOS backends are planned for a later update.</div>
+    <div class="note" data-i18n="d_install_plat">Platform support: Windows 11 (stable, wallpaper embedding uses the WorkerW technique) and macOS 13+ (beta, new this release). A Linux backend is planned for a later update.</div>
     <h3 data-i18n="d_install_win_h">Windows — one-shot installer (recommended)</h3>
     <p data-i18n="d_install_win_p">Open PowerShell and run the command below. It installs every dependency (Git, Node LTS, Rust, Godot 4.6.3, Claude Code CLI), clones the app to %LOCALAPPDATA%\BagIdeaOffice, builds the desktop shell, brands the window icon, adds bagidea to your PATH, and creates a Start Menu shortcut. It is safe to re-run — each step skips what's already done.</p>
     <pre><code>irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex</code></pre>

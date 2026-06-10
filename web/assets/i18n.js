@@ -15,7 +15,7 @@ const I18N = {
     cta_get:"Get started", cta_docs:"Read the docs", cta_github:"GitHub",
     hero_title:'Your wallpaper <span class="grad">goes to work</span>.',
     hero_sub:"BagIdea Office turns your Windows desktop into a living 2.5D office where every AI agent is a real Claude — they walk to their desks, ask permission, hold meetings, learn new skills, propose their own projects, and grow with you. A whole AI team living behind your icons.",
-    badge_win:"Windows 11", badge_open:"Open source", badge_free:"Free to run",
+    badge_win:"Windows 11 · macOS (beta)", badge_open:"Open source", badge_free:"Free to run",
     badge_langs:"14 languages",
     shot_cap:"A real desktop, captured live — agents at their desks, the brand billboard, the day/night cycle following your local time.",
 
@@ -45,11 +45,11 @@ const I18N = {
 
     inst_eyebrow:"Installation", inst_title:"Up and running in minutes",
     inst_lead:"One command installs every dependency, builds the app, and wires it onto your PATH.",
-    inst_plat:"Currently supported: Windows 11. Linux & macOS wallpaper backends are planned and will land in a later update.",
+    inst_plat:"Windows 11 (stable) and macOS 13+ (beta) are supported. A Linux wallpaper backend is planned for a later update.",
     inst_s1_h:"Run the one-shot installer", inst_s1_p:"Open PowerShell and paste this. It installs Git, Node LTS, Rust, Godot 4.6.3 and the Claude Code CLI, clones the app, builds the shell, brands the icon, and adds the bagidea command to your PATH.",
     inst_s2_h:"Log in to Claude (first time only)", inst_s2_p:"Open a new terminal and run claude once to sign in with your existing Claude account or subscription — that's the brain of every agent.",
     inst_s3_h:"Start the office", inst_s3_p:"Run bagidea start (or use the Start Menu shortcut). Your wallpaper becomes the office, with the chat head and tray icon ready.",
-    inst_req_h:"Requirements", inst_req:"Windows 11 · a Vulkan-capable GPU (verified on a GTX 1060) · a Claude account (Claude Code CLI). Node, Rust and Godot are installed for you by the installer.",
+    inst_req_h:"Requirements", inst_req:"Windows 11 or macOS 13+ (beta) · a Vulkan-capable GPU (verified on a GTX 1060) · a Claude account (Claude Code CLI). Node, Rust and Godot are installed for you by the installer.",
     inst_manual:"Prefer manual? Clone the repo, build the Rust shell with cargo build --release, and run it. Full steps are in the docs.",
 
     cli_eyebrow:"Command line", cli_title:"The bagidea CLI",
@@ -112,7 +112,7 @@ const I18N = {
     d_install_manual_p:"Clone the repository, point the Claude hook paths at your clone, then build the Rust shell:",
     d_install_first_h:"First run",
     d_install_first_p:"Log in to Claude once, then start the office. Your wallpaper becomes the live office; a chat head and tray icon appear.",
-    d_install_plat:"Platform support: Windows 11 today (wallpaper embedding uses the WorkerW technique). Linux and macOS backends are planned for a later update.",
+    d_install_plat:"Platform support: Windows 11 (stable, wallpaper embedding uses the WorkerW technique) and macOS 13+ (beta, new this release). A Linux backend is planned for a later update.",
 
     d_using_h:"Using it",
     d_chat_h:"Chat & the CEO", d_chat_p:"The chat panel opens on your CEO seat. Type an order in the CEO seat and the Director walks over to take it, plans, and delegates — you watch the hand-offs on the wallpaper, and the summary is walked back to you. To talk to any agent directly, click their face in the rail or on the live map. Every conversation is a resumable thread with full history.",
