@@ -3153,10 +3153,15 @@ const server = http.createServer((req, res) => {
           res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ map: out }));
         };
-        if (!missing.length) return reply();
+        // Reply with whatever's cached RIGHT NOW — never make the overlay wait
+        // on a slow Gemini call for a handful of uncached strings. That used to
+        // block the WHOLE batch, so switching language flashed Thai for seconds
+        // even when ~everything was already seeded. The misses translate in the
+        // background (cached to disk); the overlay's ~1.5s janitor sweep re-asks
+        // and picks them up the moment they're ready.
+        reply();
         const gm = (reg.apiKeys || {}).GEMINI_API_KEY;
-        if (!gm) { res.writeHead(200, { "content-type": "application/json" });
-          return res.end(JSON.stringify({ map: {}, err: "no GEMINI_API_KEY" })); }
+        if (!missing.length || !gm) return;
         const langName = { en: "English", zh: "Simplified Chinese", ja: "Japanese",
           ko: "Korean", es: "Spanish", fr: "French", de: "German", hi: "Hindi",
           ar: "Arabic", pt: "Portuguese", ru: "Russian", id: "Indonesian",
@@ -3167,7 +3172,7 @@ const server = http.createServer((req, res) => {
         let pending = chunks.length;
         const finish = () => { if (--pending <= 0) {
           try { const tmp = file + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(cache)); fs.renameSync(tmp, file); } catch {}
-          reply(); } };
+        } };
         for (const chunk of chunks) {
           const prompt = `Translate these UI strings from Thai to ${langName}. ` +
             `Keep emoji, symbols, numbers, code and placeholders (like \${...}, <...>) EXACTLY. ` +
