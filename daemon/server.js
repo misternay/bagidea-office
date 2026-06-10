@@ -286,14 +286,27 @@ function loadJson(file, fallback) {
 const OFFICE_MD = path.join(WORKSPACE, "OFFICE.md");
 const MEM_DIR = path.join(WORKSPACE, "memory");
 fs.mkdirSync(MEM_DIR, { recursive: true });
+const OFFICE_MD_DEFAULT =
+  "# OFFICE.md — shared office knowledge\n\n" +
+  "(The owner can edit this from the 🗂 NOTES tab. Every agent knows where this " +
+  "file is and reads it only when it's relevant to the work. Write in any language.)\n\n" +
+  "## About the owner\n- \n\n## Office rules\n- \n";
+// English by default (this is a global product); agents may append in any
+// language later. Also migrate the OLD Thai default in place: it's a single
+// shared file regardless of UI language, so when it's still the untouched
+// Thai template we replace it with the English one (never clobber real content).
+const OFFICE_MD_OLD_TH =
+  "# OFFICE.md — ข้อมูลกลางของออฟฟิศ\n\n" +
+  "(เจ้าของแก้ไฟล์นี้ได้จากหน้า 🗂 NOTES — agents ทุกตัวรู้ว่าไฟล์นี้อยู่ที่ไหน " +
+  "และจะเปิดอ่านเมื่อเกี่ยวข้องกับงานเท่านั้น)\n\n" +
+  "## เกี่ยวกับเจ้าของ\n- \n\n## กฎของออฟฟิศ\n- \n";
 if (!fs.existsSync(OFFICE_MD)) {
-  // English by default (this is a global product); agents may append in any
-  // language later — the owner edits it from the 🗂 NOTES tab.
-  fs.writeFileSync(OFFICE_MD,
-    "# OFFICE.md — shared office knowledge\n\n" +
-    "(The owner can edit this from the 🗂 NOTES tab. Every agent knows where this " +
-    "file is and reads it only when it's relevant to the work. Write in any language.)\n\n" +
-    "## About the owner\n- \n\n## Office rules\n- \n");
+  fs.writeFileSync(OFFICE_MD, OFFICE_MD_DEFAULT);
+} else {
+  try {
+    if (fs.readFileSync(OFFICE_MD, "utf8").trim() === OFFICE_MD_OLD_TH.trim())
+      fs.writeFileSync(OFFICE_MD, OFFICE_MD_DEFAULT);
+  } catch {}
 }
 
 // 🌐 Ship pre-translated UI caches: merge daemon/i18n-seed/<lang>.json into the
