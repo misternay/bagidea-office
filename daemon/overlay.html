@@ -530,14 +530,18 @@
   .perm .deny { color: #ff5448; border-color: #ff544855; }
 
   footer {
-    display: flex; gap: 5px; padding: 9px 12px; flex: none; align-items: center;
+    display: flex; gap: 5px; padding: 9px 12px; flex: none; align-items: flex-end;
     border-top: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(12px);
   }
-  footer input {
+  /* the message box is a textarea: Enter sends, Shift+Enter is a newline, and it
+     grows with the message up to a cap then scrolls — never a cramped one-liner. */
+  footer #inp {
     flex: 1; min-width: 0; font: inherit; color: var(--text); background: rgba(255,255,255,0.05);
-    border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; outline: none;
+    border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; outline: none;
+    resize: none; line-height: 1.45; max-height: 132px; overflow-y: auto;
+    overflow-wrap: break-word; word-break: break-word;
   }
-  footer input:focus { border-color: var(--accent); }
+  footer #inp:focus { border-color: var(--accent); }
   /* compact square icon buttons so they never crowd out the message box */
   footer .send {
     flex: none; width: 34px; height: 34px; padding: 0; font-size: 15px; cursor: pointer;
@@ -611,7 +615,8 @@
     background: rgba(255,255,255,0.05); border: 1px solid var(--line);
     border-radius: 9px; padding: 8px 10px; outline: none;
   }
-  .field textarea { min-height: 110px; resize: vertical; }
+  .field textarea { min-height: 110px; resize: vertical;
+    line-height: 1.5; overflow-wrap: break-word; word-break: break-word; }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
   /* style BOTH option and optgroup — an unstyled optgroup label renders on a
      white system background (the "เสียงผู้หญิง/ผู้ชาย" headers vanished). */
@@ -639,8 +644,17 @@
   .btnrow .primary { color: #06121f; background: var(--accent); border-color: var(--accent); font-weight: 700; }
   .btnrow .danger { color: #ff7468; border-color: rgba(255,84,72,0.45); }
   .btnrow button:disabled { opacity: 0.45; cursor: wait; }
-  .assistrow { display: flex; gap: 6px; }
-  .assistrow input { flex: 1; }
+  .assistrow { display: flex; gap: 6px; align-items: flex-end; }
+  /* inline inputs (the note box, etc.) — themed, not the browser's white default,
+     and textareas grow + wrap like the main composer. */
+  .assistrow input, .assistrow textarea {
+    flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 11px; outline: none;
+  }
+  .assistrow textarea { resize: none; line-height: 1.45; max-height: 120px;
+    overflow-y: auto; overflow-wrap: break-word; word-break: break-word; }
+  .assistrow input:focus, .assistrow textarea:focus { border-color: var(--accent); }
   .assistrow .sparkle {
     flex: none; padding: 0 12px; font-size: 13px; cursor: pointer; border-radius: 9px;
     color: #ffd28a; background: rgba(255,210,138,0.08); border: 1px solid rgba(255,210,138,0.35);
@@ -777,8 +791,8 @@
 <div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b></div>
 <div id="attachRow"></div>
 <footer>
-  <input id="inp" placeholder="Message Main… (Enter to send)" autofocus
-         autocomplete="off" spellcheck="false">
+  <textarea id="inp" rows="1" placeholder="Message Main… (Enter to send · Shift+Enter = new line)"
+            autofocus autocomplete="off" spellcheck="false"></textarea>
   <input id="filePick" type="file" multiple style="display:none">
   <button class="send" id="attachBtn" title="แนบไฟล์ (หรือลากมาวางได้เลย)">📎</button>
   <button class="send" id="micBtn" title="พูดแทนพิมพ์">🎤</button>
@@ -1141,8 +1155,8 @@
     document.getElementById("compRole").textContent = roleOf(id);
     body(document.getElementById("compBody"), id);
     document.getElementById("inp").placeholder = id === "ceo"
-      ? `สั่งงานในนาม CEO… (Director จะมารับคำสั่ง)`
-      : `Message ${nameOf(id)}… (Enter to send)`;
+      ? `สั่งงานในนาม CEO… (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)`
+      : `Message ${nameOf(id)}… (Enter to send · Shift+Enter = new line)`;
     // 📞 calling is for the MAIN agent only (it speaks for the office).
     // The realtime call always reaches the main agent — offer it from the CEO seat too.
     document.getElementById("liveBtn").style.display = (id === "main" || id === "ceo") ? "" : "none";
@@ -3025,7 +3039,7 @@
     } else if (tab === "notes") {
       body = `<div id="nlist"></div>
         <div class="assistrow" style="margin-top:10px">
-          <input id="nText" placeholder="จดโน้ต… (agents อ่าน/เขียนผ่าน notes.md ได้ด้วย)" maxlength="500">
+          <textarea id="nText" rows="1" placeholder="จดโน้ต… (Shift+Enter ขึ้นบรรทัดใหม่ · agents อ่าน/เขียนผ่าน notes.md ได้)" maxlength="500"></textarea>
           <button class="send" id="nMic" title="พูดแทนพิมพ์">🎤</button>
           <button class="primary" id="nAdd">📝</button>
         </div>
@@ -3374,8 +3388,11 @@
         openOps("notes");
       };
       modalCard.querySelector("#nAdd").onclick = add;
-      modalCard.querySelector("#nText").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") add();
+      const nt = modalCard.querySelector("#nText");
+      nt.addEventListener("input", () => { nt.style.height = "auto"; nt.style.height = Math.min(nt.scrollHeight, 120) + "px"; });
+      nt.addEventListener("keydown", (e) => {
+        // Enter saves the note; Shift+Enter is a newline (multi-line notes).
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); add(); }
       });
       const r = await fetch("/notes").then((x) => x.json()).catch(() => ({ notes: [] }));
       const box = modalCard.querySelector("#nlist");
@@ -3400,7 +3417,7 @@
         const edit = () => {
           row.innerHTML = `<div style="flex:1;width:100%">
               <textarea class="nEdit" maxlength="500" spellcheck="false"
-                style="width:100%;min-height:96px;font:inherit;resize:vertical"></textarea>
+                style="width:100%;min-height:96px;font:inherit;font-size:13px;line-height:1.5;color:var(--text);background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:10px;padding:8px 11px;outline:none;resize:vertical;overflow-wrap:break-word;word-break:break-word"></textarea>
               <div class="assistrow" style="margin-top:6px">
                 <button class="primary nSave" style="flex:1">💾 ${t("บันทึก")}</button>
                 <button class="send nCancel" title="${t("ยกเลิก")}">↩</button>
@@ -4090,6 +4107,7 @@
       return;
     }
     inp.value = "";
+    inp.style.height = "auto";  // collapse the grown textarea back to one row
     uiSnd("send");
     const d = addMsg("you", null, prompt || "(ส่งไฟล์แนบ)");
     for (const f of files) d.appendChild(mediaNode(f.url, f.kind, f.name));
@@ -4106,7 +4124,16 @@
     refreshThreadBar();  // a fresh thread exists server-side immediately
   }
   document.getElementById("send").onclick = send;
-  document.getElementById("inp").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+  (function () {
+    const box = document.getElementById("inp");
+    // grow with the message (capped by CSS max-height, then it scrolls)
+    const grow = () => { box.style.height = "auto"; box.style.height = Math.min(box.scrollHeight, 132) + "px"; };
+    box.addEventListener("input", grow);
+    box.addEventListener("keydown", (e) => {
+      // Enter sends; Shift+Enter inserts a newline (like every modern chat).
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+  })();
   // Top-bar popups (menus, modals, the map…) live where the sidebar slides
   // in — opening any of them tucks the panel away first.
   for (const bid of ["opsBtn", "discussBtn", "mapBtn", "dayBtn", "setBtn", "sessBtn"]) {
