@@ -57,7 +57,7 @@
     <p class="muted" data-i18n="d_sub">Everything about BagIdea Office — what it is, every feature, how to install, and the full CLI.</p>
 
     <h2 id="intro" data-i18n="d_intro_h">Introduction</h2>
-    <p data-i18n="d_intro_p1">BagIdea Office is a living AI-agent office that runs as your Windows desktop wallpaper. Every AI agent on your machine becomes a pixel-art employee in an HD-2D office: they walk to their desks when real work starts, gather at Security to ask permission, hold meetings, learn skills, and the lights follow your real local time.</p>
+    <p data-i18n="d_intro_p1">BagIdea Office is a living AI-agent office that runs as your desktop wallpaper. Every AI agent on your machine becomes a pixel-art employee in an HD-2D office: they walk to their desks when real work starts, gather at Security to ask permission, hold meetings, learn skills, and the lights follow your real local time.</p>
     <p data-i18n="d_intro_p2">It is not a dashboard and not a chat window — it is a world that renders the true state of your Claude Code sessions, headless agent runs and custom scripts as living characters, behind your desktop icons.</p>
     <p data-i18n="d_intro_p3">Three independent layers keep it robust: a zero-dependency Node daemon (the source of truth), a Godot 4 renderer (the wallpaper), and a lightweight overlay UI (chat, settings, approvals). The daemon keeps agents running even if rendering restarts.</p>
     <img src="img/world.png" alt="BagIdea Office overview">
@@ -135,7 +135,8 @@ bagidea start   # launch the office</code></pre>
 
     <h2 id="plugins" data-i18n="d_plugins_h">Plugins, skills & tools</h2>
     <p data-i18n="d_plugins_p">Plugins extend the office for real — a folder with a manifest can add UI panels, HTTP routes, and commands agents can drive, with ctx access to the registry, feed, broadcasting and even running Claude turns. Two core plugins ship in the box (🎵 Music Player, 🧮 Calculator); install more from any GitHub repo. Start from the official template, or read the worked example repos.</p>
-    <img src="img/plugins.png" alt="The plugins panel">
+    <img src="img/plugins.png" alt="The plugins panel listing installed plugins, with install-from-GitHub">
+    <img src="img/briefing.png" alt="A morning briefing rendered inside a plugin panel">
     <pre><code>bagidea plugin install https://github.com/bagidea/bagidea-office-template</code></pre>
     <p data-i18n="d_skills_p">Every office ships with a library of builtin skills (deep research, office control, plugin building, code review, docs, debugging, data wrangling, project kickoff, diagrams) you can assign to any agent, plus Hermes-style skills the office learns automatically after real work. Add new raw capability via MCP servers.</p>
 
@@ -176,7 +177,7 @@ bagidea start   # launch the office</code></pre>
     <h3 data-i18n="d_faq_q2">Is my code/data sent anywhere?</h3>
     <p data-i18n="d_faq_a2">The daemon runs locally on 127.0.0.1. Agents are Claude Code sessions, so they use Claude like any Claude Code project. Optional features (voice, image, realtime) use your own OpenAI/Gemini keys only when you enable them.</p>
     <h3 data-i18n="d_faq_q3">Which platforms are supported?</h3>
-    <p data-i18n="d_faq_a3">Windows 11 today. Linux and macOS wallpaper backends are on the roadmap.</p>
+    <p data-i18n="d_faq_a3">Windows 11 and macOS 13+ (beta) today. A Linux wallpaper backend is on the roadmap.</p>
     <h3 data-i18n="d_faq_q4">Can I build my own plugin?</h3>
     <p data-i18n="d_faq_a4">Yes — fork the official template repo. A person or an agent can build a working plugin from it in minutes; the full spec is in the plugin guide.</p>
   </main>
