@@ -2382,7 +2382,7 @@
     const myTools = new Set(a.tools || []);
     const AURAS = [["", "✨ none", "#8294ab"], ["fire", "🔥 fire", "#ff9540"],
       ["ice", "❄ ice", "#6fd3ff"], ["nature", "🍃 nature", "#7be36b"],
-      ["arcane", "🔮 arcane", "#cf7dff"], ["shadow", "🌑 shadow", "#9a7fd9"],
+      ["arcane", "🔮 arcane", "#cf7dff"], ["shadow", "🌑 shadow", "#6e7488"],
       ["gold", "👑 gold", "#ffd24d"]];
     const auraField = `<div class="field"><label>✨ AURA — วงแสงเวทย์ใต้เท้า (ของตกแต่ง)</label>
       <div class="checks" id="eAura"></div></div>`;
@@ -3384,11 +3384,37 @@
       for (const n of (r.notes || []).slice().reverse()) {
         const row = document.createElement("div");
         row.className = "arow";
-        row.innerHTML = `<div class="meta"><b>${n.who === "you" ? "🧑‍💼" : "🤖"} ${String(n.text).replace(/</g, "&lt;")}</b>
-            <span>${new Date(n.ts).toLocaleString()}</span></div>
-          <div class="winbtn hide" title="ลบ">✕</div>`;
-        row.querySelector(".winbtn").onclick = () =>
-          api("/notes", { remove: n.id }).then(() => openOps("notes"));
+        const safe = String(n.text).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+        const del = (e) => { if (e) e.stopPropagation();
+          api("/notes", { remove: n.id }).then(() => openOps("notes")); };
+        // Collapsed: a one-line preview (long notes no longer overflow the row).
+        // Click it to open the full note — readable AND editable, not delete-only.
+        const view = () => {
+          row.innerHTML = `<div class="meta" style="cursor:pointer;flex:1;min-width:0" title="${t("คลิกเพื่อเปิด/แก้ไข")}">
+              <b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.who === "you" ? "🧑‍💼" : "🤖"} ${safe}</b>
+              <span>${new Date(n.ts).toLocaleString()}</span></div>
+            <div class="winbtn hide" title="${t("ลบ")}">✕</div>`;
+          row.querySelector(".meta").onclick = edit;
+          row.querySelector(".winbtn").onclick = del;
+        };
+        const edit = () => {
+          row.innerHTML = `<div style="flex:1;width:100%">
+              <textarea class="nEdit" maxlength="500" spellcheck="false"
+                style="width:100%;min-height:96px;font:inherit;resize:vertical"></textarea>
+              <div class="assistrow" style="margin-top:6px">
+                <button class="primary nSave" style="flex:1">💾 ${t("บันทึก")}</button>
+                <button class="send nCancel" title="${t("ยกเลิก")}">↩</button>
+                <button class="danger nDel" title="${t("ลบ")}">🗑</button>
+              </div></div>`;
+          const ta = row.querySelector(".nEdit"); ta.value = n.text; ta.focus();
+          row.querySelector(".nSave").onclick = async () => {
+            const v = ta.value.trim(); if (!v) return;
+            await api("/notes", { edit: n.id, text: v }); openOps("notes");
+          };
+          row.querySelector(".nCancel").onclick = view;
+          row.querySelector(".nDel").onclick = del;
+        };
+        view();
         box.appendChild(row);
       }
       // 🏛 shared office knowledge — the file every agent knows about.

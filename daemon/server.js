@@ -2509,6 +2509,13 @@ const server = http.createServer((req, res) => {
       try {
         const p = JSON.parse(body);
         if (p.remove) notes = notes.filter((n) => n.id !== p.remove);
+        else if (p.edit) {
+          const n = notes.find((x) => x.id === p.edit);
+          if (!n) throw new Error("note not found");
+          const txt = String(p.text || "").trim().slice(0, 500);
+          if (!txt) throw new Error("empty");
+          n.text = txt;  // keep id/who/ts so the note stays in place
+        }
         else if (p.text) notes.push({ id: "n" + Date.now(), who: p.who || "you",
           text: String(p.text).slice(0, 500), ts: Date.now() });
         else throw new Error("no text");
