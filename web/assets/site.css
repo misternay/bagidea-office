@@ -8,6 +8,16 @@
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior:smooth; }
+
+/* Signature BagIdea Office scrollbar — the same slim blue-glass bar the overlay
+   and plugin panels use, so the site matches the app instead of the chunky
+   default. (WebKit/Chromium + Firefox.) */
+* { scrollbar-width:thin; scrollbar-color:rgba(110,180,255,0.30) transparent; }
+::-webkit-scrollbar { width:9px; height:9px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(110,180,255,0.22); border-radius:6px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(110,180,255,0.45); }
+::-webkit-scrollbar-corner { background:transparent; }
 body { font-family:'Segoe UI',system-ui,'Noto Sans Thai','Noto Sans Arabic',sans-serif;
   background:var(--bg); color:var(--text); line-height:1.65; overflow-x:hidden; }
 html[dir="rtl"] body { font-family:'Noto Sans Arabic','Segoe UI',system-ui,sans-serif; }
