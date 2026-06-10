@@ -42,7 +42,7 @@ the office truly comes alive.
 | 👥 Agents at their desks, auras lit | ⌨️ The `bagidea` CLI |
 | ![Agents working at their desks](docs/img/agents.png) | ![The bagidea CLI help](docs/img/cli.png) |
 
-> ✅ **Status: working product — Windows 11 (stable) + macOS 13+ (beta, new this release).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions working *inside real project folders* → spatialized approvals → agent management UI → Telegram/Discord/LINE channels → CLI → self-updater. Some art packs are not bundled (licenses — see [Art assets](#art-assets)); the game falls back to procedural placeholders without them.
+> ✅ **Status: working product — Windows 11 (stable) + macOS 13+ (beta, new this release).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions working *inside real project folders* → spatialized approvals → agent management UI → Telegram/Discord/LINE channels → CLI → self-updater. All visuals and sounds **ship in the repo** (free / CC0 art — see [Art assets](#art-assets)), so a fresh install and `bagidea update` carry the full look out of the box.
 
 ---
 
@@ -305,63 +305,19 @@ cargo build --release   # → shell/target/release/bagidea-office-shell.exe
 
 ## Art assets
 
-One pack is bundled; three are not (third-party licenses). Everything loads at
-runtime — no Godot import step — and **the game still runs without them**,
-falling back to procedural placeholder visuals.
+All the visuals and sounds **ship in the repo** — a fresh install and every
+`bagidea update` carry the full look and feel out of the box. No separate
+downloads, no Godot import step: everything loads at runtime (and still falls
+back to a procedural placeholder for anything ever missing). The packs are free /
+CC0, made possible by these creators — **thank you** 🙏:
 
-> **Bringing art to another machine you own.** Because the licensed packs aren't
-> in the repo, a fresh install shows procedural visuals. Zip your local
-> `godot/assets/{characters,scifi,env,decor,pixelfx,sounds}` and either drop them
-> into the new install's `godot/assets/`, or run the installer with
-> `-Assets <zip-or-folder-or-URL>` (or `$env:BAGIDEA_ASSETS_URL`) and it unpacks
-> them for you. Keep this for **your own machines** — don't redistribute the
-> licensed packs publicly.
-
-**Bundled** ✓ — [Elemental Magic FX by Binbun3D](https://binbun3d.itch.io/elemental-magic-fx) (CC0): the equippable aura rings.
-
-**Characters** — [Customizable Characters Top-Down 32x32 by Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32):
-
-```
-godot/assets/characters/
-├── npc/      ← contents of premade-npc-spritesheets.zip  (npc1.png … npc12.png)
-└── layers/   ← contents of demo-character-idle.zip
-```
-
-**The office cat** — [Cat 2D Pixel Art by xzany](https://xzany.itch.io/cat-2d-pixel-art) (free):
-
-```
-godot/assets/characters/cat/Sprites/   ← IDLE.png, WALK.png, RUN.png … (80x64 cells)
-```
-(missing → the original procedural pixel dog roams instead)
-
-**Environment** — [Molten Maps SciFi Asset Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack):
-
-```
-godot/assets/scifi/   ← all .glb files from the pack's Assets/gtlf folder
-```
-
-**Countryside** — a low-poly environment pack (FBX, runtime FBXDocument):
-
-```
-godot/assets/env/     ← Mounting_*.fbx, Tree_*.fbx, Rock_*.fbx, Bush_*.fbx, …
-```
-
-**Event FX** — [Super Pixel Effects Gigapack (Free) by untiedgames](https://untiedgames.itch.io/super-pixel-effects-gigapack):
-copy these `spritesheet.png` files from the pack's `spritesheet/` tree into
-`godot/assets/pixelfx/`, renamed as follows:
-
-| File | From pack folder |
-|---|---|
-| `success.png` | `symbol_success_001_small_green` |
-| `failure.png` | `symbol_failure_001_small_red` |
-| `alert.png` | `symbol_alert_001_small_red` |
-| `warning.png` | `symbol_warning_001_small_yellow` |
-| `thumbs_up.png` / `thumbs_down.png` | `symbol_thumbs_up/down_001_small_*` |
-| `warp_in.png` / `warp_out.png` | `scifi_warp_001_small_green` / `scifi_warp_002_small_red` |
-| `heart.png` | `round_heart_burst_001_small_red` |
-| `sparkle.png` / `sparkle_green.png` | `round_sparkle_burst_001/002_small_*` |
-| `light_burst.png` | `round_light_burst_001_small_yellow` |
-| `music.png` | `directional_music_burst_002_small_yellow` |
+- **Auras** — [Elemental Magic FX by Binbun3D](https://binbun3d.itch.io/elemental-magic-fx) (CC0)
+- **Characters** — [Customizable Characters Top-Down 32x32 by Schwarnhild](https://schwarnhild.itch.io/customizable-characters-top-down-32x32)
+- **The office cat** — [Cat 2D Pixel Art by xzany](https://xzany.itch.io/cat-2d-pixel-art)
+- **Environment (sci-fi kit)** — [Molten Maps SciFi Asset Pack](https://moltenmaps.itch.io/molten-maps-scifi-pack)
+- **Countryside** — a free low-poly environment pack (FBX)
+- **Event FX** — [Super Pixel Effects Gigapack (Free) by untiedgames](https://untiedgames.itch.io/super-pixel-effects-gigapack)
+- **Pets & ambience** — free dog, sound and household packs bundled under `godot/assets/`
 
 ## Running the full stack
 
