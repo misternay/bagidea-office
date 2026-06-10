@@ -58,7 +58,16 @@ cat > "$ROOT/workspace/.claude/settings.json" <<JSON
 JSON
 echo "    → .claude/settings.json + workspace/.claude/settings.json (local, not committed)"
 
-echo "[4/4] done."
+echo "[4/4] setting up the 'bagidea' CLI command..."
+mkdir -p "$ROOT/bin"
+ln -sf "$ROOT/cli/bagidea" "$ROOT/bin/bagidea"
+export PATH="$ROOT/bin:$PATH"
+echo "    → created $ROOT/bin/bagidea (linked to cli/bagidea)"
+
+echo "[5/5] done."
+echo
+echo "To use the 'bagidea' command anywhere, add this to your .zshrc/.bash_profile:"
+echo "  export PATH=\"$ROOT/bin:\$PATH\""
 echo
 echo "Run it:   $ROOT/shell/target/release/bagidea-office-shell"
 echo "Exit it:  menu-bar tray icon → Exit BagIdea Office"
