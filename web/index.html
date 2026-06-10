@@ -118,8 +118,11 @@
     <div class="steps">
       <div class="step">
         <h4 data-i18n="inst_s1_h">Run the one-shot installer</h4>
-        <p data-i18n="inst_s1_p">Open PowerShell and paste this. It installs Git, Node LTS, Rust, Godot 4.6.3 and the Claude Code CLI, clones the app, builds the shell, brands the icon, and adds the bagidea command to your PATH.</p>
+        <p data-i18n="inst_s1_p">On a fresh machine it installs Git, Node LTS, Rust, Godot 4.6.3 and the Claude Code CLI, clones the app, builds the shell, brands the icon, and adds the bagidea command to your PATH — in one pass.</p>
+        <p style="margin:10px 0 4px"><b>🪟 Windows</b> — <span data-i18n="inst_s1_win">PowerShell</span></p>
         <pre><code>irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex</code></pre>
+        <p style="margin:12px 0 4px"><b>🍎 macOS</b> <span class="muted">(beta)</span> — <span data-i18n="inst_s1_mac">Terminal</span></p>
+        <pre><code>curl -fsSL https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install-mac.sh | bash</code></pre>
       </div>
       <div class="step">
         <h4 data-i18n="inst_s2_h">Log in to Claude (first time only)</h4>
