@@ -13,6 +13,11 @@
 
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+// Flipped true the moment the user quits from the tray, so the daemon watchdog
+// stops resurrecting the daemon we're deliberately tearing down.
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
@@ -913,6 +918,24 @@ fn main() {
     let _ = std::fs::write(std::env::temp_dir().join("bagidea_shell_alive"), "1");
     watch_editor_requests(proxy.clone());
 
+    // ---- daemon watchdog: the office must never sit there brainless.
+    // If the daemon ever dies (a crash, an OOM, a `bagidea` kill that reached
+    // the daemon but not us), bring it straight back. Cheap: a 400ms TCP probe
+    // every 5s, and spawn_daemon is a no-op while it's already up. Stops the
+    // moment the user quits so we don't fight a deliberate shutdown.
+    {
+        let root = root.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            if SHUTTING_DOWN.load(Ordering::Relaxed) {
+                break;
+            }
+            if !daemon_running() && !SHUTTING_DOWN.load(Ordering::Relaxed) {
+                let _ = spawn_daemon(&root);
+            }
+        });
+    }
+
     // ---- system tray: the only true exit
     let tray_menu = Menu::new();
     let open_item = MenuItem::new("Open Office Chat", true, None);
@@ -1203,6 +1226,9 @@ fn main() {
         }
 
         if shutdown {
+            // Tell the watchdog to stand down BEFORE we kill the daemon, or it
+            // would dutifully resurrect the very process we're shutting down.
+            SHUTTING_DOWN.store(true, Ordering::Relaxed);
             if let Some(c) = office_child.as_mut() {
                 let _ = c.kill();
             }

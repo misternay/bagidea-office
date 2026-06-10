@@ -3426,6 +3426,21 @@ server.on("upgrade", (req, sock) => {
   sock.write(wsFrame(JSON.stringify({ ...rosterEvt(), ts: Date.now() })));
 });
 
+// Resilience: the office is an always-on daemon spawned by a console-less GUI
+// shell, so a single stray exception (a bad scheduler tick, a malformed plugin
+// event) must NOT take the whole office down. Log it and keep serving — the
+// shell's watchdog can still restart us if we ever truly die.
+process.on("uncaughtException", (e) => console.error("[fatal] uncaught:", e && e.stack || e));
+process.on("unhandledRejection", (e) => console.error("[fatal] rejection:", e && e.stack || e));
+
+server.on("error", (e) => {
+  // Most likely EADDRINUSE — another daemon already holds :8787. Exit cleanly
+  // (code 1) so the launcher/watchdog knows not to expect us, instead of a
+  // cryptic unhandled-error crash.
+  console.error("[fatal] server error:", e && e.message || e);
+  process.exit(1);
+});
+
 server.listen(8787, "127.0.0.1", () =>
   console.log("[oep] http+ws listening :8787")
 );

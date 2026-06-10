@@ -203,10 +203,14 @@ async function main() {
   }
 
   if (cmd === "restart") {
-    const wasUp = await daemonUp();
-    if (wasUp) { info("Stopping the office…"); await killAll(); }
+    // ALWAYS kill — never gate on /health. A half-dead daemon (process alive
+    // but not answering, or a stale shell holding the single-instance lock)
+    // reports "down", and gating the kill on that left the old shell running
+    // so the fresh one bailed on the single-instance check → nothing restarted.
+    info("Stopping the office…");
+    await killAll();
     // let Windows release the processes + port 8787 before relaunching
-    await new Promise((r) => setTimeout(r, wasUp ? 2500 : 600));
+    await new Promise((r) => setTimeout(r, 2500));
     if (await startOffice("restarting the office")) ok("The office is back 🏢");
     return;
   }
