@@ -73,3 +73,6 @@ daemon/presets.json
 daemon/assets.json
 daemon/stats.json
 daemon/proposals.json
+
+# daemon stdout/stderr log (runtime)
+daemon/daemon.log

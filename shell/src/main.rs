@@ -162,6 +162,21 @@ fn spawn_daemon(root: &PathBuf) -> Option<Child> {
     }
     let mut c = Command::new("node");
     c.arg(root.join("daemon").join("server.js"));
+    // A release GUI shell has NO console (windows_subsystem="windows"), so an
+    // INHERITED stdout/stderr is an invalid handle and node can crash on its
+    // first write — taking the daemon down seconds after launch. Send the
+    // daemon's output to daemon/daemon.log instead: keeps it alive AND gives a
+    // log to read. Fall back to /dev/null-equivalent if the file can't open.
+    use std::process::Stdio;
+    match std::fs::File::create(root.join("daemon").join("daemon.log")) {
+        Ok(f) => {
+            match f.try_clone() {
+                Ok(f2) => { c.stdout(Stdio::from(f)).stderr(Stdio::from(f2)); }
+                Err(_) => { c.stdout(Stdio::from(f)).stderr(Stdio::null()); }
+            }
+        }
+        Err(_) => { c.stdout(Stdio::null()).stderr(Stdio::null()); }
+    }
     hidden(&mut c).spawn().ok()
 }
 
