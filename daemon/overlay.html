@@ -1008,6 +1008,10 @@
     addEventListener("DOMContentLoaded", async () => {
       await preloadSeed();
       applyI18n(document.body);
+      // tr()-built chrome (the now-strip) may have rendered from a task event
+      // that beat the async preload — re-render it now that TR is complete, or
+      // a steady "กำลังทำ N งาน" would stay Thai until the next task change.
+      try { renderRunning(); } catch {}
       _obs.observe(document.body, { childList: true, subtree: true });
       setInterval(() => { if (!document.hidden) applyI18n(document.body); }, 1500);
     });
