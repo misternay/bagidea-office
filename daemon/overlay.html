@@ -420,6 +420,17 @@
   }
   audio.msgmedia { width: 240px; }
   a.msgmedia { color: var(--accent); font-size: 12px; }
+  /* media + an unobtrusive 'open folder' button on hover */
+  .mediawrap { position: relative; display: inline-block; margin-top: 6px; max-width: 100%; }
+  .mediawrap .msgmedia { margin-top: 0; }
+  .revealbtn {
+    position: absolute; top: 6px; right: 6px; width: 26px; height: 26px;
+    border: none; border-radius: 7px; background: rgba(12,19,34,0.72);
+    color: #fff; font-size: 13px; cursor: pointer; opacity: 0; transition: opacity .15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mediawrap:hover .revealbtn { opacity: 1; }
+  a.msgmedia + .revealbtn, .mediawrap a.msgmedia ~ .revealbtn { position: static; opacity: 0.8; width: auto; height: auto; padding: 2px 6px; margin-left: 6px; }
   /* timestamp under each chat message */
   .msgtime { font-size: 10px; opacity: 0.42; margin-top: 3px; letter-spacing: 0.2px; }
   .msg.you .msgtime { text-align: right; }
@@ -4226,7 +4237,12 @@
   }
 
   // Media nodes for chat bubbles (uploads + agent-produced files).
-  function mediaNode(url, kind, name) {
+  function revealInFolder(realPath) {
+    fetch("/reveal", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+      body: JSON.stringify({ path: realPath }) }).catch(() => {});
+  }
+  function mediaNode(url, kind, name, realPath) {
     let el;
     if (kind === "image") {
       el = document.createElement("img");
@@ -4235,16 +4251,27 @@
       el.onclick = () => openLightbox(url);
     } else if (kind === "video") {
       el = document.createElement("video");
-      el.src = url; el.controls = true;
+      el.src = url; el.controls = true; el.preload = "metadata";
     } else if (kind === "audio") {
       el = document.createElement("audio");
-      el.src = url; el.controls = true;
+      el.src = url; el.controls = true; el.preload = "metadata";
     } else {
       el = document.createElement("a");
       el.href = url; el.target = "_blank"; el.textContent = "📄 " + (name || url);
     }
     el.className = "msgmedia";
-    return el;
+    // No real filesystem path → nothing to reveal (return bare element).
+    if (!realPath) return el;
+    const wrap = document.createElement("div");
+    wrap.className = "mediawrap";
+    wrap.appendChild(el);
+    const fb = document.createElement("button");
+    fb.className = "revealbtn";
+    fb.title = "เปิดโฟลเดอร์ที่เก็บไฟล์";
+    fb.textContent = "📂";
+    fb.onclick = (e) => { e.stopPropagation(); revealInFolder(realPath); };
+    wrap.appendChild(fb);
+    return wrap;
   }
   // Agent replies that mention media files get inline previews.
   const MEDIA_RE = /((?:[A-Za-z]:\\|\/uploads\/)[^\s"'`<>|?*]+?\.(?:png|jpe?g|gif|webp|bmp|mp4|webm|mp3|wav|m4a|ogg))/gi;
@@ -4255,7 +4282,7 @@
       if (seen.has(p) || seen.size >= 4) continue;
       seen.add(p);
       const url = p.startsWith("/uploads/") ? p : "/media?p=" + encodeURIComponent(p);
-      d.appendChild(mediaNode(url, fileKind(p), p.split(/[\\/]/).pop()));
+      d.appendChild(mediaNode(url, fileKind(p), p.split(/[\\/]/).pop(), p));
     }
   }
 
@@ -4273,7 +4300,7 @@
     inp.style.height = "auto";  // collapse the grown textarea back to one row
     uiSnd("send");
     const d = addMsg("you", null, prompt || "(ส่งไฟล์แนบ)");
-    for (const f of files) d.appendChild(mediaNode(f.url, f.kind, f.name));
+    for (const f of files) d.appendChild(mediaNode(f.url, f.kind, f.name, f.path || f.url));
     if (files.length) {
       prompt += "\n\n[ไฟล์แนบจากผู้ใช้ — เปิดดูได้ด้วย Read]:\n" +
         files.map((f) => "- " + f.path).join("\n");

@@ -2126,14 +2126,31 @@ const MEDIA_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
   mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime",
   mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg",
   pdf: "application/pdf" };
-function serveMedia(res, full) {
+function serveMedia(res, full, req) {
   const ext = full.split(".").pop().toLowerCase();
   const mime = MEDIA_MIME[ext];
   if (!mime) { res.writeHead(415); return res.end("not a media file"); }
-  fs.readFile(full, (e, data) => {
-    if (e) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { "content-type": mime, "cache-control": "max-age=300" });
-    res.end(data);
+  fs.stat(full, (e, st) => {
+    if (e || !st.isFile()) { res.writeHead(404); return res.end(); }
+    const total = st.size;
+    const range = req && req.headers && req.headers.range;
+    // Range support is REQUIRED for <video> to play/seek in Chromium/WebView2.
+    if (range) {
+      const m = /bytes=(\d*)-(\d*)/.exec(range) || [];
+      let start = m[1] ? parseInt(m[1], 10) : 0;
+      let end = m[2] ? parseInt(m[2], 10) : total - 1;
+      if (!(start >= 0)) start = 0;
+      if (!(end < total)) end = total - 1;
+      if (start > end) { res.writeHead(416, { "content-range": `bytes */${total}` }); return res.end(); }
+      res.writeHead(206, { "content-type": mime, "accept-ranges": "bytes",
+        "content-range": `bytes ${start}-${end}/${total}`, "content-length": end - start + 1,
+        "cache-control": "max-age=300" });
+      fs.createReadStream(full, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, { "content-type": mime, "accept-ranges": "bytes",
+        "content-length": total, "cache-control": "max-age=300" });
+      fs.createReadStream(full).pipe(res);
+    }
   });
 }
 
@@ -2822,7 +2839,7 @@ const server = http.createServer((req, res) => {
 
   } else if (req.method === "GET" && req.url.startsWith("/uploads/")) {
     const name = decodeURIComponent(req.url.slice(9).split("?")[0]).replace(/[\\/]|\.\./g, "");
-    serveMedia(res, path.join(WORKSPACE, "uploads", name));
+    serveMedia(res, path.join(WORKSPACE, "uploads", name), req);
 
   } else if (req.method === "GET" && req.url.startsWith("/media?")) {
     // Render agent-produced media in chat: absolute path, but ONLY under the
@@ -2834,7 +2851,29 @@ const server = http.createServer((req, res) => {
     if (!roots.some((r) => norm.toLowerCase().startsWith(r.toLowerCase() + path.sep))) {
       res.writeHead(403); return res.end("outside allowed roots");
     }
-    serveMedia(res, norm);
+    serveMedia(res, norm, req);
+
+  } else if (req.method === "POST" && req.url === "/reveal") {
+    // Open the OS file manager at a file (like LINE/other messengers). UI-only,
+    // and the target must live under the workspace or a registered project.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        let p = String((JSON.parse(body) || {}).path || "");
+        if (p.startsWith("/uploads/"))
+          p = path.join(WORKSPACE, "uploads", decodeURIComponent(p.slice(9)).replace(/[\\/]|\.\./g, ""));
+        p = path.resolve(p);
+        const roots = [path.resolve(WORKSPACE), ...projects.map((x) => path.resolve(x.dir))];
+        const ok = roots.some((r) => p.toLowerCase() === r.toLowerCase() ||
+          p.toLowerCase().startsWith(r.toLowerCase() + path.sep));
+        if (!ok) { res.writeHead(403); return res.end("outside allowed roots"); }
+        if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
+        if (process.platform === "win32") spawn("explorer", ["/select,", p], { detached: true, windowsHide: true });
+        else if (process.platform === "darwin") spawn("open", ["-R", p], { detached: true });
+        else spawn("xdg-open", [path.dirname(p)], { detached: true });
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
 
   } else if (req.method === "GET" && req.url === "/layout") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
