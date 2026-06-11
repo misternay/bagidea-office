@@ -2880,6 +2880,28 @@ const server = http.createServer((req, res) => {
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
 
+  } else if (req.method === "POST" && req.url === "/open") {
+    // Open a file in the OS default app (image viewer, player, browser) — a real
+    // separate, resizable window. Same UI-only + allowlist guard as /reveal.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        let p = String((JSON.parse(body) || {}).path || "");
+        if (p.startsWith("/uploads/"))
+          p = path.join(WORKSPACE, "uploads", decodeURIComponent(p.slice(9)).replace(/[\\/]|\.\./g, ""));
+        p = path.resolve(p);
+        const roots = [path.resolve(WORKSPACE), ...projects.map((x) => path.resolve(x.dir))];
+        const ok = roots.some((r) => p.toLowerCase() === r.toLowerCase() ||
+          p.toLowerCase().startsWith(r.toLowerCase() + path.sep));
+        if (!ok) { res.writeHead(403); return res.end("outside allowed roots"); }
+        if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
+        if (process.platform === "win32") spawn("cmd", ["/c", "start", "", p], { detached: true, windowsHide: true });
+        else if (process.platform === "darwin") spawn("open", [p], { detached: true });
+        else spawn("xdg-open", [p], { detached: true });
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
   } else if (req.method === "GET" && req.url === "/layout") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     try { res.end(fs.readFileSync(LAYOUT_FILE, "utf8")); }

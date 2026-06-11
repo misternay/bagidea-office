@@ -430,6 +430,13 @@
     display: flex; align-items: center; justify-content: center;
   }
   .mediawrap:hover .revealbtn { opacity: 1; }
+  .revealbtn.openbtn { right: 38px; }
+  #lbOpen {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    border: none; border-radius: 9px; padding: 8px 16px; cursor: pointer;
+    background: rgba(94,200,255,0.92); color: #04121f; font-weight: 700; font-size: 13px;
+  }
+  #lbOpen:hover { filter: brightness(1.1); }
   a.msgmedia + .revealbtn, .mediawrap a.msgmedia ~ .revealbtn { position: static; opacity: 0.8; width: auto; height: auto; padding: 2px 6px; margin-left: 6px; }
   /* timestamp under each chat message */
   .msgtime { font-size: 10px; opacity: 0.42; margin-top: 3px; letter-spacing: 0.2px; }
@@ -4237,20 +4244,28 @@
 
   // Full-size image viewer — click any chat image to open it big, in-app.
   // Lazily created on first use; click the backdrop or press Esc to close.
-  let _lbEl = null;
-  function openLightbox(url) {
+  let _lbEl = null, _lbImg = null, _lbOpen = null, _lbPath = null;
+  function openLightbox(url, realPath) {
     if (!_lbEl) {
       _lbEl = document.createElement("div");
       _lbEl.id = "lightbox";
-      _lbEl.appendChild(document.createElement("img"));
-      const close = () => { _lbEl.style.display = "none"; _lbEl.firstChild.src = ""; };
+      _lbImg = document.createElement("img");
+      _lbEl.appendChild(_lbImg);
+      _lbOpen = document.createElement("button");
+      _lbOpen.id = "lbOpen";
+      _lbOpen.textContent = "⤢ เปิดในหน้าต่างใหม่";
+      _lbOpen.onclick = (e) => { e.stopPropagation(); if (_lbPath) openExternal(_lbPath); };
+      _lbEl.appendChild(_lbOpen);
+      const close = () => { _lbEl.style.display = "none"; _lbImg.src = ""; };
       _lbEl.onclick = close;
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && _lbEl.style.display === "flex") close();
       });
       document.body.appendChild(_lbEl);
     }
-    _lbEl.firstChild.src = url;
+    _lbImg.src = url;
+    _lbPath = realPath || null;
+    _lbOpen.style.display = _lbPath ? "" : "none";
     _lbEl.style.display = "flex";
   }
 
@@ -4260,13 +4275,19 @@
       headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
       body: JSON.stringify({ path: realPath }) }).catch(() => {});
   }
+  // Open the file in the OS default app — a real separate, resizable window.
+  function openExternal(realPath) {
+    fetch("/open", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+      body: JSON.stringify({ path: realPath }) }).catch(() => {});
+  }
   function mediaNode(url, kind, name, realPath) {
     let el;
     if (kind === "image") {
       el = document.createElement("img");
       el.src = url; el.loading = "lazy";
-      el.title = "คลิกเพื่อดูภาพเต็ม";
-      el.onclick = () => openLightbox(url);
+      el.title = "คลิกเพื่อดูภาพ · ปุ่ม ⤢ เปิดเป็นหน้าต่างใหม่";
+      el.onclick = () => openLightbox(url, realPath);
     } else if (kind === "video") {
       el = document.createElement("video");
       el.src = url; el.controls = true; el.preload = "metadata";
@@ -4288,6 +4309,12 @@
     fb.title = "เปิดโฟลเดอร์ที่เก็บไฟล์";
     fb.textContent = "📂";
     fb.onclick = (e) => { e.stopPropagation(); revealInFolder(realPath); };
+    const ob = document.createElement("button");
+    ob.className = "revealbtn openbtn";
+    ob.title = "เปิดเป็นหน้าต่างใหม่ (โปรแกรมดูไฟล์ของเครื่อง)";
+    ob.textContent = "⤢";
+    ob.onclick = (e) => { e.stopPropagation(); openExternal(realPath); };
+    wrap.appendChild(ob);
     wrap.appendChild(fb);
     return wrap;
   }
