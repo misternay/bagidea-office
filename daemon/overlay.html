@@ -420,6 +420,24 @@
   }
   audio.msgmedia { width: 240px; }
   a.msgmedia { color: var(--accent); font-size: 12px; }
+  /* timestamp under each chat message */
+  .msgtime { font-size: 10px; opacity: 0.42; margin-top: 3px; letter-spacing: 0.2px; }
+  .msg.you .msgtime { text-align: right; }
+  /* full-size image viewer (click an image in chat) */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 9999; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.86); cursor: zoom-out; backdrop-filter: blur(2px);
+  }
+  #lightbox img {
+    max-width: 92vw; max-height: 92vh; border-radius: 10px;
+    box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+  }
+  /* "what's new" link inside the update banner */
+  #updWhat {
+    margin-left: 6px; color: #fff; text-decoration: underline;
+    font-weight: 600; white-space: nowrap;
+  }
 
   .filterbox {
     width: 100%; margin: 6px 0; padding: 6px 10px; font-size: 11.5px;
@@ -757,7 +775,7 @@
 <div id="langMenu"></div>
 
 <!-- 🔄 update banner: appears when a newer release is on main -->
-<div id="updBar">🔄 มีเวอร์ชันใหม่ <b id="updSha"></b> — คลิกที่นี่เพื่ออัปเดต (โปรแกรมจะรีสตาร์ทเอง)</div>
+<div id="updBar">🔄 มีเวอร์ชันใหม่ <b id="updSha"></b> — คลิกที่นี่เพื่ออัปเดต (โปรแกรมจะรีสตาร์ทเอง) <a id="updWhat" href="https://github.com/bagidea/bagidea-office/blob/main/CHANGELOG.md" target="_blank" rel="noopener" onclick="event.stopPropagation()">📝 มีอะไรใหม่</a></div>
 
 <div id="rail"></div>
 <!-- 🔵 live work strip: sits BELOW the agents rail so it never covers the
@@ -1198,7 +1216,15 @@
   }
 
   // ---- chat ---------------------------------------------------------------
-  function addMsg(cls, who, text) {
+  // Compact, locale-aware timestamp: "HH:MM" for today, "D MMM HH:MM" otherwise.
+  function fmtTime(ts) {
+    if (!ts) return "";
+    const d = new Date(ts), now = new Date();
+    const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toDateString() === now.toDateString()
+      ? t : d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " + t;
+  }
+  function addMsg(cls, who, text, ts) {
     const d = document.createElement("div");
     d.className = "msg " + cls;
     if (who) {
@@ -1212,6 +1238,10 @@
     }
     d.appendChild(document.createTextNode(text));
     if (String(cls).includes("agent")) attachMediaPreviews(d, text);
+    const tm = document.createElement("div");
+    tm.className = "msgtime";
+    tm.textContent = fmtTime(ts || Date.now());
+    d.appendChild(tm);
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
@@ -3561,8 +3591,8 @@
         .then((x) => x.json());
       for (const m of r.log || []) {
         if (m.who === "tool") addToolRow(m.text);
-        else if (m.who === "you") addMsg("you", null, m.text);
-        else addMsg("agent", faceId || m.who, m.text);
+        else if (m.who === "you") addMsg("you", null, m.text, m.ts);
+        else addMsg("agent", faceId || m.who, m.text, m.ts);
       }
     } catch {}
   }
@@ -3582,7 +3612,7 @@
         .then((x) => x.json());
       for (const m of r.log || []) {
         if (m.who === "tool") addToolRow(m.text);
-        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text);
+        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text, m.ts);
       }
     } catch {}
   }
@@ -3822,7 +3852,7 @@
       if (groupView && ev.session === groupView) addToolRow(ev.tool || "…");
     }
     else if (ev.type === "chat.message") {
-      if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text);
+      if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text, ev.ts);
     }
     else if (ev.type === "perm.requested") addPermCard({ ...ev, agent: gname });
     else if (ev.type === "perm.approved" || ev.type === "perm.denied") {
@@ -3960,12 +3990,12 @@
       // current thread (or the meeting being watched live); history replays
       // come from /sessions/log instead.
       if (!ev.replay && groupView && ev.session === groupView) {
-        addMsg("agent", ev.agent, ev.text);
+        addMsg("agent", ev.agent, ev.text, ev.ts);
         uiSnd("msg");
       } else if (!ev.replay && !groupView &&
           (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
           (!ev.session || !CUR[target] || ev.session === CUR[target])) {
-        addMsg("agent", ev.agent, ev.text);
+        addMsg("agent", ev.agent, ev.text, ev.ts);
         uiSnd("msg");
       }
     }
@@ -4110,13 +4140,33 @@
     if (e.dataTransfer && e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
   });
 
+  // Full-size image viewer — click any chat image to open it big, in-app.
+  // Lazily created on first use; click the backdrop or press Esc to close.
+  let _lbEl = null;
+  function openLightbox(url) {
+    if (!_lbEl) {
+      _lbEl = document.createElement("div");
+      _lbEl.id = "lightbox";
+      _lbEl.appendChild(document.createElement("img"));
+      const close = () => { _lbEl.style.display = "none"; _lbEl.firstChild.src = ""; };
+      _lbEl.onclick = close;
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && _lbEl.style.display === "flex") close();
+      });
+      document.body.appendChild(_lbEl);
+    }
+    _lbEl.firstChild.src = url;
+    _lbEl.style.display = "flex";
+  }
+
   // Media nodes for chat bubbles (uploads + agent-produced files).
   function mediaNode(url, kind, name) {
     let el;
     if (kind === "image") {
       el = document.createElement("img");
       el.src = url; el.loading = "lazy";
-      el.onclick = () => window.open(url);
+      el.title = "คลิกเพื่อดูภาพเต็ม";
+      el.onclick = () => openLightbox(url);
     } else if (kind === "video") {
       el = document.createElement("video");
       el.src = url; el.controls = true;
