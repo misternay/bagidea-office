@@ -63,6 +63,35 @@ test("reindexSkill indexes name+description; null removes it", () => {
   assert.deepStrictEqual(R.search("research brief", { tiers: ["skill"] }), []);
 });
 
+test("init() indexes memory / OFFICE / project files into the right tiers", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "bagidea-init-"));
+  const memDir = path.join(root, "memory");
+  const projDir = path.join(root, "projects", "p1");
+  fs.mkdirSync(memDir, { recursive: true });
+  fs.mkdirSync(projDir, { recursive: true });
+  fs.writeFileSync(path.join(memDir, "shino.md"), "# mem\n\n- the owner ships on Fridays via the banner\n- shino likes short replies\n");
+  fs.writeFileSync(path.join(memDir, "sahara.md"), "- sahara handles data wrangling tasks\n");
+  fs.writeFileSync(path.join(root, "OFFICE.md"), "# Office\n\n- the company is WARRIX\n- prefer Thai in replies\n");
+  fs.writeFileSync(path.join(projDir, "MEMORY.md"), "- the widget service deploys nightly at 2am\n");
+
+  R.init({ memDir, officeMd: path.join(root, "OFFICE.md"), projectsDir: path.join(root, "projects"), skills: {} });
+
+  // agent memory is isolated by ref
+  const shino = R.search("owner ships banner", { tiers: ["mem"], refs: { mem: "shino" }, k: 5 });
+  assert.ok(shino.length && shino[0].ref === "shino");
+  assert.ok(!shino.some((h) => h.ref === "sahara"));
+  // owner tier
+  assert.strictEqual(R.search("WARRIX company", { tiers: ["user"], refs: { user: true } })[0].ref, "OFFICE");
+  // project tier
+  assert.strictEqual(R.search("widget nightly deploy", { tiers: ["proj"], refs: { proj: "p1" } })[0].ref, "p1");
+  // combined query the way memoryNote does it (exact terms — BM25 has no stemming)
+  const combo = R.search("banner widget WARRIX", { tiers: ["mem", "proj", "user"], refs: { mem: "shino", proj: "p1", user: true }, k: 6 });
+  const tiersHit = new Set(combo.map((h) => h.tier));
+  assert.ok(tiersHit.has("mem") && tiersHit.has("proj") && tiersHit.has("user"));
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("persist + loadPersisted round-trips the corpus", () => {
   R.clear();
   R.addDoc("mem", "shino", "mem:shino:0", "alpha beta gamma delta");
