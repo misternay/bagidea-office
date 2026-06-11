@@ -4,6 +4,13 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.3] — Dogs back on the ground
+
+**Fixed**
+- **Dogs (and the cat) no longer look like they're floating.** Their billboards
+  were casting a drifting shadow that read as "airborne" (more obvious after the
+  v0.7.2 shadow upgrade); they now skip shadow-casting like every other character.
+
 ## [0.7.2] — Media, project fixes, a livelier office
 
 **Added**
@@ -158,6 +165,7 @@ behavior if anything goes wrong.
 
 *Earlier history predates this changelog — see `git log` for the full record.*
 
+[0.7.3]: https://github.com/bagidea/bagidea-office/releases/tag/v0.7.3
 [0.7.2]: https://github.com/bagidea/bagidea-office/releases/tag/v0.7.2
 [0.7.1]: https://github.com/bagidea/bagidea-office/releases/tag/v0.7.1
 [0.7.0]: https://github.com/bagidea/bagidea-office/releases/tag/v0.7.0
