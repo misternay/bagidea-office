@@ -29,6 +29,7 @@ public class WU {
   public delegate bool EnumProc(IntPtr h, IntPtr l);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc p, IntPtr l);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 }
 "@
 
@@ -123,7 +124,14 @@ foreach ($p in $hosts) {
           [void][WU]::SetForegroundWindow($win.h)
         }
       }
-      "stop" { taskkill /PID $p.ProcessId /T /F | Out-Null }
+      "stop" {
+        # Close the WINDOW itself (WM_CLOSE) — killing only the shell process
+        # left the Windows Terminal window lingering, so the project looked
+        # "still open" and any click re-detected it as active. This is OUR
+        # dedicated `-w new` window (title-locked), so closing it is safe.
+        if ($win) { [void][WU]::PostMessage($win.h, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
+        taskkill /PID $p.ProcessId /T /F | Out-Null
+      }
     }
   }
 }

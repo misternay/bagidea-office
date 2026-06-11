@@ -2573,7 +2573,12 @@ const server = http.createServer((req, res) => {
         const { id } = JSON.parse(body);
         const action = req.url.endsWith("stop") ? "stop"
           : req.url.endsWith("hide") ? "hide" : "show";
-        winproj(action, String(id).replace(/[^\w-]/g, ""), () => sweepProjects());
+        winproj(action, String(id).replace(/[^\w-]/g, ""), () => {
+          sweepProjects();
+          // After a stop, confirm again once the window/process has fully gone —
+          // an immediate sweep can still race the kill and re-flag it as open.
+          if (action === "stop") setTimeout(sweepProjects, 1500);
+        });
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
