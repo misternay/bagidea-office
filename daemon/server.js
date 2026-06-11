@@ -26,6 +26,7 @@ const {
   DEFAULT_MAIN_AGENT,
   DEFAULT_CEO_AGENT
 } = require("./constants");
+const maintenance = require("./maintenance");
 
 const WORKSPACE = path.join(__dirname, "..", "workspace");
 // Server-local paths (the refactor moved REPLAY_COUNT to constants.js but these
@@ -195,6 +196,17 @@ const SESSIONS = path.join(__dirname, "sessions.json");
 let sess = {};
 try { sess = JSON.parse(fs.readFileSync(SESSIONS, "utf8")); } catch {}
 function saveSess() { fs.writeFileSync(SESSIONS, JSON.stringify(sess, null, 2)); }
+
+// One-time boot housekeeping (P0): keep journal + sessions from growing forever
+// on long-running offices. Both fail-open — any error leaves today's state intact.
+try {
+  const r = maintenance.rotateJournal(JOURNAL);
+  if (r.rotated) console.log(`[maint] journal trimmed ${r.before} -> ${r.kept} lines`);
+} catch (e) { console.error("[maint] journal:", e.message); }
+try {
+  const p = maintenance.pruneSessions(sess);
+  if (p.changed) { sess = p.sess; saveSess(); console.log(`[maint] pruned ${p.dropped} stale session thread(s)`); }
+} catch (e) { console.error("[maint] sessions:", e.message); }
 function latestSession(agent) {
   const l = sess[agent] || [];
   return l.length ? l.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
