@@ -806,7 +806,9 @@ func _finish(a: Dictionary, label: String) -> void:
 		_clear_status_later(a, 4.0)
 
 func _release_desk(a: Dictionary) -> void:
-	if a.desk != "" and not a.desk in ["ops_c", "ceo_desk"]:
+	# lead_desk is the Director's PRIVATE workstation — it must never re-enter the
+	# shared ops pool, or a non-main agent could later pop it and sit at main's desk.
+	if a.desk != "" and not a.desk in ["ops_c", "ceo_desk", "lead_desk"]:
 		desk_pool.append(a.desk)
 	a.desk = ""
 
