@@ -552,8 +552,7 @@
   footer #inp:focus { border-color: var(--accent); }
   /* The resting hint is small + subtle so the empty box stays compact; what you
      TYPE is full-size. (Mini window shrinks the hint a touch more.) */
-  footer #inp::placeholder, .assistrow textarea::placeholder { font-size: 11px; opacity: 0.65; }
-  @media (max-width: 480px), (max-height: 460px) { footer #inp::placeholder { font-size: 10px; } }
+  footer #inp::placeholder, .assistrow textarea::placeholder { font-size: 12px; opacity: 0.7; }
   /* compact square icon buttons so they never crowd out the message box */
   footer .send {
     flex: none; width: 34px; height: 34px; padding: 0; font-size: 15px; cursor: pointer;
@@ -668,9 +667,11 @@
     overflow-y: hidden; overflow-wrap: break-word; word-break: break-word; height: 36px; }
   .assistrow input:focus, .assistrow textarea:focus { border-color: var(--accent); }
   .assistrow .sparkle {
-    flex: none; padding: 0 12px; font-size: 13px; cursor: pointer; border-radius: 9px;
+    flex: none; height: 35px; padding: 0 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border-radius: 10px; display: inline-flex; align-items: center; gap: 4px;
     color: #ffd28a; background: rgba(255,210,138,0.08); border: 1px solid rgba(255,210,138,0.35);
   }
+  .assistrow .sparkle:hover { background: rgba(255,210,138,0.16); }
   .assistrow .sparkle:disabled { opacity: 0.5; cursor: wait; }
   .checks { display: flex; flex-wrap: wrap; gap: 6px; }
   .chk {
@@ -960,7 +961,7 @@
 
   // Dynamic content (chat, feed, agent names, thread titles, live counters)
   // must NOT be machine-translated — only UI chrome. Skip these subtrees.
-  const NO_I18N = new Set(["log", "feed", "feedTasks", "rail", "companion", "nowStrip", "threadName", "pttTxt"]);
+  const NO_I18N = new Set(["log", "feed", "feedTasks", "rail", "companion", "nowStrip", "threadName", "pttTxt", "inp"]);
   function inNoI18n(node) {
     let el = node.nodeType === 1 ? node : node.parentElement;
     while (el) { if (el.id && NO_I18N.has(el.id)) return true; el = el.parentElement; }
@@ -983,11 +984,14 @@
     }
     for (const [node, val] of hits) node.nodeValue = val;
     const attrEls = root.nodeType === 1 ? [root, ...root.querySelectorAll("[placeholder],[title]")] : [];
-    for (const el of attrEls) for (const a of ["placeholder", "title"]) {
+    for (const el of attrEls) {
+      if (inNoI18n(el)) continue;  // e.g. #inp — its placeholder is set via tr() already
+      for (const a of ["placeholder", "title"]) {
       const v = el.getAttribute && el.getAttribute(a); if (!v) continue;
       const key = v.trim();
       if (TR[key]) el.setAttribute(a, TR[key]);
       else if (THAI.test(key)) _pending.add(key);
+      }
     }
     if (_pending.size) { clearTimeout(_timer); _timer = setTimeout(fetchTR, 400); }
   }
@@ -1163,15 +1167,29 @@
     railEl.appendChild(plus);
   }
 
+  // Composer placeholder — follows the chosen language (tr) AND the window: the
+  // mini window shows just the keys, the normal window shows who you're messaging.
+  const _miniMQ = matchMedia("(max-width: 480px), (max-height: 460px)");
+  function setComposerHint(id) {
+    const inp = document.getElementById("inp");
+    if (!inp) return;
+    if (id === undefined) id = target || "main";
+    const hint = tr("⏎ ส่ง · ⇧⏎ บรรทัดใหม่");
+    if (_miniMQ.matches) { inp.placeholder = hint; return; }
+    const prefix = id === "ceo"
+      ? tr("สั่งงานในนาม CEO…")
+      : tr("ส่งข้อความถึง %s…").replace("%s", nameOf(id));
+    inp.placeholder = prefix + "   " + hint;
+  }
+  _miniMQ.addEventListener("change", () => setComposerHint());
+
   function setTarget(id) {
     groupView = null;  // leaving a meeting log view
     target = id;
     document.getElementById("compName").textContent = nameOf(id);
     document.getElementById("compRole").textContent = roleOf(id);
     body(document.getElementById("compBody"), id);
-    document.getElementById("inp").placeholder = id === "ceo"
-      ? `สั่งงานในนาม CEO…   ⏎ ส่ง · ⇧⏎ บรรทัดใหม่`
-      : `Message ${nameOf(id)}…   ⏎ send · ⇧⏎ new line`;
+    setComposerHint(id);
     // 📞 calling is for the MAIN agent only (it speaks for the office).
     // The realtime call always reaches the main agent — offer it from the CEO seat too.
     document.getElementById("liveBtn").style.display = (id === "main" || id === "ceo") ? "" : "none";
