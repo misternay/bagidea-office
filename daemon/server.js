@@ -1943,9 +1943,11 @@ async function runDiscussion(ids, topic, rounds, social) {
 // ---------------------------------------------------------------- http
 
 function readBody(req, cb) {
-  let body = "";
-  req.on("data", (c) => (body += c));
-  req.on("end", () => cb(body));
+  // Collect raw bytes and decode once as UTF-8. Decoding per-chunk (body += c)
+  // corrupts any multibyte char (e.g. 3-byte Thai) that straddles a chunk boundary.
+  const chunks = [];
+  req.on("data", (c) => chunks.push(c));
+  req.on("end", () => cb(Buffer.concat(chunks).toString("utf8")));
 }
 
 function readBodyRaw(req, cb) {
