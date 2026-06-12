@@ -50,6 +50,7 @@ enum UserEvent {
     WorldReady,
     EditorOpening, // show the logo splash + launch the 3D editor tiny behind it
     EditorReady,   // the editor window is on screen → drop the splash
+    OpenWindow(String), // pop a normal OS window onto a daemon URL (plugin / viewer)
 }
 
 // Run a child process without flashing a console window (Windows); a no-op
@@ -1208,6 +1209,8 @@ fn main() {
                     "mini" => p_overlay.send_event(UserEvent::MiniToggle),
                     s if s.starts_with("hotkey:") =>
                         p_overlay.send_event(UserEvent::SetHotkey(s[7..].to_string())),
+                    s if s.starts_with("open-window:") =>
+                        p_overlay.send_event(UserEvent::OpenWindow(s[12..].to_string())),
                     _ => Ok(()),
                 };
             }))
@@ -1242,6 +1245,9 @@ fn main() {
         orb.set_always_on_top(true);
     };
 
+    // Pop-out windows (plugin panels / media viewers) opened on demand from the
+    // overlay. Held here so their Window + WebView stay alive; dropped on close.
+    let mut popups: Vec<(tao::window::WindowId, Window, wry::WebView)> = Vec::new();
     let mut mini = false;
     let mut feed = false;
     let mut editor_pid: u32 = 0;
@@ -1250,7 +1256,7 @@ fn main() {
     // (2 fps). Driven by the manual "Hide office" tray item AND auto-occlusion.
     let mut vis_on = true;
     let mut last_watch = std::time::Instant::now();
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, target, control_flow| {
         // A slow poll tick keeps the tray channels live without pinning a core.
         *control_flow = ControlFlow::WaitUntil(
             std::time::Instant::now() + std::time::Duration::from_millis(250));
@@ -1331,6 +1337,9 @@ fn main() {
             Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
                 if window_id == overlay_id {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                } else {
+                    // A pop-out window's native ✕ — drop it (frees Window + WebView).
+                    popups.retain(|(id, _, _)| *id != window_id);
                 }
             }
             Event::WindowEvent { window_id, event: WindowEvent::Focused(true), .. } => {
@@ -1428,6 +1437,26 @@ fn main() {
                     }
                 }
                 UserEvent::SetHotkey(s) => platform::rebind_hotkey(&s),
+                UserEvent::OpenWindow(u) => {
+                    // A normal, decorated, resizable OS window onto a daemon URL
+                    // (plugin panel, media viewer, terminal watch). Closing it
+                    // via the native ✕ drops it from `popups`.
+                    let full = if u.starts_with("http") { u.clone() }
+                        else { format!("http://127.0.0.1:8787{}", u) };
+                    let win = WindowBuilder::new()
+                        .with_title("BagIdea Office")
+                        .with_inner_size(LogicalSize::new(900.0, 680.0))
+                        .with_window_icon(app_icon())
+                        .build(target)
+                        .expect("popup window");
+                    let id = win.id();
+                    match platform::webview_extras(WebViewBuilder::new().with_url(&full))
+                        .build(&win)
+                    {
+                        Ok(view) => popups.push((id, win, view)),
+                        Err(e) => eprintln!("[shell] popup webview: {e}"),
+                    }
+                }
             },
             _ => {}
         }

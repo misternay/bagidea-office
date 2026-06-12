@@ -2902,11 +2902,14 @@
           <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
         (p.panel ? `<div class="winbtn" title="เปิดแผง">▶</div>` : "") +
+        (p.panel && shellPost ? `<div class="winbtn" title="เปิดเป็นหน้าต่างแยก">⤢</div>` : "") +
         (p.core ? `<span class="hide" title="plugin หลัก ลบไม่ได้" style="opacity:.5;font-size:13px;align-self:center">🔒</span>`
                 : `<div class="winbtn hide" title="ถอนการติดตั้ง">🗑</div>`);
-      const btns = row.querySelectorAll(".winbtn");
-      if (p.panel) btns[0].onclick = () => openPluginPanel(p);
-      else if (!btns.length) row.style.cursor = "default";
+      const openBtn = row.querySelector('[title="เปิดแผง"]');
+      if (openBtn) openBtn.onclick = () => openPluginPanel(p);
+      else if (!p.panel) row.style.cursor = "default";
+      const winBtn = row.querySelector('[title="เปิดเป็นหน้าต่างแยก"]');
+      if (winBtn) winBtn.onclick = () => openPluginWindow(p.id);
       const del = row.querySelector('[title="ถอนการติดตั้ง"]');
       if (del) del.onclick = () => api("/plugins/remove", { id: p.id }).then(() => openPlugins());
       box.appendChild(row);
@@ -2924,10 +2927,17 @@
       else addChip("✗ " + (await r2.text()).slice(0, 100));
     };
   }
+  // Pop a plugin's panel out as its own resizable OS window (via the shell).
+  // Falls back to a browser tab when not running inside the shell.
+  function openPluginWindow(id) {
+    if (shellPost) shellPost("open-window:/plugin/" + id + "/panel");
+    else window.open("/plugin/" + id + "/panel", "_blank");
+  }
   function openPluginPanel(p) {
     modal.classList.add("open");
     modalCard.innerHTML = hdr(p.name) +
       `<iframe id="plgFrame" src="/plugin/${p.id}/panel" style="width:100%;height:60vh;border:none;border-radius:10px;background:#0c1322"></iframe>` +
+      (shellPost ? `<button class="bigbtn" id="plgWin" style="margin-top:8px">⤢ ${t("เปิดเป็นหน้าต่างแยก")}</button>` : "") +
       `<button class="bigbtn" id="plgBack" style="margin-top:8px">← ${t("กลับ")}</button>`;
     // Inject the office's themed scrollbar into the panel iframe so EVERY plugin
     // (even ones whose author forgot the CSS) gets the slim on-theme scrollbar
@@ -2950,6 +2960,8 @@
       } catch {}
     };
     modalCard.querySelector("#plgBack").onclick = () => openPlugins();
+    const pw = modalCard.querySelector("#plgWin");
+    if (pw) pw.onclick = () => openPluginWindow(p.id);
   }
 
   // ---- 🎨 Office Editor: place furniture on a top-down grid ----------------
