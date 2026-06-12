@@ -444,10 +444,12 @@
   /* native date/time pickers: dark color-scheme so the calendar icon is light
      (it was a dark icon lost on the dark input) and the popup renders on-theme. */
   input[type="datetime-local"], input[type="date"], input[type="time"] { color-scheme: dark; }
+  /* force the picker icon to solid WHITE (brightness(0)=black silhouette, then
+     invert(1)=white) so it's clearly visible on the dark input. */
   input[type="datetime-local"]::-webkit-calendar-picker-indicator,
   input[type="date"]::-webkit-calendar-picker-indicator,
   input[type="time"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.9) brightness(1.6); opacity: 0.95; cursor: pointer;
+    filter: brightness(0) invert(1); opacity: 1; cursor: pointer;
   }
   /* full-size image viewer (click an image in chat) */
   #lightbox {
