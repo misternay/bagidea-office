@@ -4,6 +4,18 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.6] — Media shows inline & your atmosphere sticks
+
+**Fixed**
+- **Agents now show media inline.** When an agent shares an image, video or audio,
+  it appears right in the chat as a viewer/player — click to enlarge, ⤢ pop out,
+  📂 reveal in the folder — instead of replying with a raw file path. Agents are
+  told to send the file itself, and the chat now recognises more path styles
+  (forward-slash and macOS paths, not just backslash and uploads).
+- **Your manual day/night choice sticks.** Pinning a fixed atmosphere (e.g. 🌅
+  morning) no longer snaps back to the real-time clock when the wallpaper
+  reconnects or restarts — the choice is now saved and restored on every reconnect.
+
 ## [0.7.5] — Smoother wallpaper, a livelier world & sponsors
 
 **Added**
