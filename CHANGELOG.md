@@ -4,6 +4,30 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.5] — Smoother wallpaper, a livelier world & sponsors
+
+**Added**
+- **Sponsor the project.** A real sponsor wall with four tiers — 💛 Supporter,
+  🥉 Bronze / Backer, 🥈 Silver, 👑 Gold — powered by **GitHub Sponsors**
+  (recurring monthly). Sponsors appear automatically on the website and README,
+  sorted by tier (amounts never shown). See the **Sponsors** page on the site.
+
+**Changed**
+- **Shadows stay crisp at the normal wallpaper zoom.** They used to nearly vanish
+  unless you zoomed right in — now they read clearly and softly without zooming.
+- **Warmer noon light.** Midday was a washed-out white; it's now warm daylight
+  (in the wallpaper and the 3D Office Editor).
+- **Smoother chase.** Agents no longer jitter before a chase — there's a quick
+  "spotted you 👀" beat, then a clean dash.
+- **More cinematic server-room incident.** When the server room blows, the camera
+  now focuses on it with two real explosions, fire, and matching sound.
+
+**Fixed**
+- **Hiding the office no longer stutters the wallpaper.** "Hide office" hides only
+  the overlay UI — your wallpaper is still the live desktop — so it now keeps
+  rendering smoothly at 30 FPS instead of crawling to ~2 FPS (which looked like a
+  frozen, choppy wallpaper). Agents keep working either way.
+
 ## [0.7.4] — Pop-out windows + smarter Office Ops
 
 **Added**
