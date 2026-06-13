@@ -1229,6 +1229,10 @@ PROJECT: <ชื่อโปรเจค> @ <ชื่อ place หรือ ful
 
 function ceoFlow(prompt, session, project, opts = {}) {
   broadcast({ type: "ceo.summon", agent: "main" });
+  // Mirror app/CLI CEO conversations out to connected channels (#121). NOT set
+  // for channel-origin turns — their reply already rides back, so relaying would
+  // echo. Guarded so it's a no-op without a connected channel.
+  if (opts.relay) try { channels.relay("👤 " + prompt); } catch {}
   const wrapped =
     `The owner (CEO) has called you over and given this order in person:\n` +
     `"""${prompt}"""\n\n` +
@@ -1245,7 +1249,10 @@ function ceoFlow(prompt, session, project, opts = {}) {
     project,
     logPrompt: opts.logPrompt || ("👑 (CEO) " + prompt),
     filterText: makeDelegateFilter(0, session),
-    onDone: opts.onDone,   // channels/CLI hook the reply ride-back here
+    onDone: (out, ok) => {
+      if (opts.relay && ok && out) try { channels.relay("👑 " + out); } catch {}
+      if (opts.onDone) opts.onDone(out, ok);   // channels/CLI hook the reply ride-back here
+    },
   });
 }
 
@@ -1897,12 +1904,67 @@ function setAutostart(on, cb) {
 // The outside world (Telegram / Discord / LINE) talks to the Director —
 // inbound messages become serialized Director turns (no thread races) and
 // his reply rides back on the same channel. Full DELEGATE power applies.
+// Slash commands from any connected chat channel (#123) — instant office info
+// without a full Director turn. Returns reply text, or null for a normal message.
+function channelCommand(text) {
+  if (!text.startsWith("/")) return null;
+  const cmd = text.slice(1).split(/\s+/)[0].toLowerCase();
+  if (cmd === "help" || cmd === "start")
+    return [
+      "🧭 คำสั่งลัด:",
+      "/status — ภาพรวมออฟฟิศ",
+      "/agents — รายชื่อทีม",
+      "/projects — โปรเจค",
+      "/who — ใครกำลังทำงานอยู่",
+      "",
+      "พิมพ์ข้อความปกติ = สั่งงาน Director ได้เลย 👑",
+    ].join("\n");
+  if (cmd === "agents" || cmd === "team") {
+    const list = Object.keys(reg.agents)
+      .filter((id) => id !== "ceo")
+      .map((id) => `• ${reg.agents[id].name} — ${reg.agents[id].role}`);
+    return list.length ? "👥 ทีมงาน:\n" + list.join("\n") : "ยังไม่มีพนักงาน";
+  }
+  if (cmd === "projects") {
+    const ps = projectStatus();
+    return ps.length
+      ? "📁 โปรเจค:\n" + ps.map((p) => `• ${p.name}${p.ai ? " 🟢" : ""}`).join("\n")
+      : "ยังไม่มีโปรเจค";
+  }
+  if (cmd === "who") {
+    const busy = projectStatus().filter((p) => p.ai).map((p) => `• ${p.name}`);
+    return busy.length ? "🟢 กำลังทำงานอยู่:\n" + busy.join("\n") : "ตอนนี้ทีมว่างอยู่ 😌";
+  }
+  if (cmd === "status") {
+    const on = Object.entries(channels.status())
+      .filter(([, v]) => v === "on")
+      .map(([k]) => k);
+    return [
+      "🏢 BagIdea Office",
+      `พนักงาน: ${staffCount()} คน`,
+      `โปรเจค: ${projectStatus().length} (กำลังทำงาน ${projectStatus().filter((p) => p.ai).length})`,
+      `ช่องทางที่ต่อ: ${on.length ? on.join(", ") : "—"}`,
+    ].join("\n");
+  }
+  return `ไม่รู้จักคำสั่ง /${cmd} — พิมพ์ /help ดูทั้งหมด`;
+}
+
 const channels = require("./channels")({
   getConfig: () => reg.channels || {},
   log: (s) => console.log(s),
-  onMessage(channel, from, text, reply) {
+  onMessage(channel, from, text, reply, typing) {
     broadcast({ type: "channel.message", channel, from,
       text: String(text).slice(0, 500) });
+    // Slash command? answer instantly, no Director turn (#123).
+    const cmd = channelCommand(String(text).trim());
+    if (cmd !== null) { try { reply(cmd); } catch (e) { console.error("[chan cmd]", e.message); } return; }
+    // "typing…" while the Director thinks (#122) — repeated, since the platforms
+    // expire it after a few seconds.
+    let typer = null;
+    if (typeof typing === "function") {
+      try { typing(); } catch {}
+      typer = setInterval(() => { try { typing(); } catch {} }, 4000);
+    }
     // A channel message IS the owner speaking — it goes through the CEO
     // seat: the Director walks over (ceo.summon), takes the order, may
     // DELEGATE, and his reply rides back on the same channel. Serialized
@@ -1916,6 +1978,7 @@ const channels = require("./channels")({
         { logPrompt: `👑📨 [${channel}] ${String(text).slice(0, 80)}`,
           onDone: (out, ok) => {
             release();
+            if (typer) clearInterval(typer);
             try { reply(ok && out ? out : "ขออภัยครับ ระบบติดขัดชั่วคราว ลองใหม่อีกครั้งนะครับ"); }
             catch (e) { console.error("[chan reply]", e.message); }
           } });
@@ -2270,6 +2333,7 @@ const server = http.createServer((req, res) => {
         const task = agent === "ceo"
           ? ceoFlow(prompt, session, project,
               { logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + prompt : undefined,
+                relay: true,  // mirror the CEO conversation to connected channels
                 onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
           : agent === "main"
             ? runClaude("main", prompt + directorNote(),

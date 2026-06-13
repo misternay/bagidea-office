@@ -107,6 +107,7 @@ module.exports = function initChannels(ctx) {
   // pollers after a restart (two getUpdates → Telegram 409 Conflict).
   let tgGen = 0, dcGen = 0;
   let dcSock = null, dcBeat = null, dcSeq = null;
+  let lastLine = null;  // last LINE sender {token,to} — LINE has no fixed target id
 
   const log = (s) => ctx.log && ctx.log("[chan] " + s);
 
@@ -137,7 +138,9 @@ module.exports = function initChannels(ctx) {
               .filter(Boolean).join(" ") || "telegram user";
             const chatId = m.chat.id;
             ctx.onMessage("telegram", from, m.text,
-              (reply) => sendTelegram(cfg.token, chatId, reply));
+              (reply) => sendTelegram(cfg.token, chatId, reply),
+              () => jreq("POST", "api.telegram.org", `/bot${cfg.token}/sendChatAction`,
+                null, { chat_id: chatId, action: "typing" }, () => {}));
           }
           setTimeout(poll, 400);
         });
@@ -187,7 +190,9 @@ module.exports = function initChannels(ctx) {
           if (cfg.channel && String(d.channel_id) !== String(cfg.channel)) return;
           const from = (d.author && (d.author.global_name || d.author.username)) || "discord user";
           ctx.onMessage("discord", from, d.content,
-            (reply) => sendDiscord(cfg.token, d.channel_id, reply));
+            (reply) => sendDiscord(cfg.token, d.channel_id, reply),
+            () => jreq("POST", "discord.com", `/api/v10/channels/${d.channel_id}/typing`,
+              { authorization: "Bot " + cfg.token }, null, () => {}));
         } else if (m.op === 9) {      // invalid session → re-identify fresh
           try { sock.close(); } catch {}
         }
@@ -230,12 +235,15 @@ module.exports = function initChannels(ctx) {
       if (ev.type !== "message" || !ev.message || ev.message.type !== "text") continue;
       const to = ev.source && (ev.source.userId || ev.source.groupId);
       if (!to) continue;
+      lastLine = { token: cfg.token, to };  // remember so relay() can push here
       ctx.onMessage("line", "LINE user", ev.message.text, (reply) => {
         for (const part of chunk(String(reply), 4900))
           jreq("POST", "api.line.me", "/v2/bot/message/push",
             { authorization: "Bearer " + cfg.token },
             { to, messages: [{ type: "text", text: part }] }, () => {});
-      });
+      },
+      () => jreq("POST", "api.line.me", "/v2/bot/chat/loading/start",
+        { authorization: "Bearer " + cfg.token }, { chatId: to, loadingSeconds: 20 }, () => {}));
     }
   }
 
@@ -252,9 +260,28 @@ module.exports = function initChannels(ctx) {
     if (dcSock) { try { dcSock.close(); } catch {} dcSock = null; }
   }
 
+  // Push an office-originated line OUT to every connected channel that has a
+  // known target — so a conversation held at the CEO seat in the app also
+  // mirrors to Telegram/Discord/LINE. No-op for a channel without a target.
+  function relay(text) {
+    const t = String(text);
+    if (!t.trim()) return;
+    const tg = (ctx.getConfig().telegram) || {};
+    if (state.telegram === "on" && tg.token && tg.chat) sendTelegram(tg.token, tg.chat, t);
+    const dc = (ctx.getConfig().discord) || {};
+    if (state.discord === "on" && dc.token && dc.channel) sendDiscord(dc.token, dc.channel, t);
+    if (lastLine && lastLine.token) {
+      for (const part of chunk(t, 4900))
+        jreq("POST", "api.line.me", "/v2/bot/message/push",
+          { authorization: "Bearer " + lastLine.token },
+          { to: lastLine.to, messages: [{ type: "text", text: part }] }, () => {});
+    }
+  }
+
   return {
     restart() { stopAll(); setTimeout(() => { startTelegram(); startDiscord(); }, 300); },
     lineWebhook,
+    relay,
     status: () => ({ ...state }),
   };
 };

@@ -15,6 +15,10 @@ const BUILTIN_TOOLS = {
   Task: "ปล่อย sub-agent ช่วยทำงานย่อย",
   TodoWrite: "จดและติดตามรายการงาน",
   NotebookEdit: "แก้ไข Jupyter notebook",
+  Skill: "เรียกใช้สกิลที่ได้รับมอบหมาย",
+  BashOutput: "อ่านผลลัพธ์ของงานเบื้องหลังที่สั่งรันไว้",
+  KillShell: "หยุดงานเบื้องหลังที่สั่งรันไว้",
+  SlashCommand: "เรียกใช้คำสั่ง slash ที่ติดตั้งไว้",
 };
 
 const SKILL_LIBRARY = {
