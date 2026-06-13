@@ -516,6 +516,53 @@ mod platform {
         }
     }
 
+    /// Place the wallpaper window over the chosen monitor (default: primary),
+    /// in WorkerW client coords. WorkerW spans the whole virtual desktop, so its
+    /// origin is the virtual-screen origin. Without this the reparented window
+    /// kept Godot's (0,0)+primary-size guess, which on a multi-monitor setup
+    /// lands on the wrong monitor (or off-screen) — so the wallpaper never
+    /// appeared. `BAGIDEA_MONITOR=<index>` (0 = primary) picks another monitor.
+    fn position_wallpaper(godot: HWND) {
+        unsafe {
+            use windows_sys::Win32::Foundation::{LPARAM, RECT};
+            use windows_sys::Win32::Graphics::Gdi::{
+                EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
+            };
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetSystemMetrics, MoveWindow, SM_CXSCREEN, SM_CYSCREEN, SM_XVIRTUALSCREEN,
+                SM_YVIRTUALSCREEN,
+            };
+            struct Mons { v: Vec<(i32, i32, i32, i32, bool)> }
+            unsafe extern "system" fn cb(h: HMONITOR, _dc: HDC, _r: *mut RECT, lp: LPARAM) -> i32 {
+                let m = &mut *(lp as *mut Mons);
+                let mut mi: MONITORINFO = std::mem::zeroed();
+                mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+                if GetMonitorInfoW(h, &mut mi) != 0 {
+                    let r = mi.rcMonitor;
+                    m.v.push((r.left, r.top, r.right - r.left, r.bottom - r.top, mi.dwFlags & 1 != 0));
+                }
+                1
+            }
+            let mut mons = Mons { v: Vec::new() };
+            EnumDisplayMonitors(0 as HDC, std::ptr::null(), Some(cb), &mut mons as *mut Mons as LPARAM);
+            mons.v.sort_by_key(|m| !m.4); // primary first → index 0 is always primary
+            let idx = std::env::var("BAGIDEA_MONITOR")
+                .ok()
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+            let vsx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            let vsy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            let (left, top, w, h) = mons
+                .v
+                .get(idx)
+                .or_else(|| mons.v.first())
+                .map(|&(l, t, w, h, _)| (l, t, w, h))
+                .unwrap_or((0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)));
+            // WorkerW client origin = virtual-screen origin → subtract it.
+            MoveWindow(godot, left - vsx, top - vsy, w, h, 1);
+        }
+    }
+
     pub fn attach_wallpaper_when_ready(pid: u32, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
         std::thread::spawn(move || unsafe {
             let mut find = FindByPid { pid, hwnd: 0 as HWND };
@@ -566,6 +613,10 @@ mod platform {
                 }
             }
             SetParent(godot, workerw);
+            // Cover the chosen monitor in WorkerW coords (fixes multi-monitor:
+            // the window used to keep its primary-size guess at (0,0) and miss
+            // the target screen entirely).
+            position_wallpaper(godot);
             let _ = proxy.send_event(UserEvent::WorldReady);
         });
     }
