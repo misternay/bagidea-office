@@ -105,11 +105,25 @@ function staffCount() {
 }
 
 // ---- Workflow Builder (human-language nodes the Director analyzes) ----------
-// Flow is read top→bottom by node Y on the canvas, so no explicit edges needed.
+// Nodes form a graph via edges (A → B = do B after A). A node with several
+// outgoing edges = parallel branches; several incoming = wait for all, then
+// continue. Falls back to top→bottom by Y when no edges are drawn.
 function workflowToText(w) {
-  const nodes = (w.nodes || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0));
-  let s = `Workflow: ${w.name || "(untitled)"}\nSteps (in order):\n`;
-  nodes.forEach((n, i) => { s += `${i + 1}. [${n.type || "step"}] ${(n.text || "").trim()}\n`; });
+  const nodes = w.nodes || [];
+  const edges = w.edges || [];
+  const byId = {}; for (const n of nodes) byId[n.id] = n;
+  const label = (id) => { const n = byId[id]; return n ? `[${n.type || "step"}] ${(n.text || "").trim()}` : id; };
+  let s = `Workflow: ${w.name || "(untitled)"}\n\nSteps:\n`;
+  nodes.slice().sort((a, b) => (a.y || 0) - (b.y || 0))
+    .forEach((n, i) => { s += `(${i + 1}) ${label(n.id)}\n`; });
+  if (edges.length) {
+    s += "\nFlow (A → B = do B after A; a node with several outgoing arrows runs those " +
+      "branches in PARALLEL; a node with several incoming arrows WAITS for all of them " +
+      "before continuing):\n";
+    for (const e of edges) s += `- ${label(e.from)}  →  ${label(e.to)}\n`;
+  } else {
+    s += "\n(No connections drawn — treat the steps in order, top to bottom.)\n";
+  }
   return s;
 }
 const WORKFLOW_ANALYZE_PROMPT = [
