@@ -1969,6 +1969,7 @@
   // checkmark — survive a wiped journal (a fresh install just gets "auto").
   let dayMode = "auto";
   try { const s = localStorage.getItem("dayMode"); if (s !== null && s !== "") dayMode = s; } catch {}
+  let monMode = 0;  // wallpaper monitor index (synced from roster.sync)
   // "auto" hands the clock back to real time; a number pins it. godot needs a
   // real number ("13" as a string reads as auto there), so coerce here.
   function pushDaylight(v) {
@@ -2001,6 +2002,31 @@
       };
       m.appendChild(o);
     }
+    // ---- monitor picker (multi-monitor) — applies on next restart -----------
+    const hr = document.createElement("div");
+    hr.style.cssText = "border-top:1px solid rgba(255,255,255,.12);margin:6px 0 4px;padding-top:5px;font-size:11px;opacity:.6";
+    hr.textContent = "🖥 จอแสดงผล (รีสตาร์ทเพื่อใช้)";
+    m.appendChild(hr);
+    for (let i = 0; i < 3; i++) {
+      const o = document.createElement("div");
+      const active = i === monMode;
+      o.className = "opt" + (active ? " active" : "");
+      const mark = document.createElement("span");
+      mark.textContent = active ? "✓ " : "  ";
+      const lbl = document.createElement("span");
+      lbl.textContent = i === 0 ? "จอหลัก (Primary)" : "จอที่ " + (i + 1);
+      o.append(mark, lbl);
+      o.onclick = () => { m.classList.remove("open"); setMonitor(i); };
+      m.appendChild(o);
+    }
+  }
+  function setMonitor(i) {
+    monMode = i;
+    renderDayMenu();
+    fetch("/ui/monitor", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ index: i }) })
+      .then(() => pillShow("🖥 ตั้งจอแล้ว — รีสตาร์ทออฟฟิศเพื่อให้มีผล", "", true))
+      .catch(() => {});
   }
   // One dropdown at a time: opening any menu closes the others. (Each menu
   // button calls stopPropagation, so the per-menu outside-click closers can't
@@ -4089,6 +4115,7 @@
       REGMCP = ev.mcp || {};
       AUTOSKILLS = ev.autoSkills !== false;
       SOUND = ev.sound !== false;
+      if (typeof ev.monitor === "number") { monMode = ev.monitor; try { renderDayMenu(); } catch {} }
       HEARTBEAT = Number(ev.heartbeatMin || 0);
       if (ev.features) FEATURES = ev.features;
       TTSON = ev.tts !== false;

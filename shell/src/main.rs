@@ -522,7 +522,7 @@ mod platform {
     /// kept Godot's (0,0)+primary-size guess, which on a multi-monitor setup
     /// lands on the wrong monitor (or off-screen) — so the wallpaper never
     /// appeared. `BAGIDEA_MONITOR=<index>` (0 = primary) picks another monitor.
-    fn position_wallpaper(godot: HWND) {
+    fn position_wallpaper(godot: HWND, root: &std::path::Path) {
         unsafe {
             use windows_sys::Win32::Foundation::{LPARAM, RECT};
             use windows_sys::Win32::Graphics::Gdi::{
@@ -546,9 +546,12 @@ mod platform {
             let mut mons = Mons { v: Vec::new() };
             EnumDisplayMonitors(0 as HDC, std::ptr::null(), Some(cb), &mut mons as *mut Mons as LPARAM);
             mons.v.sort_by_key(|m| !m.4); // primary first → index 0 is always primary
-            let idx = std::env::var("BAGIDEA_MONITOR")
+            // Chosen monitor: daemon/monitor.txt (set from the in-app picker) wins,
+            // then the BAGIDEA_MONITOR env, else 0 (primary). Plain int — no JSON dep.
+            let idx = std::fs::read_to_string(root.join("daemon").join("monitor.txt"))
                 .ok()
                 .and_then(|s| s.trim().parse::<usize>().ok())
+                .or_else(|| std::env::var("BAGIDEA_MONITOR").ok().and_then(|s| s.trim().parse::<usize>().ok()))
                 .unwrap_or(0);
             let vsx = GetSystemMetrics(SM_XVIRTUALSCREEN);
             let vsy = GetSystemMetrics(SM_YVIRTUALSCREEN);
@@ -563,7 +566,7 @@ mod platform {
         }
     }
 
-    pub fn attach_wallpaper_when_ready(pid: u32, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
+    pub fn attach_wallpaper_when_ready(pid: u32, root: PathBuf, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
         std::thread::spawn(move || unsafe {
             let mut find = FindByPid { pid, hwnd: 0 as HWND };
             for _ in 0..240 {
@@ -616,7 +619,7 @@ mod platform {
             // Cover the chosen monitor in WorkerW coords (fixes multi-monitor:
             // the window used to keep its primary-size guess at (0,0) and miss
             // the target screen entirely).
-            position_wallpaper(godot);
+            position_wallpaper(godot, &root);
             let _ = proxy.send_event(UserEvent::WorldReady);
         });
     }
@@ -861,7 +864,7 @@ mod platform {
 
     // The shim handles the desktop-level embed; here we just wait for the world
     // to report ready (or a timeout) and lift the splash.
-    pub fn attach_wallpaper_when_ready(_pid: u32, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
+    pub fn attach_wallpaper_when_ready(_pid: u32, _root: PathBuf, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
         std::thread::spawn(move || {
             let started = std::time::SystemTime::now() - std::time::Duration::from_secs(2);
             let flag = std::env::temp_dir().join("bagidea_world_ready");
@@ -1096,7 +1099,7 @@ mod platform {
     pub fn ensure_single_instance() -> bool { true }
     pub fn spawn_hotkey_thread(_p: tao::event_loop::EventLoopProxy<UserEvent>) {}
     pub fn rebind_hotkey(_s: &str) {}
-    pub fn attach_wallpaper_when_ready(_pid: u32, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
+    pub fn attach_wallpaper_when_ready(_pid: u32, _root: PathBuf, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(4));
             let _ = proxy.send_event(UserEvent::WorldReady);
@@ -1166,7 +1169,7 @@ fn main() {
         .unwrap_or((1920, 1080));
     let mut office_child = spawn_office(&root, phys_w / 2, phys_h / 2 - 30);
     if let Some(child) = office_child.as_ref() {
-        platform::attach_wallpaper_when_ready(child.id(), proxy.clone());
+        platform::attach_wallpaper_when_ready(child.id(), root.clone(), proxy.clone());
     }
 
     let _ = std::fs::write(std::env::temp_dir().join("bagidea_shell_alive"), "1");

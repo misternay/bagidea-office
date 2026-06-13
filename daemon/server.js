@@ -122,7 +122,7 @@ function rosterEvt() {
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
     proposalMin: Number(reg.proposalMin !== undefined ? reg.proposalMin : 120),
     maxStaff: MAX_STAFF, staffCount: staffCount(),
-    lang: reg.lang || "en", daylight: reg.daylight ?? "auto" };
+    lang: reg.lang || "en", daylight: reg.daylight ?? "auto", monitor: reg.monitor || 0 };
 }
 
 // Structured persona → one compiled system prompt (editor v2 fields).
@@ -3411,6 +3411,20 @@ const server = http.createServer((req, res) => {
         res.writeHead(400);
         res.end("bad json");
       }
+    });
+
+  } else if (req.method === "POST" && req.url === "/ui/monitor") {
+    // Which monitor the wallpaper runs on (multi-monitor). The shell reads
+    // daemon/monitor.txt at attach time (0 = primary); applies on next restart.
+    readBody(req, (body) => {
+      try {
+        const idx = Math.max(0, parseInt(JSON.parse(body || "{}").index, 10) || 0);
+        reg.monitor = idx;
+        saveReg();
+        fs.writeFileSync(path.join(__dirname, "monitor.txt"), String(idx));
+        broadcast({ type: "ui.monitor", index: idx }, false);
+        res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
     });
 
   } else if (req.method === "POST" && req.url === "/event") {
