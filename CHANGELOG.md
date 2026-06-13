@@ -4,6 +4,45 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.7] — Workflow Builder, louder channels & a sturdier wallpaper
+
+A big update — a whole new way to plan work, channels that talk back, and fixes
+for the multi-monitor / desktop-click wallpaper reports.
+
+**Added**
+- **🔀 Workflow Builder.** A drag-drop canvas (⋯ menu → Workflow Builder) where
+  each node is a plain-language step (trigger / fetch / action / decision /
+  output / note) and the flow reads top→bottom. Hit **Analyze** and the Director
+  reads your plan and tells you which skills/tools to use, what permissions or
+  agents are needed, and what's still open — so non-technical users can plan work
+  and let the team figure out execution. Ships with three example workflows to
+  learn from. (Guide: docs/guide/workflows.md)
+- **Channels do more.** Conversations at the CEO seat now **mirror out** to your
+  connected Telegram / Discord / LINE; agents show a **“typing…”** indicator
+  while they think; and **slash commands** (`/status`, `/agents`, `/projects`,
+  `/who`, `/help`) answer instantly from any channel.
+- **Pick the wallpaper monitor.** A monitor picker in the display menu (and a
+  `BAGIDEA_MONITOR` override) for multi-monitor setups.
+- **More agent tools & gimmicks.** Exposed `Skill` / `BashOutput` / `KillShell` /
+  `SlashCommand` to the tool catalog; new idle moments (yawn, lightbulb idea,
+  high-five, group selfie) so the office feels livelier.
+
+**Changed**
+- **Wallpaper sits on the right monitor.** On multi-monitor desktops it now lands
+  on your primary (or chosen) screen instead of missing the screen entirely.
+- **Meeting board scales with zoom** — it no longer looms oversized when zoomed
+  out. The server-room incident is now a **rare** treat (cooldown), not frequent.
+- **Leaner tokens** — trimmed the per-turn media note and skip it for ghost
+  sub-agents.
+
+**Fixed**
+- **Wallpaper no longer detaches on a desktop click** (a re-pin watcher keeps it
+  embedded; it respects an intentional Hide-office). *(GitHub #7)*
+- **All staff now appear in the 3D office**, not just the CEO — a roster
+  reconcile re-ensures every teammate has a body. *(GitHub #6)*
+- **Multi-monitor blank wallpaper** (secondary monitor at a negative X) now
+  embeds correctly. *(GitHub #5)*
+
 ## [0.7.6] — Media shows inline & your atmosphere sticks
 
 **Fixed**

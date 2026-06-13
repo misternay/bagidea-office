@@ -46,6 +46,7 @@
     <a href="#updates" data-i18n="dn_updates">Updates & start-up</a>
     <h4 data-i18n="dn_features">More</h4>
     <a href="#plugins" data-i18n="dn_plugins">Plugins & skills</a>
+    <a href="#workflow" data-i18n="dn_workflow">Workflow Builder</a>
     <a href="#lang" data-i18n="dn_lang">Languages</a>
     <a href="#sponsors" data-i18n="dn_sponsors">Sponsoring</a>
     <a href="https://github.com/bagidea/bagidea-office/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-i18n="dn_changelog">Changelog ↗</a>
@@ -146,6 +147,14 @@ bagidea start   # launch the office</code></pre>
     <img src="img/briefing.png" alt="A morning briefing rendered inside a plugin panel">
     <pre><code>bagidea plugin install https://github.com/bagidea/bagidea-office-template</code></pre>
     <p data-i18n="d_skills_p">Every office ships with a library of builtin skills (deep research, office control, plugin building, code review, docs, debugging, data wrangling, project kickoff, diagrams) you can assign to any agent, plus Hermes-style skills the office learns automatically after real work. Add new raw capability via MCP servers.</p>
+
+    <h2 id="workflow" data-i18n="d_wf_h">Workflow Builder</h2>
+    <p data-i18n="d_wf_p">Plan work as plain-language nodes on a drag-drop canvas (⋯ menu → Workflow Builder) — each node is a step (trigger / fetch / action / decision / output) and the flow reads top to bottom. Press <b>Analyze</b> and the Director reads your plan and tells you which skills and tools it needs, what permissions or extra agents to add, and what's still undecided — so you can plan work even if you don't know how to instruct it, and let the team work out the execution.</p>
+    <ol>
+      <li data-i18n-html="d_wf_1"><b>Add nodes & write in plain language.</b> e.g. “every morning summarize AI news, then send it to Telegram”. Drag cards to order the flow top→bottom.</li>
+      <li data-i18n-html="d_wf_2"><b>Analyze.</b> The Director returns a plan: needed skills/tools, permissions/agents to set up, and open questions. (This release plans only — it doesn't auto-run yet.)</li>
+      <li data-i18n-html="d_wf_3"><b>Save & reuse.</b> Workflows are stored under workspace/workflows. Three example workflows ship in the box to learn from.</li>
+    </ol>
 
     <h2 id="lang" data-i18n="d_lang_h">Languages</h2>
     <p data-i18n="d_lang_p">The whole interface supports 14 languages. English is the default; pick another in settings and the office translates office-wide (and remembers your choice per machine). This website speaks the same 14 languages — use the picker in the top bar.</p>

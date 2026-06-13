@@ -33,8 +33,9 @@ the office truly comes alive.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
-- **v0.7.4** — pop-out plugin **windows** (custom chrome: minimize/maximize/close, resizable or fixed), a **watch-agent-live** window, self-tidying & **editable tasks**, calendar states, Plugins search.
-- **v0.7.0–0.7.3** — **Hermes-style memory + native skills** (far fewer tokens, same smarts), audio device settings, chat timestamps & image lightbox, cleaner shadows, a livelier office (cross-room chase, server-room incidents).
+- **v0.7.7** — 🔀 **Workflow Builder** (plan work as plain-language nodes; the Director analyzes what skills/tools/agents it needs), channels that **mirror out + show “typing” + take slash commands**, **multi-monitor** wallpaper + monitor picker, more tools & agent gimmicks. Fixes the desktop-click/multi-monitor wallpaper reports (#5/#6/#7).
+- **v0.7.5–0.7.6** — **media shows inline** in chat (images/video/audio, not file paths), manual **atmosphere persists**, a **sponsor wall** via GitHub Sponsors, smoother wallpaper (visible shadows, warmer noon).
+- **v0.7.0–0.7.4** — **Hermes-style memory + native skills** (far fewer tokens, same smarts), pop-out plugin **windows**, watch-agent-live, editable tasks, audio device settings.
 - **v0.6.x** — first **macOS** build (beta), full **14-language** UI, cost visibility, Right-Ctrl push-to-talk.
 
 → Full history in the [**CHANGELOG**](CHANGELOG.md).
