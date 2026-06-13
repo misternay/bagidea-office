@@ -1164,21 +1164,29 @@ func _idle_life_loop() -> void:
 		# Weighted so the CAFE gets as much love as the REC room, with the odd
 		# wander to the server/meeting rooms (rare). Beds are handled by naps.
 		var r := randf()
-		if r < 0.13:
+		if r < 0.11:
 			_act_tv(a)             # rec
-		elif r < 0.21:
+		elif r < 0.18:
 			_act_ball(a)           # rec
-		elif r < 0.29:
+		elif r < 0.25:
 			_act_pet(a)            # rec
-		elif r < 0.41:
+		elif r < 0.34:
 			_act_chase(a, pool)    # play tag with a friend (falls back if alone)
-		elif r < 0.49:
+		elif r < 0.40:
 			_act_dance(a)          # a little dance in the rec room
-		elif r < 0.55:
+		elif r < 0.45:
 			_act_stretch(a)        # quick stretch on the spot
-		elif r < 0.78:
+		elif r < 0.49:
+			_act_yawn(a)           # 🥱 sleepy beat on the spot
+		elif r < 0.53:
+			_act_idea(a)           # 💡 a lightbulb moment
+		elif r < 0.58:
+			_act_highfive(a, pool) # ✋ high-five a colleague
+		elif r < 0.62:
+			_act_selfie(a, pool)   # 📸 group selfie in the lobby
+		elif r < 0.80:
 			_act_cafe(a)           # cafe — still the biggest single share
-		elif r < 0.90:
+		elif r < 0.92:
 			_act_chat(a, pool)     # chat with a colleague (anywhere)
 		elif r < 0.99 or Time.get_ticks_msec() / 1000.0 < _incident_cd:
 			_act_explore(a)        # a rare peek at the server / meeting room
@@ -1269,6 +1277,71 @@ func _act_explore(a: Dictionary) -> void:
 	await get_tree().create_timer(d + randf_range(6.0, 12.0)).timeout
 	if a.state == "idle":
 		a.node.set_status("")
+
+## A sleepy little yawn on the spot — no walking, pure charm.
+func _act_yawn(a: Dictionary) -> void:
+	if not is_instance_valid(a.node):
+		return
+	a.node.set_status(ui(["หาว... 🥱", "ง่วงจัง 😴", "ขอบิดขี้เกียจแป๊บ 🥱"].pick_random()))
+	Fx.spawn(a.node, "sparkle", Vector3(0, 1.2, 0), 0.02)
+	_clear_status_later(a, 4.0)
+
+## A lightbulb moment — an idea strikes.
+func _act_idea(a: Dictionary) -> void:
+	if not is_instance_valid(a.node):
+		return
+	a.node.set_status(ui(["ไอเดียเด็ด! 💡", "นึกออกแล้ว! 💡", "เจอทางแล้ว ✨"].pick_random()))
+	Fx.spawn(a.node, "light_burst", Vector3(0, 1.3, 0), 0.03)
+	Sfx.play("blip2")
+	_maybe_focus(a.node, 0.5, 5.0)
+	_clear_status_later(a, 5.0)
+
+## Two idle agents meet up for a high-five.
+func _act_highfive(a: Dictionary, pool: Array) -> void:
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	if others.is_empty():
+		_act_yawn(a)
+		return
+	var b: Dictionary = others.pick_random()
+	a.node.set_status(ui("ไฮไฟว์! ✋"))
+	b.node.set_status(ui("ไฮไฟว์! ✋"))
+	var d: float = a.node.walk_to(world.path_between(a.node.position,
+		b.node.position + Vector3(0.6, 0, 0.3)))
+	await get_tree().create_timer(d + 0.2).timeout
+	if is_instance_valid(a.node):
+		Fx.spawn(a.node, "sparkle", Vector3(0, 1.2, 0), 0.03)
+	if is_instance_valid(b.node):
+		Fx.spawn(b.node, "sparkle", Vector3(0, 1.2, 0), 0.03)
+	Sfx.play("blip2")
+	_maybe_focus(a.node, 0.6, 5.0)
+	_clear_status_later(a, 5.0)
+	_clear_status_later(b, 5.0)
+
+## A quick group selfie in the lobby — needs a small crew.
+func _act_selfie(a: Dictionary, pool: Array) -> void:
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	if others.size() < 2 or not world.WP.has("lobby_c"):
+		_act_idea(a)
+		return
+	var crew: Array = [a, others[0], others[1]]
+	var spot: Vector3 = world.WP["lobby_c"]
+	var offs := [Vector3(-0.7, 0, 0.0), Vector3(0, 0, 0.35), Vector3(0.7, 0, 0.0)]
+	var dmax := 0.0
+	for i in crew.size():
+		var m: Dictionary = crew[i]
+		if not is_instance_valid(m.node):
+			continue
+		m.node.set_status(ui("ยิ้ม! 📸"))
+		var dd: float = m.node.walk_to(world.path_to(m.node.position, "lobby_c") + [spot + offs[i]])
+		dmax = maxf(dmax, dd)
+	await get_tree().create_timer(dmax + 0.4).timeout
+	for m in crew:
+		if is_instance_valid(m.node):
+			Fx.spawn(m.node, "sparkle", Vector3(0, 1.3, 0), 0.03)
+	Sfx.play("tada")
+	_maybe_focus(a.node, 0.8, 6.0)
+	for m in crew:
+		_clear_status_later(m, 5.0)
 
 ## Keep a free target point inside the office (the chase dash could otherwise
 ## fling an agent through a wall and out onto the lawn).
