@@ -33,7 +33,8 @@ the office truly comes alive.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
-- **v0.7.7** — 🔀 **Workflow Builder** (plan work as plain-language nodes; the Director analyzes what skills/tools/agents it needs), channels that **mirror out + show “typing” + take slash commands**, **multi-monitor** wallpaper + monitor picker, more tools & agent gimmicks. Fixes the desktop-click/multi-monitor wallpaper reports (#5/#6/#7).
+- **v0.7.8–0.7.9** — 🔀 **Workflow Builder** grows up: an n8n-style **graph canvas** (zoom/pan, branch & merge), **tabs**, **7 read-only examples**, and you can **▶️ Run** a flow or **🧠 save it as a Skill**. 🧰 **Tools Hub** — one-click MCP servers (Browser automation, Google, Postgres, Notion…) with a plain-language guide. New windows now follow your **language**, plugins open one way, the chat tucks aside for new windows, and a **wallpaper-stability** fix (no more vanishing on Win+D).
+- **v0.7.7** — first Workflow Builder, channels that **mirror out + show “typing” + take slash commands**, **multi-monitor** wallpaper + monitor picker. Fixes the wallpaper reports (#5/#6/#7).
 - **v0.7.5–0.7.6** — **media shows inline** in chat (images/video/audio, not file paths), manual **atmosphere persists**, a **sponsor wall** via GitHub Sponsors, smoother wallpaper (visible shadows, warmer noon).
 - **v0.7.0–0.7.4** — **Hermes-style memory + native skills** (far fewer tokens, same smarts), pop-out plugin **windows**, watch-agent-live, editable tasks, audio device settings.
 - **v0.6.x** — first **macOS** build (beta), full **14-language** UI, cost visibility, Right-Ctrl push-to-talk.

@@ -4,6 +4,31 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.9] — Workflows you can run, a richer Tools Hub & full-language windows
+
+**Added**
+- **Workflows do things now.** After you build a flow, **▶️ Run now** hands it to
+  the team to execute (with parallel branches & “wait for all” merges), and **🧠
+  Save as Skill** turns it into a reusable skill you assign to an agent (or just
+  tell an agent to “run &lt;name&gt;”). Dragging to connect nodes is fixed.
+- **Workflow tabs + read-only examples.** Open several workflows in tabs and
+  switch between them. **7 worked examples** (basic→advanced: PDF summary, GitHub
+  triage, competitor watch, research→draft→review…) are read-only templates —
+  save one to fork your own editable copy. Your test workflows are kept clean.
+- **Tools Hub: more & clearer.** 12 popular MCP servers (Browser, Memory,
+  Sequential-Thinking, Filesystem, Fetch, GitHub, Google Workspace, Google Maps,
+  Brave Search, Postgres, Slack, Notion), installed ones grouped on top, plus a
+  plain-language **“What is MCP?”** explainer and how-to.
+
+**Changed**
+- **New windows speak your language.** The Workflow Builder and Tools Hub now
+  follow the office language (Thai/English; other languages fall back to English)
+  instead of always showing Thai.
+- **Plugins open one way** — as their own window (so they can't be open two ways
+  at once), and the chat tucks aside for any new window / opened image or folder.
+- **Warmer agent voices** — every spoken line now carries a lively, natural,
+  anime-flavored delivery instead of a flat read.
+
 ## [0.7.8] — Visual Workflow canvas, Tools Hub & a wallpaper-stability fix
 
 **Fixed**
