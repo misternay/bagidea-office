@@ -619,53 +619,18 @@ mod platform {
                 }
             }
             SetParent(godot, workerw);
-            // Cover the chosen monitor in WorkerW coords (fixes multi-monitor:
-            // the window used to keep its primary-size guess at (0,0) and miss
-            // the target screen entirely).
-            position_wallpaper(godot, &root);
-            let _ = proxy.send_event(UserEvent::WorldReady);
-
-            // Re-attach watcher (issue #7) — GENTLE. The earlier version pinned the
-            // z-order / re-poked Progman every tick, which BURIED the wallpaper on
-            // setups where it was actually fine (a regression: Win+D made it vanish).
-            // Rule now: while the window is correctly embedded in WorkerW, do NOTHING.
-            // Only when it has genuinely lost its WorkerW parent (e.g. Win+D destroyed
-            // the WorkerW) do we recreate it and re-attach. Respects Hide-office.
-            use windows_sys::Win32::UI::WindowsAndMessaging::{GetParent, IsWindow};
-            let progman_class = wide("Progman");
-            loop {
-                std::thread::sleep(std::time::Duration::from_millis(1200));
-                if IsWindow(godot) == 0 {
-                    break; // renderer gone — stop watching
-                }
-                if WALLPAPER_HIDDEN.load(std::sync::atomic::Ordering::SeqCst) {
-                    continue; // user hid the office on purpose — leave it hidden
-                }
-                let mut ww: HWND = 0 as HWND;
-                EnumWindows(Some(find_workerw_cb), &mut ww as *mut HWND as _);
-                // Correctly embedded? leave it COMPLETELY alone (no z-order / parent
-                // poking — that was the regression).
-                if ww != 0 as HWND && GetParent(godot) == ww {
-                    continue;
-                }
-                // Genuinely detached. If the WorkerW is gone (Win+D destroyed it),
-                // ask Progman to recreate it, then re-find + re-attach.
-                if ww == 0 as HWND {
-                    let progman = FindWindowW(progman_class.as_ptr(), std::ptr::null());
-                    let mut r: usize = 0;
-                    SendMessageTimeoutW(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, &mut r);
-                    EnumWindows(Some(find_workerw_cb), &mut ww as *mut HWND as _);
-                    if ww == 0 as HWND {
-                        let wc = wide("WorkerW");
-                        ww = FindWindowExW(progman, 0 as HWND, wc.as_ptr(), std::ptr::null());
-                    }
-                }
-                if ww != 0 as HWND {
-                    SetParent(godot, ww);
-                    position_wallpaper(godot, &root);
-                    ShowWindow(godot, SW_SHOW);
-                }
+            // By DEFAULT do nothing more — just like the original code that stayed
+            // pinned through Win+D / desktop clicks. Reposition ONLY when the user
+            // explicitly picked a monitor (multi-monitor); moving/poking the embed
+            // otherwise regressed it (the wallpaper vanished on Win+D). No watcher.
+            let monitor_chosen =
+                std::fs::read_to_string(root.join("daemon").join("monitor.txt"))
+                    .ok().map(|s| !s.trim().is_empty()).unwrap_or(false)
+                || std::env::var("BAGIDEA_MONITOR").map(|s| !s.trim().is_empty()).unwrap_or(false);
+            if monitor_chosen {
+                position_wallpaper(godot, &root);
             }
+            let _ = proxy.send_event(UserEvent::WorldReady);
         });
     }
 
