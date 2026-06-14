@@ -29,7 +29,9 @@
     radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0) 0 0/24px 24px; }
   #vp.panning { cursor:grabbing; }
   #world { position:absolute; left:0; top:0; width:1px; height:1px; transform-origin:0 0; }
-  #edges { position:absolute; left:-4000px; top:-4000px; width:8000px; height:8000px; overflow:visible; pointer-events:none; }
+  /* origin-aligned with #world so edge paths (drawn in world coords) line up with
+     the nodes; overflow:visible lets paths render outside the 1px box. */
+  #edges { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; pointer-events:none; }
   #edges path.edge { fill:none; stroke:#5ec8ff; stroke-width:2; opacity:.7; pointer-events:stroke; cursor:pointer; }
   #edges path.edge:hover { stroke:#7fd4ff; opacity:1; stroke-width:3; }
   #edges path.temp { fill:none; stroke:#7fd4ff; stroke-width:2; stroke-dasharray:5 4; opacity:.8; }
@@ -63,6 +65,7 @@
 <body>
   <div id="bar">
     <input id="name" placeholder="ชื่อ workflow…" value="Workflow ใหม่">
+    <button onclick="newWf()">🆕 ใหม่</button>
     <button onclick="addNode()">＋ Node</button>
     <select id="wfopen" onchange="if(this.value)loadWf(this.value)"><option value="">📂 เปิด…</option></select>
     <span class="grow"></span>
@@ -220,10 +223,18 @@
   }
 
   // ---- persistence ----
+  function rememberLast() { try { localStorage.setItem("lastWf", curId || ""); } catch {} }
   function saveWf() {
     const body = { id: curId || undefined, name: document.getElementById("name").value || "Workflow", nodes, edges };
     fetch("/workflows/save", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body) })
-      .then(r=>r.json()).then(j=>{ curId=j.id; flash("💾 บันทึกแล้ว"); refreshList(); }).catch(()=>flash("บันทึกไม่สำเร็จ"));
+      .then(r=>r.json()).then(j=>{ curId=j.id; rememberLast(); flash("💾 บันทึกแล้ว"); refreshList(); }).catch(()=>flash("บันทึกไม่สำเร็จ"));
+  }
+  function newWf() {
+    clearCanvas(); nodes = []; edges = []; curId = ""; seq = 1; rememberLast();
+    document.getElementById("name").value = "Workflow ใหม่";
+    pan = { x: 60, y: 40 }; zoom = 1; applyTransform();
+    addNode("trigger", "เมื่อสั่งให้เริ่ม…");
+    document.getElementById("wfopen").value = "";
   }
   function analyze() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");
@@ -235,9 +246,11 @@
   function clearCanvas() { world.querySelectorAll(".node").forEach(e=>e.remove()); edgeg.innerHTML=""; }
   function loadWf(id) {
     fetch("/workflows/get?id="+encodeURIComponent(id)).then(r=>r.json()).then(w=>{
-      clearCanvas(); nodes = w.nodes||[]; edges = w.edges||[]; curId = w.id||id;
+      clearCanvas(); nodes = w.nodes||[]; edges = w.edges||[]; curId = w.id||id; rememberLast();
       document.getElementById("name").value = w.name||"Workflow";
-      seq = nodes.length + 1; nodes.forEach(renderNode); drawEdges(); fitView();
+      // ids like n3 → keep seq ahead of the highest existing id so new nodes don't collide
+      seq = Math.max(1, ...nodes.map(n=>parseInt(String(n.id).replace(/\D/g,""))||0)) + 1;
+      nodes.forEach(renderNode); drawEdges(); fitView();
     });
   }
   function refreshList() {
@@ -248,18 +261,31 @@
   }
   function flash(t){ const p=document.getElementById("plan"); const o=p.textContent; p.textContent=t; setTimeout(()=>{ if(p.textContent===t)p.textContent=o; },1500); }
 
-  // seed a small branching example so the canvas shows what's possible
-  applyTransform();
-  addNode("trigger","เมื่อสั่งให้เริ่ม");
-  addNode("fetch","หาข่าว A");
-  addNode("fetch","หาข่าว B");
-  addNode("action","รวมแล้วสรุป");
-  nodes[1].x = nodes[0].x - 150; nodes[2].x = nodes[0].x + 150; nodes[3].y = nodes[1].y + 170;
-  nodeEl(nodes[1].id).style.left=nodes[1].x+"px"; nodeEl(nodes[2].id).style.left=nodes[2].x+"px";
-  nodeEl(nodes[3].id).style.top=nodes[3].y+"px";
-  edges = [ {from:nodes[0].id,to:nodes[1].id},{from:nodes[0].id,to:nodes[2].id},
-            {from:nodes[1].id,to:nodes[3].id},{from:nodes[2].id,to:nodes[3].id} ];
-  drawEdges(); fitView(); refreshList();
+  // A small branching example for an empty office (split to 2 fetches, merge).
+  function seedExample() {
+    clearCanvas(); nodes = []; edges = []; seq = 1;
+    addNode("trigger","เมื่อสั่งให้เริ่ม");
+    addNode("fetch","หาข่าว A");
+    addNode("fetch","หาข่าว B");
+    addNode("action","รวมแล้วเขียนสรุป");
+    nodes[1].x = nodes[0].x - 150; nodes[2].x = nodes[0].x + 150; nodes[3].y = nodes[1].y + 190;
+    nodeEl(nodes[1].id).style.left=nodes[1].x+"px"; nodeEl(nodes[2].id).style.left=nodes[2].x+"px";
+    nodeEl(nodes[3].id).style.top=nodes[3].y+"px";
+    edges = [ {from:nodes[0].id,to:nodes[1].id},{from:nodes[0].id,to:nodes[2].id},
+              {from:nodes[1].id,to:nodes[3].id},{from:nodes[2].id,to:nodes[3].id} ];
+    drawEdges(); fitView();
+  }
+  // On open: restore the last-edited workflow → else the first saved one → else
+  // the example. Plus keep the dropdown populated.
+  applyTransform(); refreshList();
+  (function boot() {
+    let last = null; try { last = localStorage.getItem("lastWf"); } catch {}
+    fetch("/workflows").then(r=>r.json()).then(list=>{
+      if (last && list.some(w=>w.id===last)) loadWf(last);
+      else if (list.length) loadWf(list[0].id);
+      else seedExample();
+    }).catch(seedExample);
+  })();
 </script>
 </body>
 </html>

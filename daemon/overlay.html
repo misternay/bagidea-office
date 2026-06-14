@@ -2987,8 +2987,12 @@
       "&key=" + encodeURIComponent(key || "") +
       "&w=" + (win.w || 900) + "&h=" + (win.h || 680) +
       "&resizable=" + (win.resizable === false ? 0 : 1);
-    if (shellPost) shellPost("open-window:" + u);
-    else window.open(src, "_blank");
+    if (shellPost) {
+      shellPost("open-window:" + u);
+      // tuck the chat panel away (like the 3D Editor) so it doesn't cover the
+      // new window — the chat head stays; click it to bring the chat back.
+      if (!document.body.classList.contains("feedmode")) shellPost("hide");
+    } else window.open(src, "_blank");
   }
   function openPluginWindow(p) {
     popWindow("/plugin/" + p.id + "/panel", p.name, "plugin:" + p.id, p.window);
@@ -4423,16 +4427,23 @@
   }
 
   // Media nodes for chat bubbles (uploads + agent-produced files).
+  // Park the chat panel off-screen (the chat head stays — click it to bring the
+  // chat back) so a newly-opened window/folder isn't covered. Mirrors the Editor.
+  function tuckChat() {
+    if (shellPost && !document.body.classList.contains("feedmode")) shellPost("hide");
+  }
   function revealInFolder(realPath) {
     fetch("/reveal", { method: "POST",
       headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
       body: JSON.stringify({ path: realPath }) }).catch(() => {});
+    tuckChat();  // get the chat out of the way of the OS file window
   }
   // Open the file in the OS default app — a real separate, resizable window.
   function openExternal(realPath) {
     fetch("/open", { method: "POST",
       headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
       body: JSON.stringify({ path: realPath }) }).catch(() => {});
+    tuckChat();  // the image now lives in its own OS window
   }
   function mediaNode(url, kind, name, realPath) {
     let el;
