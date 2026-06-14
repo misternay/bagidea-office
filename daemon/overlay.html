@@ -2950,7 +2950,7 @@
       row.innerHTML = `<div class="meta"><b>${p.name}</b>
           <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
-        (p.panel ? `<div class="winbtn" title="เปิดหน้าต่าง">⤢ เปิด</div>` : "") +
+        (p.panel ? `<div class="winbtn" title="เปิดหน้าต่าง">⤢</div>` : "") +
         (p.core ? `<span class="hide" title="plugin หลัก ลบไม่ได้" style="opacity:.5;font-size:13px;align-self:center">🔒</span>`
                 : `<div class="winbtn hide" title="ถอนการติดตั้ง">🗑</div>`);
       // One mode only: a plugin panel opens as its OWN window (click the row or

@@ -4,6 +4,13 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.10] — Fix the Plugins “open” button
+
+**Fixed**
+- The Plugins panel's open button rendered cramped/broken (the “⤢ เปิด” icon+label
+  overflowed the small icon button). It's a clean ⤢ icon again — click it or the
+  row to open the plugin in its own window.
+
 ## [0.7.9] — Workflows you can run, a richer Tools Hub & full-language windows
 
 **Added**
