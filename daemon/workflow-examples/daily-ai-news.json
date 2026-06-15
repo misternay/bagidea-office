@@ -1,13 +1,13 @@
 {
   "id": "example-daily-ai-news",
-  "name": "ตัวอย่าง: สรุปข่าว AI ประจำวัน (แตก 3 ข่าวขนาน)",
+  "name": "Example: Daily AI news digest (3 stories in parallel)",
   "nodes": [
-    { "id": "n1", "type": "trigger", "text": "ทุกเช้าเวลา 9:00 ให้เริ่มทำงานนี้", "x": 320, "y": 40 },
-    { "id": "n2", "type": "fetch", "text": "หาข่าว AI #1 — โมเดล/งานวิจัยใหม่", "x": 70, "y": 220 },
-    { "id": "n3", "type": "fetch", "text": "หาข่าว AI #2 — ผลิตภัณฑ์/บริษัท", "x": 320, "y": 220 },
-    { "id": "n4", "type": "fetch", "text": "หาข่าว AI #3 — นโยบาย/วงการ", "x": 570, "y": 220 },
-    { "id": "n5", "type": "action", "text": "รอข่าวครบทั้ง 3 แล้วรวม + เขียนสรุป 5 หัวข้อเด่น พร้อมลิงก์ที่มา", "x": 320, "y": 410 },
-    { "id": "n6", "type": "output", "text": "ส่งสรุปเข้าแชท CEO (และ Telegram ถ้าต่อไว้)", "x": 320, "y": 590 }
+    { "id": "n1", "type": "trigger", "text": "Every morning at 9:00, start this", "x": 320, "y": 40 },
+    { "id": "n2", "type": "fetch", "text": "Find AI news #1 — new models / research", "x": 70, "y": 220 },
+    { "id": "n3", "type": "fetch", "text": "Find AI news #2 — products / companies", "x": 320, "y": 220 },
+    { "id": "n4", "type": "fetch", "text": "Find AI news #3 — policy / industry", "x": 570, "y": 220 },
+    { "id": "n5", "type": "action", "text": "Wait for all 3, then merge + write a 5-headline summary with source links", "x": 320, "y": 410 },
+    { "id": "n6", "type": "output", "text": "Send the summary to the CEO chat (and Telegram if connected)", "x": 320, "y": 590 }
   ],
   "edges": [
     { "from": "n1", "to": "n2" }, { "from": "n1", "to": "n3" }, { "from": "n1", "to": "n4" },

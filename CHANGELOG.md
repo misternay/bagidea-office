@@ -4,6 +4,19 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.19] — Workflow Builder: English-first & right-click to add a node
+
+**Changed**
+- **The bundled workflow examples are now all in English** — a clean, global
+  default. (Write your own flows in any language you like; the examples just set
+  the standard.)
+- **No more stray Thai** in the Workflow Builder when the office is in English —
+  the new-workflow starter node follows your language too.
+
+**Added**
+- **Right-click the canvas to add a node right there.** A ＋ Node menu pops up at
+  your cursor and drops the node where you clicked — no hunting for it.
+
 ## [0.7.18] — The display menu is always there
 
 **Changed**

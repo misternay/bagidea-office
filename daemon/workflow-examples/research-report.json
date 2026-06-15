@@ -1,14 +1,14 @@
 {
   "id": "example-research-report",
-  "name": "ตัวอย่าง (advanced): วิจัยหัวข้อ → ร่าง → ตรวจ → เผยแพร่",
+  "name": "Example (advanced): Research a topic → draft → review → publish",
   "nodes": [
-    { "id": "n1", "type": "trigger", "text": "เมื่อสั่ง พร้อมระบุหัวข้อที่ต้องการวิจัย", "x": 330, "y": 40 },
-    { "id": "n2", "type": "fetch", "text": "วิจัยมุมที่ 1 — ภาพรวม/นิยาม", "x": 60, "y": 210 },
-    { "id": "n3", "type": "fetch", "text": "วิจัยมุมที่ 2 — ข้อมูล/ตัวเลขล่าสุด", "x": 330, "y": 210 },
-    { "id": "n4", "type": "fetch", "text": "วิจัยมุมที่ 3 — ความเห็น/ข้อถกเถียง", "x": 600, "y": 210 },
-    { "id": "n5", "type": "action", "text": "รอครบ 3 มุม แล้วสังเคราะห์เป็นร่างรายงาน (มีที่มาอ้างอิง)", "x": 330, "y": 390 },
-    { "id": "n6", "type": "action", "text": "ตรวจทาน — เช็คข้อเท็จจริง ตัดส่วนซ้ำ ปรับให้อ่านง่าย", "x": 330, "y": 560 },
-    { "id": "n7", "type": "output", "text": "บันทึกเป็นไฟล์ในโปรเจค + ส่งสรุปให้ CEO", "x": 330, "y": 730 }
+    { "id": "n1", "type": "trigger", "text": "When started, with the topic to research", "x": 330, "y": 40 },
+    { "id": "n2", "type": "fetch", "text": "Research angle 1 — overview / definition", "x": 60, "y": 210 },
+    { "id": "n3", "type": "fetch", "text": "Research angle 2 — latest data / figures", "x": 330, "y": 210 },
+    { "id": "n4", "type": "fetch", "text": "Research angle 3 — opinions / debate", "x": 600, "y": 210 },
+    { "id": "n5", "type": "action", "text": "Wait for all 3 angles, then synthesize a draft report (with citations)", "x": 330, "y": 390 },
+    { "id": "n6", "type": "action", "text": "Review — fact-check, cut duplicates, make it readable", "x": 330, "y": 560 },
+    { "id": "n7", "type": "output", "text": "Save as a file in the project + send a summary to the CEO", "x": 330, "y": 730 }
   ],
   "edges": [
     { "from": "n1", "to": "n2" }, { "from": "n1", "to": "n3" }, { "from": "n1", "to": "n4" },

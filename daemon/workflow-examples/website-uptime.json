@@ -1,11 +1,11 @@
 {
   "id": "example-website-uptime",
-  "name": "ตัวอย่าง: เฝ้าดูเว็บไซต์ล่ม",
+  "name": "Example: Watch a website for downtime",
   "nodes": [
-    { "id": "n1", "type": "trigger", "text": "ทุก 30 นาที", "x": 140, "y": 40 },
-    { "id": "n2", "type": "fetch", "text": "เปิด URL เว็บไซต์ที่ต้องเฝ้า (เช่น https://example.com)", "x": 140, "y": 210 },
-    { "id": "n3", "type": "decision", "text": "ถ้าเปิดไม่ได้ หรือสถานะไม่ใช่ 200 OK", "x": 140, "y": 380 },
-    { "id": "n4", "type": "output", "text": "แจ้งเตือนทันทีว่าเว็บล่ม พร้อมเวลาที่ตรวจพบ", "x": 140, "y": 550 }
+    { "id": "n1", "type": "trigger", "text": "Every 30 minutes", "x": 140, "y": 40 },
+    { "id": "n2", "type": "fetch", "text": "Open the URL to watch (e.g. https://example.com)", "x": 140, "y": 210 },
+    { "id": "n3", "type": "decision", "text": "If it won't load, or the status isn't 200 OK", "x": 140, "y": 380 },
+    { "id": "n4", "type": "output", "text": "Alert immediately that the site is down, with the time detected", "x": 140, "y": 550 }
   ],
   "edges": [
     { "from": "n1", "to": "n2" }, { "from": "n2", "to": "n3" }, { "from": "n3", "to": "n4" }

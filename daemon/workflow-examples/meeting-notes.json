@@ -1,11 +1,11 @@
 {
   "id": "example-meeting-notes",
-  "name": "ตัวอย่าง: สรุปบันทึกการประชุม",
+  "name": "Example: Summarize meeting notes",
   "nodes": [
-    { "id": "n1", "type": "trigger", "text": "เมื่อสั่งให้เริ่ม (แนบไฟล์ transcript การประชุมมาด้วย)", "x": 140, "y": 40 },
-    { "id": "n2", "type": "fetch", "text": "อ่านไฟล์ transcript การประชุม", "x": 140, "y": 210 },
-    { "id": "n3", "type": "action", "text": "สรุปเป็นหัวข้อ + รายการสิ่งที่ต้องทำ (action items) + ผู้รับผิดชอบ", "x": 140, "y": 380 },
-    { "id": "n4", "type": "output", "text": "บันทึกลง workspace/notes.md แล้วรายงานสรุปสั้นให้ CEO", "x": 140, "y": 550 }
+    { "id": "n1", "type": "trigger", "text": "When started (attach the meeting transcript file)", "x": 140, "y": 40 },
+    { "id": "n2", "type": "fetch", "text": "Read the meeting transcript file", "x": 140, "y": 210 },
+    { "id": "n3", "type": "action", "text": "Summarize into topics + action items + owners", "x": 140, "y": 380 },
+    { "id": "n4", "type": "output", "text": "Save to workspace/notes.md and report a short summary to the CEO", "x": 140, "y": 550 }
   ],
   "edges": [
     { "from": "n1", "to": "n2" }, { "from": "n2", "to": "n3" }, { "from": "n3", "to": "n4" }

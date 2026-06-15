@@ -196,7 +196,7 @@
     stash();
     tabs.push({ id:"", name:tr("Workflow ใหม่"), example:false, nodes:[], edges:[], pan:{x:60,y:40}, zoom:1 });
     activate(tabs.length-1);
-    addNode("trigger","เมื่อสั่งให้เริ่ม…");
+    addNode("trigger", tr("เมื่อสั่งให้เริ่ม…"));
   }
   function openTab(id) {
     const ex = tabs.findIndex(t=>t.id && t.id===id);
@@ -356,6 +356,43 @@
     });
   }
   function flash(t){ t=tr(t); const p=document.getElementById("plan"); const o=p.textContent; p.textContent=t; setTimeout(()=>{ if(p.textContent===t)p.textContent=o; },1500); }
+
+  // ===== right-click anywhere on the canvas → "＋ Node" menu at the cursor =====
+  // Drops the new node right where you clicked (handy — no hunting for it).
+  let nodeMenuEl = null;
+  function closeNodeMenu() { if (nodeMenuEl) { nodeMenuEl.remove(); nodeMenuEl = null; } }
+  function addNodeAt(type, wx, wy) {
+    const n = { id: "n"+(seq++), type: type||"action", text: "",
+      x: Math.round(wx - W/2), y: Math.round(wy - 20) };
+    nodes.push(n); renderNode(n); drawEdges();
+  }
+  vp.addEventListener("contextmenu", (e) => {
+    if (e.target.closest(".node")) return;   // inside a node → keep the native edit menu
+    e.preventDefault();
+    closeNodeMenu();
+    if (isExample) return;                    // examples are read-only
+    const wpos = screenToWorld(e.clientX, e.clientY);
+    const m = document.createElement("div");
+    m.id = "nodemenu";
+    m.style.cssText = "position:fixed;z-index:9999;background:#0e1626;border:1px solid #2a3a55;" +
+      "border-radius:10px;padding:5px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:150px";
+    m.style.left = e.clientX + "px"; m.style.top = e.clientY + "px";
+    m.innerHTML = `<div style="font-size:11px;color:#8aa6c9;padding:4px 9px 6px">${tr("＋ Node")}</div>` +
+      TYPES.map(([v,l]) => `<div class="nmi" data-t="${v}" style="padding:7px 10px;border-radius:7px;` +
+        `cursor:pointer;font-size:12.5px;white-space:nowrap;color:#e8eef6">${tr(l)}</div>`).join("");
+    document.body.appendChild(m);
+    const r = m.getBoundingClientRect();   // keep it on-screen near edges
+    if (r.right > innerWidth) m.style.left = (innerWidth - r.width - 6) + "px";
+    if (r.bottom > innerHeight) m.style.top = (innerHeight - r.height - 6) + "px";
+    m.querySelectorAll(".nmi").forEach(it => {
+      it.onmouseenter = () => it.style.background = "rgba(94,200,255,.16)";
+      it.onmouseleave = () => it.style.background = "";
+      it.onclick = () => { addNodeAt(it.dataset.t, wpos.x, wpos.y); closeNodeMenu(); };
+    });
+    nodeMenuEl = m;
+  });
+  document.addEventListener("mousedown", (e) => { if (nodeMenuEl && !e.target.closest("#nodemenu")) closeNodeMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNodeMenu(); });
 
   // ===== boot =====
   applyTransform(); loadList();
