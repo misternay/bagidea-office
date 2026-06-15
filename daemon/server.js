@@ -2075,7 +2075,7 @@ const BANTER = [
 let lastSocial = Date.now();
 function socialTick(now) {
   const min = Number(reg.socialMin !== undefined ? reg.socialMin : 60);
-  if (!min || discussing || agentBusy.size > 0) return;
+  if (!min || activeDiscussions > 0 || agentBusy.size > 0) return;
   if (now - lastSocial < min * 60000) return;
   const staff = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main");
   const pool = staff.length >= 2 ? staff : [...staff, "main"];
@@ -2142,7 +2142,7 @@ const MOOD_LINES = {
 };
 let lastAmbient = Date.now();
 function ambientTick(now) {
-  if (discussing || agentBusy.size > 0) return;
+  if (activeDiscussions > 0 || agentBusy.size > 0) return;
   if (now - lastAmbient < 55 * 1000) return;        // at most once every ~55s
   if (Math.random() > 0.45) return;                 // ...and only ~45% of those
   const pool = Object.keys(reg.agents).filter((id) => id !== "ceo");
@@ -2177,10 +2177,13 @@ function addProposal(by, agents, name, detail) {
 // ---------------------------------------------------------------- discussion
 // Agents talk to each other: round-robin claude calls sharing a transcript,
 // staged in the meeting room (collab.* events drive seats + whiteboard).
-let discussing = false;
+// Several discussions can run at once (disjoint teams) — the wallpaper stages
+// each as its own huddle. Track a count so the ambient/social ticks stay quiet
+// while ANY meeting is live, without forcing meetings to be one-at-a-time.
+let activeDiscussions = 0;
 
 async function runDiscussion(ids, topic, rounds, social) {
-  discussing = true;
+  activeDiscussions++;
   const task = "disc" + (Date.now() % 100000);
   // Every meeting is a persistent GROUP session ("@group" bucket): topic,
   // participants and the full transcript — readable later from the thread
@@ -2239,7 +2242,7 @@ async function runDiscussion(ids, topic, rounds, social) {
     }
   } finally {
     broadcast({ type: "collab.ended", agents: ids, task, session: entry.key });
-    discussing = false;
+    activeDiscussions = Math.max(0, activeDiscussions - 1);
     // Markdown minutes inside the agents' workspace — searchable by them.
     try {
       const dir = path.join(WORKSPACE, "meetings");
@@ -2461,7 +2464,8 @@ const server = http.createServer((req, res) => {
         const ids = (p.agents || []).filter((id) => id !== "ceo").slice(0, 4);
         if (ids.length < 2) throw new Error("need at least 2 agents");
         if (!p.topic) throw new Error("no topic");
-        if (discussing) { res.writeHead(409); return res.end("discussion in progress"); }
+        // Concurrent meetings are allowed — disjoint teams huddle in parallel,
+        // and the wallpaper ghost-splits anyone double-booked.
         runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3));
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: true }));

@@ -77,6 +77,7 @@ var _anchor_local := {}         # anchor name → Vector2 local offset
 var astar := AStar3D.new()
 var _wp_ids := {}
 var _next_id := 0
+var _slot_static := {}          # slot → [hub id, door ids touching slot] (static; anchors added live)
 
 func _ready() -> void:
 	_build()
@@ -143,6 +144,7 @@ func _build_graph() -> void:
 	# hubs at slot centres
 	for slot in range(GRID_COLS * GRID_ROWS):
 		_add_point("hub_%d" % slot, _cell_center[slot] + Vector3(0, FLOOR_Y, 0))
+		_slot_static[slot] = [_wp_ids["hub_%d" % slot]]
 	# door nodes between orthogonally adjacent slots, connecting the two hubs
 	for slot in range(GRID_COLS * GRID_ROWS):
 		var c := slot % GRID_COLS
@@ -166,6 +168,9 @@ func _link_slots(a: int, b: int) -> void:
 	_add_point(dn, mid)
 	astar.connect_points(_wp_ids["hub_%d" % a], _wp_ids[dn])
 	astar.connect_points(_wp_ids[dn], _wp_ids["hub_%d" % b])
+	# the door belongs to BOTH cells — a valid in-cell entry node on either side
+	_slot_static[a].append(_wp_ids[dn])
+	_slot_static[b].append(_wp_ids[dn])
 
 func _add_point(name: String, pos: Vector3) -> void:
 	_wp_ids[name] = _next_id
@@ -179,16 +184,42 @@ func _nearest(pos: Vector3) -> int:
 		if d < best_d: best_d = d; best = _wp_ids[name]
 	return best
 
+## Which grid slot a world position sits in (clamped to the grid).
+func _slot_of(pos: Vector3) -> int:
+	var c := int(round(pos.x / CELL_X + (GRID_COLS - 1) * 0.5))
+	var r := int(round(pos.z / CELL_Z + (GRID_ROWS - 1) * 0.5))
+	c = clampi(c, 0, GRID_COLS - 1)
+	r = clampi(r, 0, GRID_ROWS - 1)
+	return r * GRID_COLS + c
+
+## Nearest graph node that lives in the SAME cell as `pos` (its hub, a door on
+## that cell's wall, or an anchor in that cell). This is the crux of the
+## walk-through-walls fix: the plain nearest node may sit across a wall in the
+## neighbouring cell, so the first straight leg would clip through it. Restricting
+## the entry node to the current cell forces every inter-room trip through a door.
+func _nearest_slot(pos: Vector3) -> int:
+	var slot := _slot_of(pos)
+	var best := -1; var best_d := INF
+	for id in _slot_static.get(slot, []):
+		var d: float = pos.distance_to(astar.get_point_position(id))
+		if d < best_d: best_d = d; best = id
+	# this cell's live anchors (membership rides room swaps via _anchor_slot)
+	for aname in _anchor_slot:
+		if _anchor_slot[aname] == slot and _wp_ids.has(aname):
+			var d2: float = pos.distance_to(astar.get_point_position(_wp_ids[aname]))
+			if d2 < best_d: best_d = d2; best = _wp_ids[aname]
+	return best if best != -1 else _nearest(pos)
+
 func path_to(from_pos: Vector3, target: String) -> Array:
 	if not _wp_ids.has(target): return []
-	var pts := astar.get_point_path(_nearest(from_pos), _wp_ids[target])
+	var pts := astar.get_point_path(_nearest_slot(from_pos), _wp_ids[target])
 	var out: Array = []
 	for p in pts: out.append(p)
 	if out.size() > 1 and from_pos.distance_to(out[0]) < 0.4: out.pop_front()
 	return out
 
 func path_between(from_pos: Vector3, to_pos: Vector3) -> Array:
-	var pts := astar.get_point_path(_nearest(from_pos), _nearest(to_pos))
+	var pts := astar.get_point_path(_nearest_slot(from_pos), _nearest_slot(to_pos))
 	var out: Array = []
 	for p in pts: out.append(p)
 	if out.size() > 1 and from_pos.distance_to(out[0]) < 0.4: out.pop_front()

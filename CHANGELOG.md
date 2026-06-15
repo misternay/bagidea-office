@@ -4,6 +4,25 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.12] — Discussions you can watch, smarter walking & clearer shadows
+
+**Fixed**
+- **Agents stop walking through walls.** Pathfinding now always enters and leaves
+  a room through its doorway instead of cutting a straight line to the nearest
+  point (which could sit on the far side of a wall).
+- **Shadows read clearly at the normal camera**, not only when zoomed in — tuned
+  the sun’s shadow so it stays crisp at a distance.
+
+**Changed**
+- **Discussions are now live huddles.** When the team confers, members actually
+  gather in a ring with a floating topic banner over them — and several
+  discussions can run at the same time, each in its own spot, so you can watch
+  everything on the wallpaper at once.
+- **Anyone double-booked splits a stand-in (แยกร่าง).** If a teammate is heads-down
+  on a task or already in another meeting, a translucent clone joins the huddle
+  while the real one keeps working.
+- **Tools Hub:** removed a stray duplicate “＋” icon on the “Add your own MCP” box.
+
 ## [0.7.11] — Workflow polish, centered windows, real ghost-splits & a fuller Tools Hub
 
 **Fixed**

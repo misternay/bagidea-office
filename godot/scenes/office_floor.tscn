@@ -71,11 +71,11 @@ light_color = Color(1, 0.92, 0.8, 1)
 light_energy = 2.6
 light_volumetric_fog_energy = 6.0
 shadow_enabled = true
-shadow_bias = 0.05
-shadow_normal_bias = 1.5
-shadow_blur = 1.2
+shadow_bias = 0.03
+shadow_normal_bias = 0.6
+shadow_blur = 1.0
 directional_shadow_mode = 0
-directional_shadow_max_distance = 70.0
+directional_shadow_max_distance = 44.0
 directional_shadow_pancake_size = 20.0
 
 [node name="CameraRig" type="Node3D" parent="."]

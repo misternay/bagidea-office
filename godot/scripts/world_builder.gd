@@ -1162,6 +1162,30 @@ func _omni(pos: Vector3, color: Color, energy: float, range_m: float) -> OmniLig
 	l.position = pos
 	return l
 
+## Live world position of a named anchor (grid-aware — follows room swaps).
+func wp(name: String) -> Vector3:
+	if _grid and _grid.WP.has(name): return _grid.WP[name]
+	return WP.get(name, Vector3.ZERO)
+
+## A floating topic banner over a discussion huddle — so several conversations
+## can run at once and each be read at a glance on the wallpaper. Returns the
+## node so the caller can fade + free it when the meeting ends.
+func gather_banner(center: Vector3, topic: String) -> Label3D:
+	var l := Label3D.new()
+	l.text = "🗣 " + topic.left(40)
+	l.font_size = 46
+	l.outline_size = 14
+	l.pixel_size = 0.0055
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.modulate = Color(0.9, 0.95, 1.2, 0.0)
+	l.outline_modulate = Color(0.04, 0.07, 0.16, 0.92)
+	l.no_depth_test = true
+	add_child(l)
+	l.position = center + Vector3(0, 3.0, 0)
+	var tw := l.create_tween()
+	tw.tween_property(l, "modulate:a", 1.0, 0.6)
+	return l
+
 func _label(text: String, pos: Vector3, size: int, color: Color, energy := 1.0) -> Label3D:
 	var l := Label3D.new()
 	l.text = text

@@ -15,6 +15,13 @@ var agents := {}  # id -> {node, state, desk, bed, id, tasks: {task_id: true}}
 var roster := {}  # id -> {name, role, avatar} — the daemon's persistent registry
 var ghosts := {}  # sub id ("pixel#s1") -> {node, desk: GHOST_DESKS index or -1}
 var meeting_ghosts := {}  # agent id -> stand-in clone (owner too busy to attend)
+# Concurrent discussions, each a visible huddle. A discussion ("collab") gathers
+# its members in a ring around a gather centre with a floating topic banner, so
+# several can run at once and the whole wallpaper stays monitorable.
+var collabs := {}          # task -> {members, center, center_name, is_primary, ghosts:{id:node}, banner}
+var collab_busy := {}      # agent id -> task it is attending IN PERSON (drives แยกร่าง stand-ins)
+var primary_collab := ""   # the one discussion that owns the meeting room + whiteboard
+var gather_centers: Array[String] = ["meeting_c", "rec_c", "cafe_c", "ops_c", "lobby_c"]
 var ghost_desks_free: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 var _sec_pending := {}  # task -> a Security walk is scheduled but not yet committed
 var ceo_hold_until := 0.0  # the boss stands still while giving/receiving work
@@ -242,18 +249,17 @@ func handle(evt: Dictionary) -> void:
 			_route_hook_to_ghost(hook_id, type, evt)
 		return
 
-	# Collaboration events may target several agents at once.
+	# A discussion targets several agents at once — set it up as ONE huddle
+	# (not per-member) so members ring a shared centre and concurrent meetings
+	# don't collide.
 	if type in ["collab.started", "collab.ended"] and evt.has("agents"):
+		var members: Array = []
+		for m in evt.agents: members.append(str(m))
+		var ctask := str(evt.get("task", "collab"))
 		if type == "collab.started":
-			# The whiteboard carries the real meeting topic.
-			world.whiteboard_reset("◤ " + str(evt.get("text", "MEETING")).left(46))
-		for member in evt.agents:
-			var sub := evt.duplicate()
-			sub.erase("agents")
-			sub["agent"] = str(member)
-			handle(sub)
-		if type == "collab.ended":
-			_wb_clear_later()
+			_start_collab(ctask, members, str(evt.get("text", "MEETING")), theatrical)
+		else:
+			_end_collab(ctask, members)
 		return
 
 	var id := str(evt.get("agent", "agent"))
@@ -431,15 +437,19 @@ func handle(evt: Dictionary) -> void:
 				if not theatrical:
 					Sfx.play("blip", 800)
 			# In a meeting, words land on the whiteboard (truth, not theater) —
-			# spoken by the agent, or by their stand-in clone.
-			if meeting_ghosts.has(id):
-				world.whiteboard_add(id, text)
-				if is_instance_valid(meeting_ghosts[id]):
-					meeting_ghosts[id].set_status("💬 " + text.left(28))
+			# spoken by the agent, or by their stand-in clone. The shared
+			# whiteboard mirrors ONLY the primary discussion so two concurrent
+			# meetings never tangle on one board.
+			var standin: Sprite3D = _standin_of(id)
+			if standin:
+				if is_instance_valid(standin): standin.set_status("💬 " + text.left(28))
+				if _collab_of_ghost(id) == primary_collab and primary_collab != "":
+					world.whiteboard_add(id, text)
 			else:
 				a.node.set_status("💬 " + text.left(28))
-				if a.state == "meeting":
-					world.whiteboard_add(id, text)
+				var ct: String = collab_busy.get(id, "")
+				if ct != "":
+					if ct == primary_collab: world.whiteboard_add(id, text)
 				elif evt.get("ambient", false):
 					# A lone ambient mood line clears itself after a beat.
 					_clear_status_later(a, 6.0)
@@ -1117,6 +1127,138 @@ func _dissolve_meeting_ghost(id: String) -> void:
 		Burst.spawn(world, g.position, 0.65)
 		Sfx.play("whoosh")
 		g.ghost_dissolve()
+
+# ------------------------------------------------------- discussions (huddles)
+## A discussion becomes a visible HUDDLE: members walk together and ring a
+## gather centre with a floating topic banner, so several can run at once and the
+## whole wallpaper stays monitorable. Anyone already tied up (in another
+## discussion, or heads-down on a task) sends a translucent stand-in — แยกร่าง.
+func _start_collab(task: String, members: Array, topic: String, theatrical := false) -> void:
+	if collabs.has(task): return
+	var center_name := _free_gather_center()
+	var center: Vector3 = world.wp(center_name)
+	var is_primary := (center_name == "meeting_c")
+	var info := {"members": members.duplicate(), "center": center,
+		"center_name": center_name, "is_primary": is_primary,
+		"ghosts": {}, "banner": null, "topic": topic}
+	collabs[task] = info
+	if is_primary:
+		primary_collab = task
+		world.whiteboard_reset("◤ " + topic.left(46))
+	info.banner = world.gather_banner(center, topic)
+	var n: int = max(members.size(), 1)
+	var first_real: Node3D = null
+	for i in members.size():
+		var id: String = str(members[i])
+		var ang := TAU * float(i) / float(n) - PI * 0.5
+		var rad: float = 1.15 if n <= 2 else 1.45
+		var spot := center + Vector3(cos(ang) * rad, 0, sin(ang) * rad)
+		if not agents.has(id): continue
+		var a: Dictionary = agents[id]
+		# busy elsewhere → a stand-in attends, the real one keeps going
+		if collab_busy.has(id) or (a.state == "working" and not a.tasks.is_empty()):
+			var g := _spawn_collab_ghost(id, spot)
+			if g: info.ghosts[id] = g
+		else:
+			collab_busy[id] = task
+			a["collab"] = task
+			_set_state(a, "meeting")
+			a.node.set_status("meeting 🗣")
+			_walk_to_pos(a.node, spot)
+			if first_real == null: first_real = a.node
+	if not theatrical:
+		Sfx.play("blip2", 400)
+		if first_real: _maybe_focus(first_real, 0.5, 8.0)
+
+func _end_collab(task: String, members: Array) -> void:
+	var info: Dictionary = collabs.get(task, {})
+	if info.is_empty(): return
+	collabs.erase(task)
+	var banner: Node = info.get("banner")
+	if banner and is_instance_valid(banner):
+		var tw: Tween = banner.create_tween()
+		tw.tween_property(banner, "modulate:a", 0.0, 0.5)
+		tw.tween_callback(banner.queue_free)
+	if primary_collab == task:
+		primary_collab = ""
+		world.whiteboard_add("", "— adjourned —")
+		_wb_clear_later()
+	for gid in info.get("ghosts", {}):
+		_dissolve_collab_ghost(info.ghosts[gid], gid)
+	for m in members:
+		var id := str(m)
+		if not agents.has(id): continue
+		var a: Dictionary = agents[id]
+		if collab_busy.get(id, "") == task:
+			collab_busy.erase(id)
+			a.erase("collab")
+			if a.state == "meeting":
+				if a.tasks.is_empty():
+					_finish(a, "done ✓")
+				else:
+					_set_state(a, "working")
+					a.node.set_status("working…")
+					if a.desk != "": _walk(a.node, a.desk)
+
+## First gather centre not already hosting an active discussion (so concurrent
+## meetings spread across rooms); falls back to the meeting room.
+func _free_gather_center() -> String:
+	var used := {}
+	for task in collabs: used[collabs[task].center_name] = true
+	for cname in gather_centers:
+		if not used.has(cname) and world.wp(cname) != Vector3.ZERO:
+			return cname
+	return "meeting_c"
+
+## Walk to a free world position (not a named anchor) via the A* graph.
+func _walk_to_pos(node: Node3D, pos: Vector3, face_dir := -1) -> float:
+	return node.walk_to(world.path_between(node.position, pos), face_dir)
+
+## A translucent stand-in that joins a huddle while the real agent stays put.
+func _spawn_collab_ghost(id: String, spot: Vector3) -> Sprite3D:
+	if not agents.has(id): return null
+	var pnode: Sprite3D = agents[id].node
+	var g := _make_char(id)
+	g.npc_index = pnode.npc_index
+	g.suit_color = pnode.suit_color
+	g.hair_color = pnode.hair_color
+	g.skin_color = pnode.skin_color
+	g.rank = "ghost"
+	g.agent_name = str(pnode.agent_name) + " · meeting"
+	g.agent_role = "stand-in"
+	get_parent().add_child(g)
+	g.set_ghost()
+	g.position = pnode.position + Vector3(0.3, 0, 0.25)
+	g.set_state("meeting")
+	g.set_status(ui("ประชุมแทนตัวจริง 🗣"))
+	Burst.spawn(world, pnode.position, 0.65)
+	Sfx.play("split")
+	_walk_to_pos(g, spot)
+	return g
+
+func _dissolve_collab_ghost(g: Sprite3D, id: String) -> void:
+	if g == null or not is_instance_valid(g): return
+	var dur := 0.0
+	if agents.has(id) and is_instance_valid(agents[id].node):
+		dur = g.walk_to(world.path_between(g.position, agents[id].node.position))
+	await get_tree().create_timer(maxf(dur, 0.1) + 0.3).timeout
+	if is_instance_valid(g):
+		Burst.spawn(world, g.position, 0.65)
+		Sfx.play("whoosh")
+		g.ghost_dissolve()
+
+## The stand-in clone (if any) representing this agent in an active huddle.
+func _standin_of(id: String) -> Sprite3D:
+	for task in collabs:
+		var g = collabs[task].ghosts.get(id)
+		if g != null: return g
+	return null
+
+## Which discussion a stand-in for `id` belongs to ("" if none).
+func _collab_of_ghost(id: String) -> String:
+	for task in collabs:
+		if collabs[task].ghosts.has(id): return task
+	return ""
 
 func _dissolve_supervisor(g: Sprite3D) -> void:
 	g.unfollow()
