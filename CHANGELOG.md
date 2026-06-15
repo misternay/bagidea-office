@@ -4,6 +4,19 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.7.24] — Custom characters: live preview, matching faces & smoother walk
+
+**Fixed**
+- **Custom-character colors now show everywhere**, not just on the wallpaper — the
+  agents rail, the companion beside the chat, and nameplates all render the same
+  tinted character (the overlay composites it just like the office does).
+- **Smoother walk** for custom characters — no more jittery stride (their idle art
+  keeps a calm cadence with a gentle step-bob instead of flickering).
+
+**Added**
+- **A live preview** in the avatar editor — see your custom character update as you
+  drag the skin / hair / outfit colors (or roll 🎲), before you save.
+
 ## [0.7.23] — Design-your-own characters (custom colors)
 
 **Added**

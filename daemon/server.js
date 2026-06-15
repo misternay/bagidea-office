@@ -2457,6 +2457,17 @@ const server = http.createServer((req, res) => {
       res.end(data);
     });
 
+  } else if (req.method === "GET" && /^\/char\/layers\/[a-z]+-idle\.png$/.test(req.url.split("?")[0])) {
+    // The 6 tintable layers (legs/torso/shirt/head/eyes/hair) so the overlay can
+    // composite the SAME custom character as the wallpaper (canvas-tinted).
+    const f = path.join(__dirname, "..", "godot", "assets", "characters", "layers",
+      req.url.split("?")[0].split("/").pop());
+    fs.readFile(f, (e, data) => {
+      if (e) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=3600" });
+      res.end(data);
+    });
+
   } else if (req.method === "POST" && req.url === "/chat") {
     readBody(req, (body) => {
       try {

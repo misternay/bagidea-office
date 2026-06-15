@@ -378,20 +378,21 @@ func _process(delta: float) -> void:
 
 	match _mode:
 		"npc", "custom":
-			var fps := WALK_FPS if _walking else IDLE_FPS
+			# Real walk sheets animate at WALK_FPS. Idle-only sheets (the custom
+			# composite) have NO walk frames — cycling their idle frames at walk
+			# speed read as jitter ("เพี้ยน"), so keep the calm IDLE cadence and
+			# carry the sense of walking with a gentle, smooth step-bob instead.
+			var stride := _walking and not _has_walk_rows
+			var fps := WALK_FPS if (_walking and _has_walk_rows) else IDLE_FPS
 			_anim_t += delta * fps
 			if _anim_t >= 1.0:
 				_anim_t = fmod(_anim_t, 1.0)
 				_anim_frame = (_anim_frame + 1) % 4
 			var row := _dir
-			if _walking:
-				if _has_walk_rows:
-					row += 4
-				else:
-					# Idle-only sheets (custom composites): fake the stride
-					# with a step-hop so walking still reads as walking.
-					offset.y = 4.0 + absf(sin(_t * 1.6)) * 2.2
-					offset.x = sin(_t * 0.8) * 1.4
+			if _walking and _has_walk_rows:
+				row += 4
+			elif stride:
+				offset.y = 4.0 + absf(sin(_t * 2.4)) * 1.6   # soft bounce, no wobble
 			frame = row * 4 + _anim_frame
 		"procedural":
 			if _walking:
