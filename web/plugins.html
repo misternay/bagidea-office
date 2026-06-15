@@ -180,8 +180,8 @@
     render();
   }).catch(() => render());
 
-  const top = document.querySelector(".toplink");
-  addEventListener("scroll", () => top.classList.toggle("show", scrollY > 600));
+  const topBtn = document.querySelector(".toplink");
+  addEventListener("scroll", () => topBtn.classList.toggle("show", scrollY > 600));
 </script>
 </body>
 </html>

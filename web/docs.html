@@ -216,8 +216,8 @@ bagidea start   # launch the office</code></pre>
 
 <a href="#" class="toplink" aria-label="Back to top">↑</a>
 <script>
-  const top = document.querySelector(".toplink");
-  addEventListener("scroll", () => top.classList.toggle("show", scrollY > 600));
+  const topBtn = document.querySelector(".toplink");
+  addEventListener("scroll", () => topBtn.classList.toggle("show", scrollY > 600));
   // highlight the active doc section in the sidebar
   const links = [...document.querySelectorAll(".docnav a[href^='#']")];
   const map = links.map((a) => ({ a, el: document.querySelector(a.getAttribute("href")) })).filter((x) => x.el);
