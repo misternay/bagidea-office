@@ -78,6 +78,7 @@
       <div class="feat"><div class="ic">🧩</div><h3 data-i18n="f_grid_t">Swappable 3×3 office</h3><p data-i18n="f_grid_d">Rearrange the whole floor in the 3D Editor — click two rooms to swap. Furniture, agent seats, navigation and even the cat and dogs follow their room.</p></div>
       <div class="feat"><div class="ic">🎤</div><h3 data-i18n="f_voice_t">Voice, channels & memory</h3><p data-i18n="f_voice_d">Talk by voice (F6 push-to-talk), call the office (realtime Gemini Live), give agents one of 16 ♀/♂ voices, and run it from Telegram, Discord or LINE. Hermes-style memory grows token-lean.</p></div>
       <div class="feat"><div class="ic">🔌</div><h3 data-i18n="f_plugin_t">Plugins, skills & tools</h3><p data-i18n="f_plugin_d">Extend the office with plugins (install from any GitHub repo), assign agents from a library of builtin skills, and add new capability via MCP servers — humans and agents can build plugins.</p></div>
+      <div class="feat"><div class="ic">🧠</div><h3 data-i18n="f_brain_t">Swappable brains</h3><p data-i18n="f_brain_d">Run each agent on its own model — Claude/GLM/DeepSeek/Qwen/MiniMax direct, or OpenAI/Gemini/OpenRouter/NVIDIA and custom providers via a built-in zero-dependency proxy (no LiteLLM). Plus auto-compact + auto-new-thread for every model, so long chats never clog or freeze.</p></div>
       <div class="feat"><div class="ic">🔀</div><h3 data-i18n="f_workflow_t">Workflow Builder</h3><p data-i18n="f_workflow_d">Plan work as plain-language nodes on a drag-drop canvas. The Director analyzes your flow and tells you which skills, tools, permissions and agents it needs — so anyone can plan work and let the team figure out how to run it.</p></div>
       <div class="feat"><div class="ic">🛡️</div><h3 data-i18n="f_security_t">Spatialized security</h3><p data-i18n="f_security_d">When an agent needs a tool you haven't granted, it physically walks to the Security Center and waits. You Allow / ✓✓ Forever / Deny. Granted tools run silently and never leave the desk.</p></div>
       <div class="feat"><div class="ic">📁</div><h3 data-i18n="f_projects_t">Real projects</h3><p data-i18n="f_projects_d">Register real folders as projects; the Director creates and routes work into them. Each assignee's Claude session lives inside the directory and is resumable by you — one window per project.</p></div>
@@ -92,6 +93,10 @@
     <p class="eyebrow" data-i18n="tour_eyebrow">A look around</p>
     <h2 class="title" data-i18n="tour_title">See it in action</h2>
 
+    <div class="split">
+      <div class="txt"><h3 data-i18n="tour_brain_h">Any model, per agent</h3><p data-i18n="tour_brain_p">Pick the provider and model for each agent in ⚙ CONNECT → 🧠 MODELS/PROVIDERS. Every message is tagged with its model and the thread bar shows a live context-usage meter — and auto-compact keeps even small models running long sessions, hands-free.</p></div>
+      <img src="img/swappable-brains.png" alt="Pick a provider and model per agent, with a context-usage meter" loading="lazy">
+    </div>
     <div class="split">
       <div class="txt"><h3 data-i18n="tour1_h">A live desktop wallpaper</h3><p data-i18n="tour1_p">It runs behind your real desktop icons with an optional activity feed down the side — clean for streaming, alive while agents work.</p></div>
       <img src="img/desktop.png" alt="BagIdea Office as a desktop wallpaper" loading="lazy">
@@ -117,7 +122,7 @@
     <p class="eyebrow" data-i18n="upd_eyebrow">Always improving</p>
     <h2 class="title" data-i18n="upd_title">Updated constantly</h2>
     <p class="sub" data-i18n="upd_sub" style="margin:0 auto 18px;max-width:620px">BagIdea Office ships real updates all the time — bug fixes, new features and polish. Every office gets a one-click update notice.</p>
-    <p style="font-size:15px;margin:0 0 18px"><span data-i18n="upd_latest">Latest</span>: <b id="latestVer" style="color:var(--accent,#5ec8ff)">v0.7.5</b></p>
+    <p style="font-size:15px;margin:0 0 18px"><span data-i18n="upd_latest">Latest</span>: <b id="latestVer" style="color:var(--accent,#5ec8ff)">v0.8.0</b></p>
     <a class="btn ghost" href="https://github.com/bagidea/bagidea-office/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-i18n="upd_cta">See what's new →</a>
   </div>
 </section>

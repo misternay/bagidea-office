@@ -33,6 +33,7 @@ the office truly comes alive.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
+- **v0.8.0 — 🧠 Swappable Brains (the big one):** run **each agent on its own model**. Director on Claude (the thinker), builders on cheaper models → big cost savings with **zero** loss of Claude Code's tools/skills/sessions (Claude Code is still the engine — only the brain behind it swaps). Talk **direct** to Claude/GLM/DeepSeek/Qwen/MiniMax, or reach **OpenAI/Gemini/OpenRouter/NVIDIA + your own custom providers** through a **built-in, zero-dependency proxy** (no LiteLLM/Python). Plus **auto-compact + auto-new-thread for *every* model** (long chats never clog or freeze — see below), a **🧠 BRAINS monitor**, a per-message **model tag + context meter**, **per-provider cost** in STATS, a **typing indicator**, and **cancel-a-task** mid-flight.
 - **v0.7.8–0.7.9** — 🔀 **Workflow Builder** grows up: an n8n-style **graph canvas** (zoom/pan, branch & merge), **tabs**, **7 read-only examples**, and you can **▶️ Run** a flow or **🧠 save it as a Skill**. 🧰 **Tools Hub** — one-click MCP servers (Browser automation, Google, Postgres, Notion…) with a plain-language guide. New windows now follow your **language**, plugins open one way, the chat tucks aside for new windows, and a **wallpaper-stability** fix (no more vanishing on Win+D).
 - **v0.7.7** — first Workflow Builder, channels that **mirror out + show “typing” + take slash commands**, **multi-monitor** wallpaper + monitor picker. Fixes the wallpaper reports (#5/#6/#7).
 - **v0.7.5–0.7.6** — **media shows inline** in chat (images/video/audio, not file paths), manual **atmosphere persists**, a **sponsor wall** via GitHub Sponsors, smoother wallpaper (visible shadows, warmer noon).
@@ -55,6 +56,54 @@ BagIdea Office is updated **constantly** — every office gets a 🔄 banner and
 | ![Agents working at their desks](docs/img/agents.png) | ![The bagidea CLI help](docs/img/cli.png) |
 | 🔌 Plugins — agents build & run their own | 📰 A live briefing panel (a plugin in action) |
 | ![The PLUGINS panel listing installed plugins, with install-from-GitHub](docs/img/plugins.png) | ![A morning briefing rendered inside a plugin panel](docs/img/briefing.png) |
+
+---
+
+## 🧠 Swappable Brains — every agent, any model *(new in v0.8.0)*
+
+Pick the model that powers **each** agent. Keep your Director on Claude for the
+hard calls, put the builders on cheaper models, and cut your bill — without losing
+a single Claude Code tool, skill or session. **Claude Code stays the engine; only
+the brain behind it swaps**, and it **fails open to Claude**, so nothing changes
+until you opt an agent in.
+
+![Pick a provider and model per agent, with a live context-usage meter in the chat](docs/img/swappable-brains.png)
+
+**Two ways agents reach a model:**
+
+- 🟢 **Direct (Anthropic-compatible)** — Claude, **GLM** (Z.AI), **DeepSeek**, **Qwen** (Alibaba), **MiniMax**. The CLI talks straight to them; nothing in between.
+- 🔵 **Via the built-in proxy (OpenAI-compatible)** — **OpenAI**, **Gemini**, **OpenRouter**, **NVIDIA build**, and **your own custom providers**. A **zero-dependency proxy is baked into the daemon** and translates Anthropic ↔ OpenAI on the fly — **no LiteLLM, no Python** to install (already have a LiteLLM gateway? point a custom provider at it).
+
+| 🔌 Connect once in ⚙ CONNECT → 🧠 MODELS/PROVIDERS | ➕ Others + your own custom provider |
+|---|---|
+| ![Provider list: Claude, GLM, DeepSeek, Qwen, MiniMax, OpenAI, Gemini](docs/img/brains-connect.png) | ![OpenRouter, NVIDIA build and the custom-provider form](docs/img/brains-providers.png) |
+
+**🆓 Try the free ones (mind the limits):** **NVIDIA build** is free to test but rate-limited (~40 req/min) — heavy agent tasks hit 429 fast, so it's best for light/eval use. **OpenRouter** has free models (`:free`, `vendor/model` ids) but they're daily-capped and may queue; top up credit for serious work. **Gemini** has a generous free quota. (And **OpenAI Tier 1**'s 30k tokens/min is small for heavy agent context — which is exactly why the next feature exists.)
+
+### ♻️ Auto-Compact + Auto-New-Thread — for *every* model
+
+> **Talk as long as you want. It never clogs, never freezes, never makes you start a new thread by hand.**
+
+Long conversations normally blow past a model's context window and break. Claude
+Code solves this *for Claude only* — BagIdea Office makes it work for **every**
+model, fully automatic and hands-free:
+
+- 🧠 **Proactive** — before each turn the office measures the conversation against the model's context window. Getting full? It **summarizes the thread with Claude → opens a fresh thread → keeps working**, *before* it ever overflows.
+- 🛟 **Reactive** — if a backend rejects a request (a rate or context limit you didn't see coming), the same recovery kicks in automatically.
+- 🪄 **Continuity preserved** — the summary is written by **Claude** (big brain, huge context) and seeded into the new thread, so the agent still knows what you discussed. The UI even **carries your view across** to the new thread, so nothing ever looks stuck.
+
+The result: even tiny / free-tier models run long sessions without you babysitting them.
+
+### 📊 See everything
+
+Every agent message is **tagged with the model that produced it**, the thread bar
+shows a **live context-usage meter** (e.g. `gpt-4o · 40k/128k`), the **🧠 BRAINS**
+panel monitors every provider's connect status + each agent's usage, and **STATS**
+breaks down **estimated spend per provider**.
+
+![Chat tagged with the model and a context-usage meter in the thread bar](docs/img/brains-chat.png)
+
+---
 
 > ✅ **Status: working product — Windows 11 (stable) + macOS 13+ (beta, new this release).** The full pipeline works end-to-end: wallpaper → daemon → real Claude Code sessions working *inside real project folders* → spatialized approvals → agent management UI → Telegram/Discord/LINE channels → CLI → self-updater. All visuals and sounds **ship in the repo** (free / CC0 art — see [Art assets](#art-assets)), so a fresh install and `bagidea update` carry the full look out of the box.
 
