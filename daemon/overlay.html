@@ -2205,7 +2205,7 @@
           : `<input type="password" placeholder="วาง key…" autocomplete="new-password"
                style="flex:0 0 140px;margin:0"><div class="winbtn" data-a="save" title="บันทึก">💾</div>`);
       const stat = card.querySelector(".kstat");
-      const saveKey = (v) => { if (v) api("/registry/key", { name, value: v }).then(() => openSettings("connect")); };
+      const saveKey = (v) => { if (v) api("/registry/key", { name, value: v }).then(() => renderConnectTab()); };
       card.querySelectorAll(".winbtn").forEach((btn) => {
         const act = btn.dataset.a;
         if (act === "save") btn.onclick = () => saveKey(card.querySelector("input").value.trim());
@@ -2244,13 +2244,13 @@
         `<span><code>${maskKey(v)}</code></span></div>` +
         `<div class="winbtn hide" title="ลบ key">✕</div>`;
       row.querySelector(".winbtn").onclick = () =>
-        api("/registry/key", { name: n, remove: true }).then(() => openSettings("connect"));
+        api("/registry/key", { name: n, remove: true }).then(() => renderConnectTab());
       klist.appendChild(row);
     }
     modalCard.querySelector("#addKey").onclick = () => {
       const n = modalCard.querySelector("#kName").value.trim();
       const v = modalCard.querySelector("#kVal").value.trim();
-      if (n && v) api("/registry/key", { name: n, value: v }).then(() => openSettings("connect"));
+      if (n && v) api("/registry/key", { name: n, value: v }).then(() => renderConnectTab());
     };
     // ── 🧠 model providers: paste key → Connect → live connected state.
     const provbox = modalCard.querySelector("#provbox");
@@ -2287,7 +2287,7 @@
           if (key) await api("/registry/provider", { provider: id, token: key });
           stat.textContent = "🧪 กำลังเชื่อมต่อ…";
           const r = await api("/registry/provider/test", { provider: id });
-          if (r.ok) openSettings("connect");
+          if (r.ok) renderConnectTab();
           else stat.innerHTML = `<span style="color:#ff6258">❌ ${r.msg || "เชื่อมต่อไม่สำเร็จ"}</span>`;
         };
         card.querySelectorAll(".winbtn").forEach((btn) => {
@@ -2295,7 +2295,7 @@
           if (act === "connect") btn.onclick = () => connect(card.querySelector("input").value.trim());
           else if (act === "retest") btn.onclick = () => connect("");
           else if (act === "disc") btn.onclick = () =>
-            api("/registry/provider", { provider: id, remove: true }).then(() => openSettings("connect"));
+            api("/registry/provider", { provider: id, remove: true }).then(() => renderConnectTab());
           else if (act === "change") btn.onclick = () => {
             const meta = card.querySelector(".meta"); card.innerHTML = ""; card.appendChild(meta);
             const inp = document.createElement("input");
@@ -2331,7 +2331,7 @@
         }
         cc.innerHTML = `<div class="meta"><b>${cauth.connected ? "✅" : "⚪"} Claude · Anthropic</b>
             <span class="pstat" style="color:${cauth.connected ? "#4ade80" : "var(--dim)"}">${statusText}</span></div>` + controls;
-        const saveKey = (v) => { if (v) api("/registry/key", { name: "ANTHROPIC_API_KEY", value: v }).then(() => openSettings("connect")); };
+        const saveKey = (v) => { if (v) api("/registry/key", { name: "ANTHROPIC_API_KEY", value: v }).then(() => renderConnectTab()); };
         const revealKeyInput = () => {
           const meta = cc.querySelector(".meta"); cc.innerHTML = ""; cc.appendChild(meta);
           const inp = document.createElement("input");
@@ -2349,7 +2349,7 @@
           else if (act === "savekey") btn.onclick = () => saveKey(cc.querySelector("input").value.trim());
           else if (act === "usekey" || act === "changekey") btn.onclick = revealKeyInput;
           else if (act === "rmkey") btn.onclick = () =>
-            api("/registry/key", { name: "ANTHROPIC_API_KEY", remove: true }).then(() => openSettings("connect"));
+            api("/registry/key", { name: "ANTHROPIC_API_KEY", remove: true }).then(() => renderConnectTab());
         });
         provbox.appendChild(cc);
       }
@@ -2390,7 +2390,7 @@
         const id = "cp-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
         await api("/registry/provider", { provider: id, kind, baseUrl, label: name, token: key });
         await api("/registry/provider/test", { provider: id });
-        openSettings("connect");
+        renderConnectTab();
       };
     }
     // Channel cards: enable switch + the fields each platform needs.
@@ -2429,7 +2429,7 @@
         const config = { enabled: sw.classList.contains("on") };
         card.querySelectorAll("input[data-f]").forEach((i) => (config[i.dataset.f] = i.value.trim()));
         await api("/registry/channel", { kind, config });
-        setTimeout(() => openSettings("connect"), 900);  // show fresh status
+        setTimeout(() => renderConnectTab(), 900);  // show fresh status
       };
       box.appendChild(card);
     }
