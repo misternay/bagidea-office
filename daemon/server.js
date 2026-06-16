@@ -711,6 +711,7 @@ let projWin = {};           // project id -> visible (true) / hidden (false)
 const projRuns = {};        // project id -> active AI run count
 const projAgents = {};      // project id -> {agentId: run count} (who's working)
 const projChildren = {};    // project id -> Set<ChildProcess> (so the owner can stop the work and take over)
+const runChildren = new Map();  // task id -> { child, agent } — cancel a running task mid-flight
 const WINPROJ = path.join(__dirname, "winproj.ps1");
 const LIVEVIEW = path.join(__dirname, "liveview.ps1");
 
@@ -1147,6 +1148,8 @@ function runClaude(agent, prompt, opts = {}) {
       if (s) { s.delete(child); if (!s.size) delete projChildren[projId]; }
     });
   }
+  // Track every run by task id so a single task can be cancelled mid-flight.
+  runChildren.set(task, { child, agent });
   // The split capability + project map ride on the wire only — never in
   // the chat log.
   const canSplit = !opts.noSub && !agent.includes("#");
@@ -1196,6 +1199,7 @@ SPEAK: <ประโยคพูดสั้นๆ 1 ประโยค เป�
   const fireDone = (text, ok) => {
     if (doneFired) return;
     doneFired = true;
+    runChildren.delete(task);
     releaseProj();
     if (opts.onDone) try { opts.onDone(text, ok); } catch (e) { console.error("[onDone]", e); }
   };
@@ -2902,6 +2906,28 @@ const server = http.createServer((req, res) => {
           // an immediate sweep can still race the kill and re-flag it as open.
           if (action === "stop") setTimeout(sweepProjects, 1500);
         });
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/task/stop") {
+    // ⏹ Cancel a running agent task mid-flight (kill its claude child by task id).
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const { task, agent } = JSON.parse(body);
+        const kill = (rec, t) => {
+          if (!rec) return;
+          try {
+            if (process.platform === "win32")
+              spawn("taskkill", ["/PID", String(rec.child.pid), "/T", "/F"], { windowsHide: true });
+            else rec.child.kill("SIGKILL");
+          } catch {}
+          broadcast({ type: "task.completed", agent: rec.agent, task: t });
+          runChildren.delete(t);
+        };
+        if (task && runChildren.has(task)) kill(runChildren.get(task), task);
+        else if (agent) { for (const [t, rec] of runChildren) if (rec.agent === agent) kill(rec, t); }
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });

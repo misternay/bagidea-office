@@ -1874,7 +1874,7 @@
     if (ev.theater || String(ev.agent || "").includes("#")) return;
     if (ev.type === "task.started")
       RUNNING.set(ev.task, { agent: ev.agent, title: ev.title || "",
-        session: ev.session || "", ts: ev.ts || Date.now() });
+        session: ev.session || "", ts: ev.ts || Date.now(), task: ev.task });
     else if (ev.type === "task.completed" || ev.type === "task.failed")
       RUNNING.delete(ev.task);
     else return;
@@ -1918,7 +1918,11 @@
         b.textContent = nameOf(v.agent);
         const s = document.createElement("span");
         s.textContent = v.title || tr("กำลังทำงาน…");
-        r.append(f, b, s);
+        const stop = document.createElement("div");
+        stop.className = "winbtn"; stop.textContent = "⏹"; stop.title = tr("ยกเลิกงานนี้");
+        stop.style.cssText = "margin-left:auto;flex:0 0 auto";
+        stop.onclick = (e) => { e.stopPropagation(); api("/task/stop", { task: v.task, agent: v.agent }); };
+        r.append(f, b, s, stop);
         if (box === strip) r.onclick = () => setTarget(v.agent);
         list.appendChild(r);
       }
