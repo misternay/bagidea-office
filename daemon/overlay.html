@@ -2375,10 +2375,10 @@
       const addRow = document.createElement("div");
       addRow.className = "arow"; addRow.style.cssText = "cursor:default;flex-wrap:wrap;gap:6px";
       addRow.innerHTML =
-        `<input id="cpName" placeholder="ชื่อ provider" style="flex:1 1 90px;margin:0">
-         <select id="cpKind" style="flex:0 0 120px;margin:0"><option value="anthropic">Anthropic-compatible</option><option value="openai">OpenAI-compatible</option></select>
+        `<input id="cpName" placeholder="ชื่อ provider" style="flex:1 1 100%;margin:0">
+         <select id="cpKind" style="flex:1 1 100%;width:100%;margin:0"><option value="anthropic">Anthropic-compatible</option><option value="openai">OpenAI-compatible</option></select>
          <input id="cpBase" placeholder="Base URL (เช่น https://api.x.ai/v1)" style="flex:1 1 100%;margin:0">
-         <input id="cpKey" type="password" placeholder="API key" autocomplete="new-password" style="flex:1 1 120px;margin:0">
+         <input id="cpKey" type="password" placeholder="API key" autocomplete="new-password" style="flex:1 1 130px;margin:0">
          <button class="sparkle" id="cpAdd" style="flex:0 0 auto">＋ เพิ่ม + Connect</button>`;
       provbox.appendChild(addRow);
       addRow.querySelector("#cpAdd").onclick = async () => {
