@@ -230,7 +230,7 @@
   /* Big friendly edge handle — one obvious place to open/close the panel. */
   #sideTab {
     position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-    z-index: 160; width: 24px; padding: 10px 2px; text-align: center;
+    z-index: 160; width: 24px; min-height: 30px; padding: 10px 2px; text-align: center;
     background: rgba(20,30,52,0.92); border: 1px solid var(--line); border-right: none;
     border-radius: 10px 0 0 10px; cursor: pointer; user-select: none;
     font-size: 13px; line-height: 1.5; color: #cfe3ff;
@@ -1372,6 +1372,14 @@
     sideTab.style.right = open ? "250px" : "0";
     try { localStorage.setItem("sideOpen", open ? "1" : "0"); } catch {}
   }
+  // The wallpaper window can be mis-sized when the page first paints on cold boot,
+  // which strands this fixed handle near the top corner and it never reflows on its
+  // own. Pin its vertical centre to the CURRENT viewport, and re-pin as the window
+  // settles to full size.
+  function placeTab() { if (window.innerHeight > 0) sideTab.style.top = Math.round(window.innerHeight / 2) + "px"; }
+  placeTab();
+  window.addEventListener("resize", placeTab);
+  [150, 500, 1200, 2500, 5000].forEach((t) => setTimeout(placeTab, t));
   if ((() => { try { return localStorage.getItem("sideOpen") === "1"; } catch { return false; } })())
     setSide(true);
   document.getElementById("sideBtn").onclick = () =>
