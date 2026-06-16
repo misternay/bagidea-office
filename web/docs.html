@@ -143,7 +143,12 @@ bagidea start   # launch the office</code></pre>
     <p data-i18n="d_updates_p">A VERSION file marks real releases: the office only shows the 🔄 update banner when main's version is newer than yours, so routine commits never nag you. Click the banner or run bagidea update to pull, rebuild and relaunch (your data is kept). Set it to launch with Windows from the tray, settings, or bagidea startup on.</p>
 
     <h2 id="brains" data-i18n="d_brain_h">Swappable brains (any model)</h2>
-    <p data-i18n-html="d_brain_p">Run each agent on its own model. Claude Code stays the engine — only the brain behind it swaps, and it fails open to Claude, so nothing changes until you opt an agent in. Two kinds: <b>direct</b> Anthropic-compatible (Claude, GLM, DeepSeek, Qwen, MiniMax), and OpenAI-compatible <b>via a built-in zero-dependency proxy</b> (OpenAI, Gemini, OpenRouter, NVIDIA, and your own custom providers) — no LiteLLM or Python to install.</p>
+    <p data-i18n-html="d_brain_p">Run each agent on its own model. Claude Code stays the engine — only the brain behind it swaps, and it fails open to Claude, so nothing changes until you opt an agent in. <b>No LiteLLM or Python to install</b> — a translation proxy is built into the daemon.</p>
+    <ul>
+      <li data-i18n-html="d_brain_direct"><b>Direct (Anthropic-compatible):</b> Claude · GLM (Z.AI) · DeepSeek · Qwen (Alibaba) · MiniMax</li>
+      <li data-i18n-html="d_brain_proxy"><b>Via the built-in proxy (OpenAI-compatible):</b> OpenAI · Gemini · OpenRouter · NVIDIA build</li>
+      <li data-i18n-html="d_brain_custom"><b>Custom providers:</b> add your own — name + Base URL + key, Anthropic- or OpenAI-style (point it at a LiteLLM gateway if you run one).</li>
+    </ul>
     <img src="img/brains-connect.png" alt="Connect providers in CONNECT → MODELS/PROVIDERS">
     <img src="img/swappable-brains.png" alt="Pick a provider and model per agent, with a context-usage meter">
     <p data-i18n-html="d_brain_setup"><b>Set it up:</b> ⚙ CONNECT → 🧠 MODELS/PROVIDERS → paste a key → Connect (✅). Then ✏️ edit an agent → 🧠 Brain → pick provider + model (a working default is auto-selected) → Save.</p>
