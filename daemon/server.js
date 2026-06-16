@@ -304,7 +304,11 @@ function brainRoute(agentId) {
 // A failure that means "the request was too big for this backend" — either a real
 // context-window overflow or a low rate/TPM ceiling. These never succeed on retry of
 // the same request, so they're the trigger for auto-compact + fresh-thread recovery.
-const OVERFLOW_RE = /exceeds your account|tokens ?\/ ?min|tokens per min|\bTPM\b|context[_ ]?length|maximum context|context window|request too large|too many tokens|prompt is too long|input is too long|string too long|reduce the (length|number)|exceeds the maximum/i;
+// Matches ONLY genuine "can never fit" failures — a context-window overflow or the
+// proxy's "larger than your account ... can never fit" 400. Deliberately excludes
+// transient rolling-window rate limits (those surface as a retryable 429 and claude
+// just backs off) so recovery never churns on a temporary TPM blip.
+const OVERFLOW_RE = /larger than your account|can never fit|context[_ ]?length|context_length_exceeded|maximum context|context window|prompt is too long|input is too long|string too long|reduce the (length|number)|too many tokens|exceeds the maximum (context|number of tokens|token)/i;
 function isOverflowError(t) { return !!t && OVERFLOW_RE.test(String(t)); }
 
 // Per-backend INPUT-token budget for ONE request — the trigger for Claude-Code-style

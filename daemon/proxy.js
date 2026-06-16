@@ -176,10 +176,10 @@ function streamAnthropic(res, msg) {
 }
 
 async function handle(req, res, provider, reg, raw) {
-  const errOut = (status, type, message) => {
+  const errOut = (status, type, message, headers) => {
     plog(`  ERR ${status} ${type}: ${String(message).slice(0, 280)}`);
     try {
-      res.writeHead(status, { "content-type": "application/json" });
+      res.writeHead(status, { "content-type": "application/json", ...(headers || {}) });
       res.end(JSON.stringify({ type: "error", error: { type, message } }));
     } catch {}
   };
@@ -246,17 +246,24 @@ async function handle(req, res, provider, reg, raw) {
   }
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    // A "request too large for your TPM" 429 is NOT transient — the request is a fixed
-    // size and the limit is fixed, so claude's silent 429-retry loop spins forever and
-    // the user just sees a hang. Convert it to a clear, non-retryable (400) error.
-    if (r.status === 429 && /too large|tokens per min|\bTPM\b|request_too_large/i.test(txt)) {
+    if (r.status === 429) {
+      // Distinguish a GENUINELY-too-big request from a TRANSIENT rolling-window limit.
+      // OpenAI says "Request too large ... Limit L, Requested N" for BOTH; only N > L
+      // means the single request can never fit (retry is futile → non-retryable 400,
+      // which triggers office compaction/recovery). N <= L is just the per-minute
+      // window temporarily full → pass the 429 through so claude backs off and retries.
       const m = txt.match(/Limit\s+(\d+).*?Requested\s+(\d+)/i);
-      const detail = m ? ` (this request needs ~${m[2]} tokens, your limit is ${m[1]} tokens/min)` : "";
-      return errOut(400, "invalid_request_error",
-        `${provider}/${model}: request exceeds your account's rate limit${detail}. ` +
-        `Agent tasks bundle the full toolset + chat history, so they need a higher usage tier. ` +
-        `Raise this provider's tier (or add billing), start a fresh thread to shrink history, ` +
-        `or run this agent on a model with larger limits (Claude / GLM / DeepSeek).`);
+      const limit = m ? +m[1] : 0, need = m ? +m[2] : 0;
+      if (need && limit && need > limit) {
+        return errOut(400, "invalid_request_error",
+          `${provider}/${model}: this request (~${need} tokens) is larger than your account's ` +
+          `${limit} tokens/min limit, so it can never fit. Raise this provider's tier (or add ` +
+          `billing), or run this agent on a model with larger limits (Claude / GLM / DeepSeek).`);
+      }
+      const ra = r.headers.get("retry-after");
+      return errOut(429, "rate_limit_error",
+        (txt || "rate limited — backing off and retrying").slice(0, 400),
+        ra ? { "retry-after": ra } : null);
     }
     return errOut(r.status, "api_error", (txt || `upstream HTTP ${r.status}`).slice(0, 600));
   }
