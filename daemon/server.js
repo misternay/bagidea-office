@@ -3153,7 +3153,7 @@ const server = http.createServer((req, res) => {
           delete reg.providerConfig[provider];
         } else {
           const c = reg.providerConfig[provider] || {};
-          if (token !== undefined) c.token = String(token).slice(0, 400);
+          if (token !== undefined) { c.token = String(token).slice(0, 400); c.connected = false; }
           if (baseUrl !== undefined) c.baseUrl = String(baseUrl).slice(0, 300);
           if (model !== undefined) c.model = String(model).slice(0, 60);
           reg.providerConfig[provider] = c;
@@ -3162,6 +3162,57 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { "content-type": "application/json" });
         res.end("{}");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/provider/test") {
+    // 🧪 Validate a provider's key (and, for openai/gemini, fetch its live model
+    // list). Persists reg.providerConfig[p].connected so the UI shows the state.
+    readBody(req, async (body) => {
+      const done = (ok, msg, models) => {
+        try {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok, msg, models: models || null }));
+        } catch {}
+      };
+      try {
+        const { provider } = JSON.parse(body);
+        const pc = (reg.providerConfig || {})[provider];
+        if (!pc || !pc.token) return done(false, "ยังไม่ได้วาง key");
+        const setConn = (ok, models) => {
+          reg.providerConfig[provider].connected = ok;
+          if (models) reg.providerConfig[provider].models = models;
+          try { saveReg(); } catch {}
+        };
+        const signal = AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined;
+        if (provider === "openai" || provider === "gemini") {
+          const base = provider === "openai"
+            ? "https://api.openai.com/v1"
+            : "https://generativelanguage.googleapis.com/v1beta/openai";
+          const r = await fetch(base + "/models", { headers: { authorization: "Bearer " + pc.token }, signal });
+          if (r.ok) {
+            let models = [];
+            try { const j = await r.json(); models = (j.data || []).map((m) => m.id).filter(Boolean).sort().slice(0, 80); } catch {}
+            setConn(true, models);
+            return done(true, "เชื่อมต่อแล้ว ✓", models);
+          }
+          setConn(false);
+          return done(false, "key ไม่ผ่าน (HTTP " + r.status + ")");
+        }
+        // direct Anthropic-compatible providers (glm/deepseek/qwen/minimax)
+        const spec = providers.PROVIDERS[provider];
+        const base = pc.baseUrl || (spec && spec.baseUrl);
+        if (!base) return done(false, "ไม่พบ endpoint");
+        const model = pc.model || (spec && spec.models && spec.models.find(Boolean)) || "";
+        const r = await fetch(base.replace(/\/+$/, "") + "/v1/messages", {
+          method: "POST", signal,
+          headers: { "content-type": "application/json", "x-api-key": pc.token,
+            authorization: "Bearer " + pc.token, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
+        });
+        const authBad = r.status === 401 || r.status === 403;  // other codes = key authenticated
+        setConn(!authBad);
+        return done(!authBad, authBad ? "key ไม่ผ่าน (HTTP " + r.status + ")" : "เชื่อมต่อแล้ว ✓");
+      } catch (e) { return done(false, String((e && e.message) || e)); }
     });
 
   } else if (req.method === "POST" && req.url === "/registry/channel") {
