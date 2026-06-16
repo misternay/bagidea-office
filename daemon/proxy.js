@@ -141,11 +141,12 @@ async function handle(req, res, provider, reg, raw) {
   const model = pickModel(a.model, fallbackModel);
   const body = toOpenAI(a, model);
 
-  // Abort the upstream call if the client (claude) disconnects — e.g. the task was
-  // cancelled — so we stop streaming from (and queuing on) a now-dead request.
+  // Abort the upstream ONLY if the client (claude) drops before we've finished —
+  // detected via res 'close' while the response hasn't ended. (Do NOT use req
+  // 'close': it fires the moment the request body is read, which is before/while
+  // the upstream fetch runs, and would abort every healthy request → 502.)
   const ac = new AbortController();
-  const onGone = () => { try { ac.abort(); } catch {} };
-  req.on("close", onGone); req.on("aborted", onGone);
+  res.on("close", () => { if (!res.writableEnded) { try { ac.abort(); } catch {} } });
 
   let r;
   try {
@@ -215,10 +216,14 @@ async function handle(req, res, provider, reg, raw) {
     }
   } catch (e) { /* upstream stream dropped — close out cleanly below */ }
 
-  start(); closeBlock();
-  sse(res, "message_delta", { type: "message_delta", delta: { stop_reason: stop, stop_sequence: null }, usage: { output_tokens: usage.output_tokens } });
-  sse(res, "message_stop", { type: "message_stop" });
-  res.end();
+  if (!res.writableEnded) {
+    try {
+      start(); closeBlock();
+      sse(res, "message_delta", { type: "message_delta", delta: { stop_reason: stop, stop_sequence: null }, usage: { output_tokens: usage.output_tokens } });
+      sse(res, "message_stop", { type: "message_stop" });
+      res.end();
+    } catch {}
+  }
 }
 
 module.exports = { handle, toOpenAI, toAnthropic, pickModel, upstreamFor, UPSTREAM };
