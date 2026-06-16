@@ -2808,7 +2808,7 @@
        </select></div>
        <div class="field"><label>🧠 สมอง (โมเดล/ผู้ให้บริการ) — ดีฟอลต์คือ Claude</label>
          <select id="eProvider"></select>
-         <select id="eModel" style="margin-top:6px"></select>
+         <input id="eModel" list="eModelList" maxlength="60" style="margin-top:6px" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์ของผู้ให้บริการ)"><datalist id="eModelList"></datalist>
          <div id="eProvWarn" style="display:none;margin-top:6px;font-size:11px">
            <span style="color:#ffb054">⚠ ยังไม่ได้เชื่อมต่อ provider นี้</span>
            <button class="send" id="eGoConnect" style="margin-left:6px">🔗 ไปหน้า CONNECT</button>
@@ -3000,10 +3000,12 @@
         if (saveBtn) { saveBtn.disabled = !connected; saveBtn.title = connected ? "" : tr("⚠ ยังไม่ได้เชื่อมต่อ provider นี้"); }
         if (!connected) { warn.style.display = "block"; modelSel.style.display = "none"; return; }
         warn.style.display = "none"; modelSel.style.display = "";
-        let list = (pcAll[p] && pcAll[p].models && pcAll[p].models.length) ? pcAll[p].models : (MODELS[p] || [""]);
-        if (a.model && !list.includes(a.model)) list = [a.model, ...list];
-        modelSel.innerHTML = list.map((m) => `<option value="${m}">${m || "(ดีฟอลต์)"}</option>`).join("");
-        modelSel.value = a.model || (p === "claude" ? "" : (list[0] || ""));
+        // Suggestions: live list (openai-kind, fetched on Connect) or static hints;
+        // the field is a free input so custom/anthropic providers can type any model.
+        const list = (pcAll[p] && pcAll[p].models && pcAll[p].models.length) ? pcAll[p].models : (MODELS[p] || []);
+        const ml = modalCard.querySelector("#eModelList");
+        if (ml) ml.innerHTML = list.filter(Boolean).map((m) => `<option value="${m}"></option>`).join("");
+        modelSel.value = a.model || "";
       };
       buildProviderOptions();
       provSel.onchange = renderModels;
