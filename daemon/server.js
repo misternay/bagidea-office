@@ -1111,6 +1111,9 @@ function runClaude(agent, prompt, opts = {}) {
     broadcast({ type: "projects.changed" }, false);
   }
   entry.log = entry.log || [];
+  // A compaction/recovery run carries a heads-up that belongs at the top of the
+  // NEW thread (where the user is sent) — not the old one they were looking at.
+  if (isNew && opts._notice) entry.log.push({ who: "agent", text: opts._notice, ts: Date.now() });
   entry.log.push({ who: "you", text: String(opts.logPrompt || prompt).slice(0, 4000), ts: Date.now() });
   while (entry.log.length > 200) entry.log.shift();
   saveSess();
@@ -1390,30 +1393,41 @@ function brainLabel(agent) {
     ? a.provider + (a.model ? "/" + a.model : "") : "โมเดลที่เลือก";
 }
 
-// PROACTIVE compaction (see runClaude / overBudget): the thread is near this backend's
-// context budget — summarize + continue on a FRESH thread BEFORE overflowing, so the
-// user's task runs without ever hitting the limit. Claude-Code-style, for any model.
-async function compactThenRun(agent, prompt, opts, oldEntry) {
-  broadcast({ type: "chat.message", agent, session: oldEntry.key,
-    text: `🧠 บทสนทนายาวขึ้น — สรุปใจความเดิม (auto-compact) แล้วทำงานต่อใน thread ใหม่ ` +
-      `เพื่อให้ ${brainLabel(agent)} ไหว…` });
+// Restart a task on a FRESH thread seeded with a Claude-made summary of the old one,
+// and carry the user's view across: the notice rides INTO the new thread's log, and a
+// thread.switch event moves a direct viewer there (so they don't sit on a dead thread
+// watching nothing happen). Shared by proactive compaction + reactive recovery.
+async function restartOnFreshThread(agent, prompt, opts, oldEntry, notice, flag) {
   const brief = await summarizeThread(oldEntry);
   const retryPrompt = brief
     ? `<previously-in-this-thread>\n${brief}\n</previously-in-this-thread>\n\n${prompt}`
     : prompt;
-  runClaude(agent, retryPrompt, { ...opts, session: "new", _compacted: true });
+  const origOnEntry = opts.onEntry;
+  runClaude(agent, retryPrompt, {
+    ...opts, session: "new", _notice: notice, [flag]: true,
+    onEntry: (newKey) => {
+      // Tell the overlay to follow this agent's conversation to the new thread.
+      broadcast({ type: "thread.switch", agent, from: oldEntry.key, to: newKey });
+      if (origOnEntry) try { origOnEntry(newKey); } catch {}
+    },
+  });
+}
+
+// PROACTIVE compaction (see runClaude / overBudget): the thread is near this backend's
+// context budget — summarize + continue on a FRESH thread BEFORE overflowing, so the
+// user's task runs without ever hitting the limit. Claude-Code-style, for any model.
+function compactThenRun(agent, prompt, opts, oldEntry) {
+  return restartOnFreshThread(agent, prompt, opts, oldEntry,
+    `🧠 บทสนทนายาวขึ้น — สรุปใจความเดิม (auto-compact) แล้วทำงานต่อใน thread ใหม่นี้ ` +
+    `เพื่อให้ ${brainLabel(agent)} ไหว`, "_compacted");
 }
 
 // REACTIVE recovery (see maybeRecover): the backend already rejected the request as
 // too big (overflow or rate/TPM). Same summarize → fresh-thread restart, one attempt.
-async function autoRecoverOverflow(agent, prompt, opts, oldEntry) {
-  broadcast({ type: "chat.message", agent, session: oldEntry.key,
-    text: `⚠ ${brainLabel(agent)} รับ context เต็มไม่ไหว — กำลังสรุปใจความเดิมแล้วเปิด thread ใหม่ให้อัตโนมัติ…` });
-  const brief = await summarizeThread(oldEntry);
-  const retryPrompt = brief
-    ? `<previously-in-this-thread>\n${brief}\n</previously-in-this-thread>\n\n${prompt}`
-    : prompt;
-  runClaude(agent, retryPrompt, { ...opts, session: "new", _recovered: true });
+function autoRecoverOverflow(agent, prompt, opts, oldEntry) {
+  return restartOnFreshThread(agent, prompt, opts, oldEntry,
+    `⚠ ${brainLabel(agent)} รับ context เต็มไม่ไหว — สรุปใจความเดิมแล้วย้ายมาทำงานต่อใน thread ใหม่นี้ให้อัตโนมัติ`,
+    "_recovered");
 }
 
 // ---------------------------------------------------------------- ceo flow

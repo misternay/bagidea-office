@@ -4683,6 +4683,18 @@
       if (missions[key]) { missions[key].state = "failed"; renderMissions(); }
       ensureAgent(ev.agent, "idle");
     }
+    else if (ev.type === "thread.switch") {
+      // Auto-compact / recovery moved this agent's work onto a fresh thread. If the
+      // user is watching this agent's old thread directly, follow them across so the
+      // live conversation keeps showing — instead of a pane that looks stuck.
+      if (!ev.replay && ev.agent === target && !groupView &&
+          (CUR[target] === ev.from || !CUR[target])) {
+        SESS[target] = ev.to;
+        CUR[target] = ev.to;
+        addChip(tr("🧵 บทสนทนายาวขึ้น — ย้ายไป thread ใหม่ (auto-compact)"));
+        refreshThreadBar(true);
+      }
+    }
     else if (ev.type === "perm.requested") {
       if (missions[key]) { missions[key].state = "blocked"; renderMissions(); }
       ensureAgent(ev.agent, "blocked");
