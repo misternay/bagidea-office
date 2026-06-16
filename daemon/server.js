@@ -701,6 +701,27 @@ function auxCost(provider, usd) {
     fs.writeFile(STATS, JSON.stringify(stats, null, 1), () => {}), 1500);
 }
 
+// Swapped-in brains don't return a real bill, so estimate from token usage. Rough
+// public $/1M [input, output]; tune freely. (openrouter/nvidia vary by model — rough.)
+const BRAIN_PRICES = {
+  glm: [0.6, 2.2], deepseek: [0.28, 1.1], qwen: [0.4, 1.2], minimax: [0.3, 1.2],
+  openai: [2.5, 10], gemini: [0.15, 0.6], openrouter: [1, 3], nvidia: [0, 0],
+};
+// Accumulate a swapped-in brain's token spend under stats[day].brains[provider].
+function brainBump(provider, inTok, outTok) {
+  if (!provider || provider === "claude") return;
+  const day = new Date().toISOString().slice(0, 10);
+  const d = (stats[day] = stats[day] || { runs: 0, done: 0, failed: 0, cost: 0, agents: {} });
+  d.brains = d.brains || {};
+  const b = (d.brains[provider] = d.brains[provider] || { in: 0, out: 0, cost: 0, runs: 0 });
+  b.in += inTok || 0; b.out += outTok || 0; b.runs += 1;
+  const pr = BRAIN_PRICES[provider] || [0, 0];
+  b.cost = Math.round((b.cost + (inTok || 0) / 1e6 * pr[0] + (outTok || 0) / 1e6 * pr[1]) * 1e6) / 1e6;
+  clearTimeout(statBump._t);
+  statBump._t = setTimeout(() =>
+    fs.writeFile(STATS, JSON.stringify(stats, null, 1), () => {}), 1500);
+}
+
 let jobs = loadJson(JOBS, []);    // {id, agent, prompt, mode, at, time, daily, everyMin, enabled, lastRun, lastDay, done, sessionKey, running}
 let notes = loadJson(NOTES, []);  // {id, who, text, ts}
 let cal = loadJson(CAL, []);      // {id, title, at, remindMin, notified}
@@ -1151,6 +1172,7 @@ function runClaude(agent, prompt, opts = {}) {
   const a = reg.agents[agent];
   const isFresh = isNew;
   const mtag = modelTag(agent);   // brain tag stamped on this run's messages + usage
+  const mprov = (a && a.provider) || reg.defaultProvider || "claude";  // for cost tally
   const picked = a && a.tools && a.tools.length ? a.tools : ["Read", "Glob", "Grep"];
   // "mcp:<name>" entries become a real --mcp-config + server-level allow rule.
   const mcpNames = picked.filter((t) => t.startsWith("mcp:"))
@@ -1381,7 +1403,10 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
         const inTok = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) +
           (u.cache_creation_input_tokens || 0);
         const usage = { in: inTok, out: u.output_tokens || 0, win: ctxWindow(agent) };
-        if (!m.is_error) { entry.lastUsage = { ...usage, model: mtag, ts: Date.now() }; saveSess(); }
+        if (!m.is_error) {
+          entry.lastUsage = { ...usage, model: mtag, ts: Date.now() }; saveSess();
+          brainBump(mprov, inTok, u.output_tokens || 0);  // estimate non-Claude spend
+        }
         broadcast({ type: m.is_error ? "task.failed" : "task.completed",
           agent, task, session: entry.key, model: mtag, usage });
         statBump(m.is_error ? "failed" : "done", null, Number(m.total_cost_usd) || 0);

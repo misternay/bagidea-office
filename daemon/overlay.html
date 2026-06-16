@@ -655,7 +655,9 @@
     padding: 3px 14px; font-size: 10.5px; color: var(--dim);
     background: rgba(10, 14, 24, 0.5); border-top: 1px solid rgba(255,255,255,0.05);
   }
-  #threadBar b { color: var(--accent); font-weight: 600; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #threadBar { flex-wrap: nowrap; }
+  #threadBar b { color: var(--accent); font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #threadCtx { flex: 0 0 auto; margin-left: auto; white-space: nowrap; padding-left: 8px; }
 
   /* ---------- settings / editor / ID-card modal ---------- */
   #modal {
@@ -3602,15 +3604,29 @@
       `<div class="statgrid">
         ${card("⚡", "งานวันนี้", today.runs, `✓ ${today.done} · ✗ ${today.failed}`)}
         ${(() => { const g = (today.aux && today.aux.gemini) || 0, o = (today.aux && today.aux.openai) || 0, c = today.cost || 0;
+          const brains = today.brains || {};
+          const bTotal = Object.values(brains).reduce((s, b) => s + (b.cost || 0), 0);
           return card("💰", "Claude วันนี้", "$" + c.toFixed(2), "ค่าจริงจาก Claude API")
-            + card("✨", "Gemini วันนี้", "≈ $" + g.toFixed(3), "ประมาณการ (TTS/ภาพ/แปล)")
-            + card("🤖", "OpenAI วันนี้", "≈ $" + o.toFixed(3), "ประมาณการ (เสียง/ภาพ)")
-            + card("🧾", "รวมวันนี้", "≈ $" + (c + g + o).toFixed(2), "Claude + Gemini + OpenAI"); })()}
+            + card("🧠", "สมองอื่นๆ วันนี้", "≈ $" + bTotal.toFixed(3), "ประมาณการจาก token (GLM/OpenAI/Gemini…)")
+            + card("✨", "Gemini (TTS/ภาพ)", "≈ $" + g.toFixed(3), "ประมาณการ TTS/ภาพ/แปล")
+            + card("🤖", "OpenAI (เสียง/ภาพ)", "≈ $" + o.toFixed(3), "ประมาณการ เสียง/ภาพ")
+            + card("🧾", "รวมวันนี้", "≈ $" + (c + g + o + bTotal).toFixed(2), "ทุก provider รวมกัน"); })()}
         ${card("⏱", "เปิดมาแล้ว", up(s.uptimeSec), `${s.clients} จอเชื่อมต่อ`)}
         ${card("📋", "งานตั้งเวลา", s.jobs, `${s.events} นัดหมาย · ${s.notes} โน้ต`)}
         ${card("📁", "โปรเจค", s.projects.length, s.projects.filter((p) => p.ai).length + " มี AI ทำงาน")}
         ${card("📡", "channels", ch, "")}
       </div>
+      ${(() => {
+        const brains = today.brains || {};
+        const rows = Object.entries(brains).sort((a, b) => (b[1].cost || 0) - (a[1].cost || 0));
+        if (!rows.length) return "";
+        const tk = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n || 0);
+        return `<div class="field" style="margin-top:10px"><label>🧠 ค่าใช้จ่ายสมอง วันนี้ (ประมาณการจาก token)</label>` +
+          rows.map(([p, b]) => `<div class="arow" style="cursor:default;padding:5px 9px">
+            <div class="meta"><b>${p}</b> <small style="color:var(--dim)">${b.runs} งาน · ${tk(b.in)}↓ ${tk(b.out)}↑ tok</small></div>
+            <span style="color:var(--accent);font-weight:700">≈ $${(b.cost || 0).toFixed(3)}</span></div>`).join("") +
+          `</div>`;
+      })()}
       <div class="field" style="margin-top:10px"><label>📈 งาน 7 วันล่าสุด</label>
         <div class="dchart">${bars}</div></div>
       <div class="field" style="margin-top:8px"><label>🏆 ใครขยันสุดวันนี้</label>${agentRows}</div>
