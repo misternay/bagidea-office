@@ -871,7 +871,7 @@
   <span id="pttTxt">กำลังฟัง…</span>
   <span class="hint" id="pttHint"></span></div>
 
-<div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b></div>
+<div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b><span id="threadCtx" style="color:var(--dim);font-size:10.5px"></span></div>
 <div id="attachRow"></div>
 <footer>
   <textarea id="inp" rows="1" placeholder="Message Main…   ⏎ send · ⇧⏎ new line"
@@ -1301,7 +1301,7 @@
     return d.toDateString() === now.toDateString()
       ? t : d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " + t;
   }
-  function addMsg(cls, who, text, ts) {
+  function addMsg(cls, who, text, ts, meta) {
     const d = document.createElement("div");
     d.className = "msg " + cls;
     if (who) {
@@ -1317,7 +1317,8 @@
     if (String(cls).includes("agent")) attachMediaPreviews(d, text);
     const tm = document.createElement("div");
     tm.className = "msgtime";
-    tm.textContent = fmtTime(ts || Date.now());
+    // meta = which brain produced this line (model tag); shown dim next to the time.
+    tm.textContent = (meta ? meta + "  ·  " : "") + fmtTime(ts || Date.now());
     d.appendChild(tm);
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
@@ -4160,6 +4161,16 @@
   const CUR = {};   // target -> resolved current thread key (for filtering)
   let groupView = null;  // meeting key while reading/watching a group session
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
+  function fmtTok(n) { n = +n || 0; return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n); }
+  // The thread bar's brain + context-usage meter: which model, and how full its window
+  // is (input tokens / context window). Updated live at end of each turn + on reload.
+  function setThreadCtx(u) {
+    const el = document.getElementById("threadCtx");
+    if (!el) return;
+    if (!u || !u.win) { el.textContent = ""; return; }
+    const pct = Math.min(100, Math.round((u.in || 0) / u.win * 100));
+    el.textContent = `   ·   🧠 ${u.model || ""}   📊 ${fmtTok(u.in)}/${fmtTok(u.win)} (${pct}%)`;
+  }
 
   // Row of mini participant faces — hover a face for name + role.
   function facesStrip(ids, size = 18) {
@@ -4221,7 +4232,8 @@
         .then((x) => x.json());
       for (const m of r.log || []) {
         if (m.who === "tool") addToolRow(m.text);
-        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text, m.ts);
+        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text, m.ts,
+          m.who !== "you" && m.model ? "🧠 " + m.model : "");
       }
     } catch {}
   }
@@ -4232,6 +4244,7 @@
     if (SESS[target] === "new") {
       CUR[target] = null;
       log.innerHTML = "";
+      setThreadCtx(null);
       return setThreadLabel("🆕 thread ใหม่ — เริ่มเมื่อส่งข้อความแรก");
     }
     try {
@@ -4241,6 +4254,7 @@
       if (!cur) cur = list[0];
       setThreadLabel((cur ? cur.title : "ยังไม่มี — จะสร้างให้เองเมื่อคุยครั้งแรก") +
         (cur && cur.proj ? " · 📁" : ""));
+      setThreadCtx(cur && cur.lastUsage);   // restore the saved usage meter on reopen
       const key = cur ? cur.key : null;
       if (CUR[target] !== key || force) {
         CUR[target] = key;
@@ -4649,12 +4663,12 @@
       // current thread (or the meeting being watched live); history replays
       // come from /sessions/log instead.
       if (!ev.replay && groupView && ev.session === groupView) {
-        addMsg("agent", ev.agent, ev.text, ev.ts);
+        addMsg("agent", ev.agent, ev.text, ev.ts, ev.model ? "🧠 " + ev.model : "");
         uiSnd("msg");
       } else if (!ev.replay && !groupView &&
           (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
           (!ev.session || !CUR[target] || ev.session === CUR[target])) {
-        addMsg("agent", ev.agent, ev.text, ev.ts);
+        addMsg("agent", ev.agent, ev.text, ev.ts, ev.model ? "🧠 " + ev.model : "");
         uiSnd("msg");
       }
     }
@@ -4677,6 +4691,10 @@
     else if (ev.type === "task.completed") {
       if (missions[key]) { missions[key].state = "done"; renderMissions(); }
       ensureAgent(ev.agent, "idle");
+      // Live context-usage meter for the thread the user is watching.
+      if (!ev.replay && ev.usage && ev.agent === sessAgent() && !groupView &&
+          (!ev.session || !CUR[target] || ev.session === CUR[target]))
+        setThreadCtx({ ...ev.usage, model: ev.model });
       if (ev.agent === target && !ev.replay) refreshThreadBar();  // fresh thread gets its title
     }
     else if (ev.type === "task.failed") {
