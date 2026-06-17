@@ -80,14 +80,15 @@ const ORB_HTML: &str = r#"<!doctype html>
 <html><body style="margin:0;overflow:hidden;background:transparent;user-select:none;-webkit-user-select:none;cursor:pointer">
 <img id="logo" src="__LOGO__" draggable="false">
 <style>
-  /* Image-ONLY orb (like the splash). WebView2 composites a raster's baked alpha
-     cleanly on a transparent window, but CSS rounded/conic layers rendered black
-     artifacts here — so the orb is just the (already round) logo. It breathes gently,
-     and breathes faster while the office is working. */
-  #logo { position:absolute; inset:0; width:100%; height:100%;
-    animation: breathe 3.4s ease-in-out infinite; }
-  body.busy #logo { animation-duration: 0.9s; }
-  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(0.92); } }
+  /* Image-ONLY orb (like the splash). WebView2 composites a raster's baked alpha cleanly
+     on a transparent window, but CSS rounded/conic layers rendered black artifacts here.
+     object-fit:contain keeps the logo a true CIRCLE no matter the window's aspect. The
+     effect is a raster transform (safe): a calm breathe at rest, an eager spin when busy. */
+  #logo { position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
+    animation: breathe 3.4s ease-in-out infinite; will-change:transform; }
+  body.busy #logo { animation: spin 1.1s linear infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(0.93); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 <script>
   // Live pulse: the ring knows when the office is actually working.
