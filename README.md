@@ -679,6 +679,10 @@ this makes them employable"*).
 - [ ] Linux wallpaper backend
 - [ ] Signed binary releases (skip the Rust build on install)
 
+## License
+
+[MIT](LICENSE) © BagIdea — free to use, modify and share. Bundled art/sound packs keep their own (free/CC0) licenses; see [Art assets](#art-assets).
+
 ---
 
 *Built with [Claude Code](https://claude.com/claude-code) — design docs in the morning of day one, a full agent-office product by sunrise of day two.*
