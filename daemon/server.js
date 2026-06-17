@@ -131,6 +131,42 @@ function workflowToText(w) {
   }
   return s;
 }
+// Turn an ordered list of plain-language steps into a Builder workflow ({id,name,
+// nodes,edges}) — a trigger entry node, then one action node per step, chained top to
+// bottom. Shared by the agent WORKFLOW: protocol and the Director-draft endpoint.
+function buildWorkflowFromSteps(name, steps) {
+  const clean = (steps || []).map((s) => String(s || "").trim()).filter(Boolean).slice(0, 24);
+  const nodes = [], edges = [];
+  let i = 1, y = 40; const x = 80;
+  const push = (type, text) => { const id = "n" + (i++); nodes.push({ id, type, text: String(text).slice(0, 300), x, y }); y += 150; return id; };
+  let prev = push("trigger", "เมื่อสั่งให้เริ่ม");
+  clean.forEach((s) => { const id = push("action", s); edges.push({ from: prev, to: id }); prev = id; });
+  return { name: String(name || "Workflow").slice(0, 60), nodes, edges };
+}
+
+// Catch `WORKFLOW: <name> :: step1 ; step2 ; step3` lines in an agent's reply (steps
+// split on ; > → • | or numbering) and save each as an editable workflow file. Returns
+// { text } with the lines stripped, and { created:[{id,name}] }.
+function harvestWorkflows(text) {
+  const created = [], keep = [];
+  for (const ln of String(text || "").split("\n")) {
+    const m = ln.match(/^\s*WORKFLOW:\s*(.+?)\s*::\s*(.+)$/i);
+    if (!m) { keep.push(ln); continue; }
+    const name = m[1].trim();
+    const steps = m[2].split(/\s*(?:;|>|→|•|\||(?:^|\s)\d+[.)])\s*/).map((s) => s.trim()).filter(Boolean);
+    if (!name || !steps.length) { keep.push(ln); continue; }
+    try {
+      const w = buildWorkflowFromSteps(name, steps);
+      w.id = "wf_" + Date.now() + "_" + created.length;
+      const dir = path.join(WORKSPACE, "workflows"); fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, w.id + ".json"), JSON.stringify(w, null, 2));
+      created.push({ id: w.id, name: w.name });
+      broadcast({ type: "workflow.created", id: w.id, name: w.name });
+    } catch (e) { console.error("[workflow] save failed:", e && e.message); keep.push(ln); }
+  }
+  return { text: keep.join("\n"), created };
+}
+
 const WORKFLOW_ANALYZE_PROMPT = [
   "ผู้ใช้วาง workflow เป็นภาษามนุษย์ (ลำดับ node) ด้านล่าง. ในฐานะ Director ให้วิเคราะห์",
   "ว่าจะทำให้เกิดจริงได้ยังไง — อย่าลงมือทำตอนนี้ แค่วางแผน. ตอบเป็นหัวข้อ กระชับ",
@@ -1385,7 +1421,16 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
                   found.map((t, i) => `${i + 1}. ${t.slice(0, 80)}`).join("\n")).trim();
               }
             }
-            const out = opts.filterText ? opts.filterText(raw) : raw;
+            let out = opts.filterText ? opts.filterText(raw) : raw;
+            // `WORKFLOW: <name> :: step ; step` lines → saved as editable workflows in
+            // the Builder (then stripped from the chat, like SUB/SPEAK). Any agent can.
+            if (/(^|\n)\s*WORKFLOW:/i.test(out)) {
+              const hw = harvestWorkflows(out);
+              out = hw.text;
+              if (hw.created.length)
+                out = (out + "\n\n🔀 บันทึก workflow ลง Builder แล้ว: " +
+                  hw.created.map((w) => w.name).join(", ")).trim();
+            }
             if (out && !opts._recovered && isOverflowError(out)) {
               // Overflow surfaced as text — keep it for detection, but don't show the
               // raw API error; the recovery notice explains what's happening instead.
@@ -4206,6 +4251,40 @@ const server = http.createServer((req, res) => {
             res.end(JSON.stringify({ ok: !!ok, analysis: ok && out ? out : "วิเคราะห์ไม่สำเร็จ ลองใหม่อีกครั้ง" }));
           },
         });
+      });
+    } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
+
+  } else if (req.method === "POST" && req.url === "/workflows/draft") {
+    // 🪄 Director drafts a workflow from a plain-language goal → returns Builder nodes
+    // the owner can edit. (Approach C — the reverse of analyze.)
+    readBody(req, (body) => { try {
+      const goal = String(JSON.parse(body || "{}").goal || "").slice(0, 800);
+      if (!goal.trim()) { res.writeHead(400); return res.end('{"ok":false}'); }
+      queueDirectorTurn((release) => {
+        runClaude("main",
+          `Draft a workflow for this goal:\n"""${goal}"""\n\n` +
+          `Reply with ONLY a JSON object, no prose: ` +
+          `{"name":"<short title>","steps":["<step 1>","<step 2>", ...]}. ` +
+          `3–8 short imperative steps in order, in the language of the goal.`,
+          { noSub: true, logPrompt: "🪄 ร่าง workflow: " + goal.slice(0, 40),
+            onDone: (out, ok) => {
+              release();
+              let wf = null;
+              try {
+                const m = String(out || "").match(/\{[\s\S]*\}/);
+                const j = m ? JSON.parse(m[0]) : null;
+                if (j && Array.isArray(j.steps) && j.steps.length)
+                  wf = buildWorkflowFromSteps(j.name || goal.slice(0, 40), j.steps);
+              } catch {}
+              // Fallback: treat non-empty reply lines as steps so we never come back empty.
+              if (!wf && ok && out) {
+                const lines = String(out).split("\n").map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, "").trim()).filter(Boolean);
+                if (lines.length) wf = buildWorkflowFromSteps(goal.slice(0, 40), lines.slice(0, 8));
+              }
+              res.writeHead(200, { "content-type": "application/json" });
+              res.end(JSON.stringify({ ok: !!wf, workflow: wf }));
+            },
+          });
       });
     } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
 

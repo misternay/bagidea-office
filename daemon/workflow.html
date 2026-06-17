@@ -94,6 +94,7 @@
   <div id="bar">
     <input id="name" placeholder="ชื่อ workflow…" data-ph="ชื่อ workflow…" value="Workflow ใหม่">
     <button onclick="newTab()" data-i18n="🆕 ใหม่">🆕 ใหม่</button>
+    <button onclick="draftWf()" data-i18n="🪄 ร่างด้วย Director">🪄 ร่างด้วย Director</button>
     <button onclick="addNode()">＋ Node</button>
     <select id="wfopen" onchange="if(this.value){openTab(this.value);this.value='';}"><option value="">📂 เปิด…</option></select>
     <span class="grow"></span>
@@ -151,6 +152,11 @@
     "สร้าง skill ไม่สำเร็จ":"Couldn't create skill","ลบ workflow นี้?":"Delete this workflow?","(ไม่มีชื่อ)":"(untitled)",
     "บันทึกทับ workflow เดิมตัวนี้? กด ตกลง เพื่อเขียนทับของเดิม":"Overwrite this saved workflow? Click OK to replace the existing version.",
     "ตกลง":"OK","ยกเลิก":"Cancel",
+    "🪄 ร่างด้วย Director":"🪄 Draft with Director",
+    "อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — Director จะร่างให้":"What should the workflow do? Type a short goal — the Director will draft it.",
+    "เช่น สรุปข่าว AI ทุกเช้าแล้วส่งเข้า Telegram":"e.g. summarize AI news every morning and send to Telegram",
+    "🪄 Director กำลังร่าง workflow…":"🪄 The Director is drafting a workflow…",
+    "ร่างไม่สำเร็จ ลองใหม่":"Draft failed — try again","✅ ร่างเสร็จ — แก้ไขแล้วกด 💾 บันทึก":"✅ Drafted — edit it, then press 💾 Save",
     "📂 เปิด…":"📂 Open…","ตัวอย่าง (อ่านอย่างเดียว)":"Examples (read-only)","ของฉัน":"Mine",
     "เมื่อสั่งให้เริ่ม…":"When started…","เมื่อสั่งให้เริ่ม":"When started","หาข่าว A":"Find news A","หาข่าว B":"Find news B","รวมแล้วเขียนสรุป":"Merge & summarize",
   };
@@ -343,6 +349,42 @@
     applyTransform();
   }
   // ===== persistence =====
+  // Themed single-line prompt (Promise<string|null>) — same dark-glass look as askConfirm.
+  function askPrompt(message, placeholder){
+    return new Promise((resolve)=>{
+      const wrap=document.createElement("div"); wrap.className="dlgwrap on";
+      wrap.innerHTML=`<div class="dlg"><div class="msg"></div>`+
+        `<input class="pin" style="width:100%;margin:0 0 14px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:#0a1020;color:var(--text);font-size:13px">`+
+        `<div class="row"><button class="cancel"></button><button class="primary ok"></button></div></div>`;
+      wrap.querySelector(".msg").textContent=message;
+      const inp=wrap.querySelector(".pin"); inp.placeholder=placeholder||"";
+      wrap.querySelector(".cancel").textContent=tr("ยกเลิก");
+      wrap.querySelector(".ok").textContent=tr("ตกลง");
+      const done=(v)=>{ wrap.remove(); document.removeEventListener("keydown",onKey); resolve(v); };
+      wrap.querySelector(".ok").onclick=()=>done(inp.value.trim()||null);
+      wrap.querySelector(".cancel").onclick=()=>done(null);
+      wrap.onclick=(e)=>{ if(e.target===wrap) done(null); };
+      function onKey(e){ if(e.key==="Escape")done(null); else if(e.key==="Enter"){e.preventDefault();done(inp.value.trim()||null);} }
+      document.addEventListener("keydown",onKey);
+      document.body.appendChild(wrap); inp.focus();
+    });
+  }
+  // 🪄 Approach C: describe a goal → the Director drafts a workflow → opens as a new
+  // editable tab (the reverse of Analyze). Save makes it your own workflow.
+  async function draftWf(){
+    const goal = await askPrompt(tr("อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — Director จะร่างให้"),
+      tr("เช่น สรุปข่าว AI ทุกเช้าแล้วส่งเข้า Telegram"));
+    if(!goal) return;
+    const plan=document.getElementById("plan"); plan.textContent=tr("🪄 Director กำลังร่าง workflow…");
+    fetch("/workflows/draft",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({goal})})
+      .then(r=>r.json()).then(j=>{
+        if(!j.ok||!j.workflow){ plan.textContent=tr("ร่างไม่สำเร็จ ลองใหม่"); return; }
+        const w=j.workflow; stash();
+        tabs.push({ id:"", name:w.name||tr("Workflow ใหม่"), example:false, nodes:w.nodes||[], edges:w.edges||[], pan:{x:60,y:40}, zoom:1 });
+        activate(tabs.length-1); fitView();
+        plan.textContent=tr("✅ ร่างเสร็จ — แก้ไขแล้วกด 💾 บันทึก");
+      }).catch(()=>{ plan.textContent=tr("ร่างไม่สำเร็จ ลองใหม่"); });
+  }
   async function saveWf() {
     // Overwriting your own saved workflow is destructive — confirm first. (Examples
     // fork into a new copy, and a brand-new workflow has nothing to overwrite, so

@@ -173,6 +173,21 @@ const SKILL_LIBRARY = {
       "4. Recall first, then reason — never invent facts the office may already hold.",
     ].join("\n"),
   },
+  "build-workflow": {
+    name: "Build Workflow",
+    description: "Save a reusable plan into the Workflow Builder when asked to design or capture a workflow.",
+    content: [
+      "When the owner asks you to create, design or capture a workflow (a reusable",
+      "step-by-step plan), save it to the Workflow Builder so they can open and edit it:",
+      "End your reply with ONE line in EXACTLY this format —",
+      "  WORKFLOW: <short name> :: step one ; step two ; step three",
+      "• Separate steps with ' ; ' (or ' > '). Keep each step a short imperative phrase, in order.",
+      "• 3–8 steps is ideal. Use the language the owner used.",
+      "• The office turns that line into an editable workflow (a trigger + one node per step)",
+      "  and confirms — it never runs automatically; the owner refines and runs it from the Builder.",
+      "Then, above that line, tell the owner in one sentence what you saved.",
+    ].join("\n"),
+  },
 };
 
 const DEFAULT_MAIN_AGENT = {
