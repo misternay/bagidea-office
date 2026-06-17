@@ -1584,9 +1584,10 @@ func _act_server_incident(a: Dictionary) -> void:
 		Sfx.play("boom2")
 	await get_tree().create_timer(0.35).timeout
 	var fire: Node3D = Incident.ignite(world, pos) if is_instance_valid(world) else null
-	Sfx.play("fire")
+	Sfx.loop("fire")   # crackle WHILE it burns — stopped at every exit below
 	if not is_instance_valid(a.node):
 		if fire: Incident.put_out(world, fire)
+		Sfx.stop_loop("fire")
 		if is_instance_valid(mark): mark.queue_free()
 		return
 	a.node.set_status(ui("เซิร์ฟเวอร์ระเบิด! 🔥"))
@@ -1596,6 +1597,7 @@ func _act_server_incident(a: Dictionary) -> void:
 	# Pulled to real work (or despawned) mid-rush? Just tidy up.
 	if a.state != "idle" or not is_instance_valid(a.node):
 		if fire: Incident.put_out(world, fire)
+		Sfx.stop_loop("fire")
 		if is_instance_valid(mark): mark.queue_free()
 		return
 	a.node.set_status(ui("กำลังกู้เซิร์ฟเวอร์ 🧯"))
@@ -1605,6 +1607,7 @@ func _act_server_incident(a: Dictionary) -> void:
 		_fx(a, "sparkle")
 		await get_tree().create_timer(1.0).timeout
 	if fire: Incident.put_out(world, fire)
+	Sfx.stop_loop("fire")
 	if is_instance_valid(mark): mark.queue_free()
 	if is_instance_valid(a.node):
 		if a.node.has_method("set_hurry"): a.node.set_hurry(false)
