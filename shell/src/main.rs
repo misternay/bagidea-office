@@ -78,17 +78,23 @@ const SPLASH_HTML: &str = r#"<!doctype html>
 
 const ORB_HTML: &str = r#"<!doctype html>
 <html><body style="margin:0;overflow:hidden;background:transparent;user-select:none;-webkit-user-select:none;cursor:pointer">
+<img id="disc" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='49' fill='%230a111d'/></svg>" draggable="false">
+<img id="ring" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%235ec8ff'/><stop offset='0.5' stop-color='%23a882ff'/><stop offset='1' stop-color='%235ec8ff' stop-opacity='0'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='none' stroke='url(%23g)' stroke-width='5' stroke-linecap='round' stroke-dasharray='165 300'/></svg>" draggable="false">
 <img id="logo" src="__LOGO__" draggable="false">
 <style>
-  /* Image-ONLY orb (like the splash). WebView2 composites a raster's baked alpha cleanly
-     on a transparent window, but CSS rounded/conic layers rendered black artifacts here.
-     object-fit:contain keeps the logo a true CIRCLE no matter the window's aspect. The
-     effect is a raster transform (safe): a calm breathe at rest, an eager spin when busy. */
-  #logo { position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
-    animation: breathe 3.4s ease-in-out infinite; will-change:transform; }
-  body.busy #logo { animation: spin 1.1s linear infinite; }
-  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(0.93); } }
+  /* The orb is THREE stacked images (SVG/PNG) — replaced elements composite their baked
+     alpha cleanly on a transparent window, unlike CSS rounded/conic divs which rendered
+     black here. So the dark coin (#disc) + the spinning coloured light ring (#ring, an SVG
+     arc we just rotate) are back, with the logo on top. object-fit:contain keeps each a
+     true circle on any window aspect. */
+  img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  #ring { animation: spin 4.5s linear infinite; will-change:transform; }
+  #logo { animation: breathe 3.4s ease-in-out infinite; will-change:transform; }
+  body.busy #ring { animation-duration: 1.05s; }
+  body.busy #logo { animation-duration: 1.6s; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* logo a touch smaller than the disc so the ring shows as a halo around it */
+  @keyframes breathe { 0%,100% { transform: scale(0.9); } 50% { transform: scale(0.86); } }
 </style>
 <script>
   // Live pulse: the ring knows when the office is actually working.
