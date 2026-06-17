@@ -2784,7 +2784,9 @@ const server = http.createServer((req, res) => {
     // Monitoring snapshot: every provider's connect status + every agent's brain
     // (provider/model) and latest context usage. Feeds the 🧠 BRAINS sidebar panel.
     const pc = reg.providerConfig || {};
-    const KNOWN = ["claude", "glm", "deepseek", "qwen", "minimax", "moonshot", "openai", "gemini", "openrouter", "nvidia"];
+    const KNOWN = ["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
+      "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
+      "together", "fireworks", "ollama", "lmstudio"];
     const byProvider = {};
     const agents = [];
     for (const [id, a] of Object.entries(reg.agents || {})) {

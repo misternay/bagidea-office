@@ -2376,7 +2376,7 @@
         d.style.cssText = "font-size:10px;color:var(--dim);font-weight:600;margin:9px 0 2px;opacity:.85"; d.textContent = txt; provbox.appendChild(d); };
 
       // Generic provider card: status + masked key + Connect / retest / change / remove.
-      const providerCard = (id, label, where, viaProxy, removable) => {
+      const providerCard = (id, label, where, viaProxy, removable, local) => {
         const pc = pcAll[id] || {};
         const connected = !!pc.connected;
         const dispKey = pc.token || (id === "openai" ? mainKeys.OPENAI_API_KEY : id === "gemini" ? mainKeys.GEMINI_API_KEY : "");
@@ -2393,8 +2393,10 @@
             ? `<div class="winbtn" data-a="retest" title="ทดสอบใหม่">🧪</div>
                <div class="winbtn" data-a="change" title="เปลี่ยน key">🔄</div>
                <div class="winbtn hide" data-a="disc" title="${removable ? "ลบ provider" : "ตัดการเชื่อมต่อ"}">✕</div>`
-            : `<input type="password" placeholder="วาง key…" autocomplete="new-password" style="flex:0 0 120px;margin:0">
-               <div class="winbtn" data-a="connect" title="Connect">🔌</div>` +
+            : (local
+                ? `<div class="winbtn" data-a="connect" title="Connect">🔌</div>`
+                : `<input type="password" placeholder="วาง key…" autocomplete="new-password" style="flex:0 0 120px;margin:0">
+                   <div class="winbtn" data-a="connect" title="Connect">🔌</div>`) +
                (removable ? `<div class="winbtn hide" data-a="disc" title="ลบ provider">✕</div>` : ""));
         const stat = card.querySelector(".pstat");
         const connect = async (key) => {
@@ -2406,7 +2408,7 @@
         };
         card.querySelectorAll(".winbtn").forEach((btn) => {
           const act = btn.dataset.a;
-          if (act === "connect") btn.onclick = () => connect(card.querySelector("input").value.trim());
+          if (act === "connect") btn.onclick = () => { const inp = card.querySelector("input"); connect(inp ? inp.value.trim() : ""); };
           else if (act === "retest") btn.onclick = () => connect("");
           else if (act === "disc") btn.onclick = () =>
             api("/registry/provider", { provider: id, remove: true }).then(() => renderConnectTab());
@@ -2478,12 +2480,23 @@
       // ── OpenAI-compatible (via the built-in proxy)
       subhead("ผ่าน proxy (OpenAI-compatible)");
       [["openai", "OpenAI", "platform.openai.com/api-keys"], ["gemini", "Gemini", "aistudio.google.com/apikey"],
-       ["openrouter", "OpenRouter", "openrouter.ai/keys"], ["nvidia", "NVIDIA build", "build.nvidia.com"]]
+       ["openrouter", "OpenRouter", "openrouter.ai/keys"], ["nvidia", "NVIDIA build", "build.nvidia.com"],
+       ["groq", "Groq", "console.groq.com/keys"], ["cerebras", "Cerebras", "cloud.cerebras.ai"],
+       ["xai", "xAI · Grok", "console.x.ai"], ["mistral", "Mistral", "console.mistral.ai/api-keys"],
+       ["together", "Together AI", "api.together.xyz/settings/api-keys"], ["fireworks", "Fireworks AI", "fireworks.ai/account/api-keys"]]
         .forEach(([id, l, w]) => providerCard(id, l, w, true, false));
+
+      // ── Local (in-machine, free, no key)
+      subhead("Local (ในเครื่อง · ฟรี · ไม่ต้องใช้ key)");
+      [["ollama", "Ollama · local", "localhost:11434 · เปิด Ollama แล้วกด Connect"],
+       ["lmstudio", "LM Studio · local", "localhost:1234 · เปิด server แล้วกด Connect"]]
+        .forEach(([id, l, w]) => providerCard(id, l, w, true, false, true));
 
       // ── Custom — add your own (anthropic- or openai-compatible)
       subhead("Custom — เพิ่ม provider เอง");
-      const BUILTIN = new Set(["claude", "glm", "deepseek", "qwen", "minimax", "moonshot", "openai", "gemini", "openrouter", "nvidia", "litellm"]);
+      const BUILTIN = new Set(["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
+        "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
+        "together", "fireworks", "ollama", "lmstudio", "litellm"]);
       Object.keys(pcAll).filter((id) => !BUILTIN.has(id) && pcAll[id] && pcAll[id].label)
         .forEach((id) => providerCard(id, pcAll[id].label + (pcAll[id].kind === "openai" ? " · OpenAI" : " · Anthropic"),
           "", pcAll[id].kind === "openai", true));
@@ -3092,14 +3105,22 @@
         ["deepseek", "DeepSeek"], ["qwen", "Qwen · Alibaba"], ["minimax", "MiniMax"],
         ["moonshot", "Kimi · Moonshot"],
         ["openai", "OpenAI · proxy"], ["gemini", "Gemini · proxy"],
-        ["openrouter", "OpenRouter · proxy"], ["nvidia", "NVIDIA · proxy"]];
+        ["openrouter", "OpenRouter · proxy"], ["nvidia", "NVIDIA · proxy"],
+        ["groq", "Groq · proxy"], ["cerebras", "Cerebras · proxy"], ["xai", "xAI · Grok · proxy"],
+        ["mistral", "Mistral · proxy"], ["together", "Together AI · proxy"], ["fireworks", "Fireworks AI · proxy"],
+        ["ollama", "Ollama · local"], ["lmstudio", "LM Studio · local"]];
       const MODELS = { claude: ["", "opus", "sonnet", "haiku"], glm: ["glm-4.6", "glm-4.5"],
         deepseek: ["deepseek-v4-pro", "deepseek-v4-flash"],
         qwen: ["qwen3-coder-plus", "qwen3-coder-next", "qwen3-coder-flash"],
         minimax: ["MiniMax-M3"], moonshot: ["kimi-k2.5", "kimi-k2", "kimi-latest"],
         openai: ["gpt-4o", "gpt-4o-mini"],
         gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-        openrouter: ["openai/gpt-4o", "anthropic/claude-sonnet-4-6"], nvidia: ["meta/llama-3.3-70b-instruct"] };
+        openrouter: ["openai/gpt-4o", "anthropic/claude-sonnet-4-6"], nvidia: ["meta/llama-3.3-70b-instruct"],
+        groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"], cerebras: ["llama-3.3-70b", "llama-3.1-8b"],
+        xai: ["grok-3", "grok-3-mini"], mistral: ["mistral-large-latest", "codestral-latest"],
+        together: ["meta-llama/Llama-3.3-70B-Instruct-Turbo"],
+        fireworks: ["accounts/fireworks/models/llama-v3p3-70b-instruct"],
+        ollama: ["llama3.1", "qwen2.5-coder", "deepseek-r1"], lmstudio: [] };
       const BSET = new Set(BUILTIN.map((b) => b[0]).concat("litellm"));
       const modelInput = modalCard.querySelector("#eModel");
       const modelWrap = modalCard.querySelector("#eModelWrap");

@@ -31,6 +31,16 @@ const UPSTREAM = {
             key: "GEMINI_API_KEY", fallbackModel: "gemini-2.5-flash" },
   openrouter: { url: "https://openrouter.ai/api/v1/chat/completions", fallbackModel: "" },
   nvidia: { url: "https://integrate.api.nvidia.com/v1/chat/completions", fallbackModel: "" },
+  groq: { url: "https://api.groq.com/openai/v1/chat/completions", fallbackModel: "llama-3.3-70b-versatile" },
+  cerebras: { url: "https://api.cerebras.ai/v1/chat/completions", fallbackModel: "llama-3.3-70b" },
+  xai: { url: "https://api.x.ai/v1/chat/completions", fallbackModel: "" },
+  mistral: { url: "https://api.mistral.ai/v1/chat/completions", fallbackModel: "mistral-large-latest" },
+  together: { url: "https://api.together.xyz/v1/chat/completions", fallbackModel: "" },
+  fireworks: { url: "https://api.fireworks.ai/inference/v1/chat/completions", fallbackModel: "" },
+  // Local OpenAI-compatible servers — no key needed (auth ignored). Default ports;
+  // a non-default port needs a Custom provider with an explicit Base URL.
+  ollama: { url: "http://127.0.0.1:11434/v1/chat/completions", fallbackModel: "", local: true },
+  lmstudio: { url: "http://127.0.0.1:1234/v1/chat/completions", fallbackModel: "", local: true },
 };
 
 // Resolve the OpenAI-compatible upstream for a provider. An explicit
@@ -41,7 +51,9 @@ function upstreamFor(provider, reg) {
   const pc = (reg.providerConfig || {})[provider] || {};
   const up = UPSTREAM[provider] || {};
   const chat = pc.baseUrl ? pc.baseUrl.replace(/\/+$/, "") + "/chat/completions" : up.url;
-  const key = pc.token || (up.key && (reg.apiKeys || {})[up.key]) || "";
+  // Local servers (Ollama/LM Studio) ignore auth — synthesize a placeholder so the
+  // "key not set" guards pass without the user pasting anything.
+  const key = pc.token || (up.key && (reg.apiKeys || {})[up.key]) || (up.local ? "local" : "");
   const models = chat ? chat.replace(/\/chat\/completions$/, "/models") : "";
   return { chat, models, key, fallbackModel: pc.model || up.fallbackModel || "" };
 }

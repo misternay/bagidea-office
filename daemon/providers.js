@@ -79,6 +79,39 @@ const PROVIDERS = {
     label: "NVIDIA build", format: "openai", needsProxy: true, baseUrl: null,
     models: ["meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-v3"],
   },
+  groq: {
+    label: "Groq", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  },
+  cerebras: {
+    label: "Cerebras", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["llama-3.3-70b", "llama-3.1-8b"],
+  },
+  xai: {
+    label: "xAI · Grok", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["grok-3", "grok-3-mini"],
+  },
+  mistral: {
+    label: "Mistral", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["mistral-large-latest", "codestral-latest"],
+  },
+  together: {
+    label: "Together AI", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["meta-llama/Llama-3.3-70B-Instruct-Turbo"],
+  },
+  fireworks: {
+    label: "Fireworks AI", format: "openai", needsProxy: true, baseUrl: null,
+    models: ["accounts/fireworks/models/llama-v3p3-70b-instruct"],
+  },
+  // Local OpenAI-compatible servers — no key needed (local: true). Default ports.
+  ollama: {
+    label: "Ollama · local", format: "openai", needsProxy: true, local: true, baseUrl: null,
+    models: ["llama3.1", "qwen2.5-coder", "deepseek-r1"],
+  },
+  lmstudio: {
+    label: "LM Studio · local", format: "openai", needsProxy: true, local: true, baseUrl: null,
+    models: [],
+  },
 };
 
 const DEFAULT_LITELLM = "http://127.0.0.1:4000";
@@ -124,7 +157,7 @@ function resolve(provider, model, reg = {}, opts = {}) {
     } else if (opts.proxyBase) {
       const mainKey = provider === "openai" ? (reg.apiKeys || {}).OPENAI_API_KEY
                     : provider === "gemini" ? (reg.apiKeys || {}).GEMINI_API_KEY : null;
-      if (!pc.token && !mainKey) {
+      if (!pc.token && !mainKey && !(spec && spec.local)) {
         return { ok: false, env: {}, modelArgs: [], reason: "key-not-set" };
       }
       baseUrl = `${opts.proxyBase}/proxy/${provider}`;
