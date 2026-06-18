@@ -4,6 +4,27 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.3] — Voice fixes, smarter calls, macOS copy/paste
+
+**Fixed**
+- **Voice push-to-talk no longer garbles Thai** — it produced `�` characters (worse the
+  longer you spoke) because the transcription response was decoded per network chunk,
+  splitting multi-byte characters. Bodies are now decoded as UTF-8 whole. (Same fix applied
+  to Claude-written summaries and the auto-translation path.)
+- **macOS: copy/paste works** — ⌘C / ⌘V / ⌘X / ⌘A had no effect because the frameless
+  window shipped no Edit menu, so the shortcuts never reached text fields. Adds a standard
+  Edit menu. (Fixes #8.)
+
+**Improved**
+- **Smarter voice calls** — the call agent is now framed as your **Director** and gets a
+  live office snapshot (projects in progress, proposals awaiting approval, scheduled jobs)
+  on top of the team roster + notes, so it can actually talk about your work and help plan
+  (and it takes new orders to delegate after the call). Every call also leaves a chat-app-
+  style record in the conversation: "📞 Voice call with <name> · HH:MM · 2m 13s".
+
+Note: a mishearing by the speech model (one Thai word for another) is separate — that's the
+accuracy of the underlying Whisper/Gemini transcription, not the corruption fixed above.
+
 ## [0.9.2] — Launch with Windows by default
 
 **Fixed**
