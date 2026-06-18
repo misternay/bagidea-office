@@ -4,6 +4,17 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.8] — Attached images readable by any model
+
+**Fixed**
+- **Attached images now work on every model** — attaching an image only passed its file
+  path with a "read it" note, so a text-only brain (DeepSeek, GLM, …) replied that it
+  couldn't read the image. The daemon now transcribes each attached image to text (visual
+  description + verbatim OCR) with a vision model — Gemini Flash first, OpenAI gpt-4o-mini
+  fallback — and inlines that into the prompt, so any brain can read it. The original file
+  still rides along for natively-multimodal brains to read directly. (Needs a Gemini or
+  OpenAI key in ⚙ CONNECT; falls back to the old behaviour without one.)
+
 ## [0.9.7] — Agent models in the roster, orb polish
 
 **Added**
