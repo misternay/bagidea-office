@@ -61,7 +61,7 @@ const PROVIDERS = {
     // https://api.moonshot.cn/anthropic — set reg.providerConfig.moonshot.baseUrl.
     baseUrl: "https://api.moonshot.ai/anthropic",
     modelsUrl: "https://api.moonshot.ai/v1/models",
-    models: ["kimi-k2.5", "kimi-k2", "kimi-latest"],
+    models: ["kimi-k2.6", "kimi-k2.5", "kimi-k2", "kimi-latest"],  // hint only — live list fetched on Connect
   },
   openai: {
     label: "OpenAI", format: "openai", needsProxy: true, baseUrl: null,
