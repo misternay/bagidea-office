@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [0.9.5] — Per-model context windows, Kimi Code, orb polish
 
 **Added**
 - **Kimi Code provider** — the Kimi Code coding plan (kimi.com/code) is a separate

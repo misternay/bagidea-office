@@ -417,8 +417,10 @@ const MODEL_CTX = {
   "qwen3-coder-plus": 1048576, "qwen3-coder-flash": 1048576, "qwen3-coder-next": 262144,
   // MiniMax (key stored lowercase — modelWindow lowercases before lookup).
   "minimax-m3": 1000000, "minimax-m2": 204800,
-  // Kimi / Moonshot — current K2 series all serve 256k.
-  "kimi-k2.5": 262144, "kimi-k2": 262144, "kimi-latest": 262144,
+  // Kimi / Moonshot — current K2 series all serve 256k; the Kimi Code plan's
+  // kimi-for-coding is 256k too (its docs set CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144).
+  "kimi-k2.6": 262144, "kimi-k2.5": 262144, "kimi-k2": 262144, "kimi-latest": 262144,
+  "kimi-for-coding": 262144,
   // OpenAI — 4o family 128k; the 4.1 family ~1M; o-series reasoning 200k.
   "gpt-4o": 128000, "gpt-4o-mini": 128000,
   "gpt-4.1": 1047576, "gpt-4.1-mini": 1047576, "gpt-4.1-nano": 1047576,
