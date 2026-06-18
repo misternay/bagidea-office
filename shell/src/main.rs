@@ -77,7 +77,7 @@ const SPLASH_HTML: &str = r#"<!doctype html>
 </body></html>"#;
 
 const ORB_HTML: &str = r#"<!doctype html>
-<html><body style="margin:0;overflow:hidden;background:transparent;user-select:none;-webkit-user-select:none;cursor:pointer">
+<html><body style="margin:0;overflow:hidden;background:transparent;user-select:none;-webkit-user-select:none;cursor:default">
 <img id="disc" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='d' cx='50%25' cy='50%25' r='50%25'><stop offset='0' stop-color='%230d1430'/><stop offset='1' stop-color='%2305060f'/></radialGradient></defs><circle cx='50' cy='50' r='49' fill='url(%23d)'/><circle cx='30' cy='26' r='0.7' fill='%23ffffff' opacity='0.7'/><circle cx='73' cy='69' r='0.6' fill='%23cfe3ff' opacity='0.6'/><circle cx='66' cy='22' r='0.5' fill='%23ffffff' opacity='0.5'/><circle cx='27' cy='60' r='0.5' fill='%23ffffff' opacity='0.45'/></svg>" draggable="false">
 <img id="logo" src="__LOGO__" draggable="false">
 <img id="ring" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='1' x2='0.25' y2='0'><stop offset='0' stop-color='%2322d3ff'/><stop offset='0.5' stop-color='%235b8cff'/><stop offset='1' stop-color='%23c850ff'/></linearGradient><filter id='b' x='-40%25' y='-40%25' width='180%25' height='180%25'><feGaussianBlur stdDeviation='1.7'/></filter></defs><circle cx='50' cy='50' r='47' fill='none' stroke='url(%23g)' stroke-width='4.5' filter='url(%23b)' opacity='1'/><circle cx='50' cy='50' r='47' fill='none' stroke='url(%23g)' stroke-width='2' stroke-linecap='round'/></svg>" draggable="false">
@@ -115,12 +115,24 @@ const ORB_HTML: &str = r#"<!doctype html>
   wire();
 </script>
 <script>
+  // Only the visible circle is interactive. The window is a square, so its
+  // transparent corners would otherwise still catch press/drag/click — an
+  // "invisible grab box" around the orb. Ignore any pointer event whose point
+  // falls outside the inscribed circle (DPI-independent, no SetWindowRgn needed).
+  function inCircle(e) {
+    const r = Math.min(window.innerWidth, window.innerHeight) / 2;
+    return Math.hypot(e.clientX - window.innerWidth / 2,
+                      e.clientY - window.innerHeight / 2) <= r;
+  }
   // Messenger chat-head feel: press-and-move drags, clean click toggles.
   let downAt = null, dragged = false;
   document.body.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { downAt = [e.screenX, e.screenY]; dragged = false; }
+    if (e.button === 0 && inCircle(e)) { downAt = [e.screenX, e.screenY]; dragged = false; }
   });
   document.body.addEventListener('mousemove', (e) => {
+    // Hand cursor only over the orb itself — the corners stay a plain arrow so
+    // they don't look/feel like an interactive window.
+    document.body.style.cursor = inCircle(e) ? 'pointer' : 'default';
     if (downAt && !dragged &&
         Math.hypot(e.screenX - downAt[0], e.screenY - downAt[1]) > 10) {
       dragged = true;
@@ -128,12 +140,13 @@ const ORB_HTML: &str = r#"<!doctype html>
     }
   });
   document.body.addEventListener('mouseup', () => { downAt = null; });
-  document.body.addEventListener('click', () => {
-    if (!dragged) window.ipc.postMessage('toggle');
+  document.body.addEventListener('click', (e) => {
+    if (!dragged && inCircle(e)) window.ipc.postMessage('toggle');
     dragged = false;
   });
   // Right-click flips chat ↔ streamer feed (a quiet right-edge status strip).
   document.body.addEventListener('contextmenu', (e) => {
+    if (!inCircle(e)) return;
     e.preventDefault();
     window.ipc.postMessage('mode');
   });
@@ -1663,8 +1676,9 @@ fn main() {
                 }
             }
             Event::WindowEvent { window_id, event: WindowEvent::Resized(_), .. } => {
-                // orb + splash are transparent — their round shape is CSS (anti-aliased),
-                // no SetWindowRgn needed. Only the opaque overlay still gets a clip region.
+                // The orb + splash are transparent — their round shape is CSS, and the
+                // orb's corners are made non-interactive in JS (inCircle), so neither
+                // needs a clip region. Only the opaque overlay gets one.
                 if window_id == overlay_id {
                     let (w, h) = if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
                     platform::region_round(&overlay, w, h, if feed { 14.0 } else { 18.0 });

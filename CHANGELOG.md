@@ -4,6 +4,13 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased]
+
+**Fixed**
+- **Orb no longer has an invisible grab box** — the chat-head's square window let
+  its transparent corners (outside the visible circle) catch clicks and drags. Pointer
+  events outside the circle are now ignored, so only the orb itself drags and toggles.
+
 ## [0.9.4] — Reliable voice hotkey + gender-aware agents
 
 **Fixed**
