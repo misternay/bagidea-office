@@ -2285,6 +2285,88 @@ function ttsSpeak(presetId, text) {
   });
 }
 
+// ------------------------------------------------------- image → text (OCR/describe)
+// Turn an attached image into TEXT (visual description + verbatim OCR) with a vision
+// model, so ANY agent brain can "read" it — even text-only ones like DeepSeek/GLM. The
+// original file path still rides in the prompt too, so natively-multimodal brains can
+// also Read it directly. Gemini Flash first (cheap), OpenAI gpt-4o-mini as fallback.
+function describeImage(filePath, name) {
+  return new Promise((resolve, reject) => {
+    const keys = reg.apiKeys || {};
+    const gm = keys.GEMINI_API_KEY || keys.GEMINI;
+    const oa = keys.OPENAI_API_KEY || keys.OPENAI;
+    if (!gm && !oa) return reject(new Error("no-vision-key"));
+    let buf;
+    try { buf = fs.readFileSync(filePath); } catch (e) { return reject(e); }
+    if (buf.length > 18 * 1024 * 1024) return reject(new Error("image too large"));
+    const ext = String(filePath.split(".").pop() || "png").toLowerCase();
+    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg"
+      : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif"
+      : ext === "bmp" ? "image/bmp" : "image/png";
+    const instr = "You are transcribing an image so a colleague who CANNOT see it can " +
+      "work with it. Describe what it shows (layout, UI, diagram/chart, people/objects) " +
+      "AND transcribe every piece of visible text VERBATIM, preserving the original " +
+      "language. Be thorough and factual; do not guess beyond what is visible.";
+    const https = require("https");
+    if (gm) {
+      const body = JSON.stringify({ contents: [{ parts: [
+        { text: instr },
+        { inline_data: { mime_type: mime, data: buf.toString("base64") } },
+      ] }] });
+      const rq = https.request({ method: "POST", host: "generativelanguage.googleapis.com",
+        path: "/v1beta/models/gemini-flash-latest:generateContent?key=" + gm,
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) } },
+        (rs) => { const chunks = []; rs.on("data", (c) => chunks.push(c)); rs.on("end", () => {
+          const o = Buffer.concat(chunks).toString("utf8");
+          try { const j = JSON.parse(o);
+            const t = j.candidates && j.candidates[0] &&
+              j.candidates[0].content.parts.map((p) => p.text || "").join("").trim();
+            if (t) { auxCost("gemini", COST_RATES.gemini_transcribe_each); resolve(t); }
+            else reject(new Error((j.error && j.error.message) || "gemini: empty")); }
+          catch (e) { reject(e); } }); });
+      rq.setTimeout(45000, () => rq.destroy(new Error("gemini timeout")));
+      rq.on("error", reject); rq.write(body); rq.end();
+      return;
+    }
+    // OpenAI vision (chat/completions with an image_url data URI).
+    const body = JSON.stringify({ model: "gpt-4o-mini", max_tokens: 1200, messages: [
+      { role: "user", content: [
+        { type: "text", text: instr },
+        { type: "image_url", image_url: { url: `data:${mime};base64,${buf.toString("base64")}` } },
+      ] }] });
+    const rq = https.request({ method: "POST", host: "api.openai.com", path: "/v1/chat/completions",
+      headers: { authorization: "Bearer " + oa, "content-type": "application/json",
+        "content-length": Buffer.byteLength(body) } },
+      (rs) => { const chunks = []; rs.on("data", (c) => chunks.push(c)); rs.on("end", () => {
+        const o = Buffer.concat(chunks).toString("utf8");
+        try { const j = JSON.parse(o);
+          const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+          if (t) { auxCost("openai", COST_RATES.openai_image_each); resolve(String(t).trim()); }
+          else reject(new Error((j.error && j.error.message) || "openai: empty")); }
+        catch (e) { reject(e); } }); });
+    rq.setTimeout(45000, () => rq.destroy(new Error("openai timeout")));
+    rq.on("error", reject); rq.write(body); rq.end();
+  });
+}
+// Build a text block describing every attached image, so the augmented prompt is
+// readable by any model. Failures are skipped silently (the file path still rides
+// along for multimodal brains). Returns "" when there's nothing to add.
+async function imageTextBlock(files) {
+  const imgs = (Array.isArray(files) ? files : [])
+    .filter((f) => f && f.path && f.kind === "image").slice(0, 5);
+  if (!imgs.length) return "";
+  const parts = [];
+  for (const f of imgs) {
+    try {
+      const desc = await describeImage(f.path, f.name);
+      if (desc) parts.push(`รูป "${f.name || path.basename(f.path)}":\n${desc.slice(0, 6000)}`);
+    } catch {}
+  }
+  if (!parts.length) return "";
+  return "\n\n[เนื้อหาของรูปที่แนบมา — ถอดเป็นข้อความให้แล้วเพื่อให้อ่านได้ทุกโมเดล " +
+    "(ถ้าโมเดลคุณดูภาพได้เอง ให้ใช้ Read กับไฟล์ต้นฉบับเพื่อความละเอียด)]:\n" + parts.join("\n\n");
+}
+
 // ---------------------------------------------------------------- image gen
 // 🖼 a SYSTEM TOOL any agent (or the owner) can call: text → PNG on disk.
 // OpenAI gpt-image-1 first, Gemini image generation as the fallback.
@@ -2918,10 +3000,16 @@ const server = http.createServer((req, res) => {
     });
 
   } else if (req.method === "POST" && req.url === "/chat") {
-    readBody(req, (body) => {
+    readBody(req, async (body) => {
       try {
-        let { agent = "main", prompt, session, wait, voice } = JSON.parse(body);
+        let { agent = "main", prompt, session, wait, voice, files } = JSON.parse(body);
         if (!prompt) throw new Error("no prompt");
+        // Attached images → inline a text transcription so ANY brain can read them
+        // (DeepSeek/GLM are text-only). The original paths still ride in the prompt for
+        // multimodal brains to Read natively. Keep origPrompt for the chat LOG so the
+        // (long) transcription only reaches the model, not the visible history.
+        const origPrompt = prompt;
+        try { const blk = await imageTextBlock(files); if (blk) prompt += blk; } catch {}
         // Saying a project's name binds the conversation to its directory.
         const project = projectFromPrompt(prompt);
         // wait:true (the CLI's ask) holds the response until the run truly
@@ -2946,15 +3034,15 @@ const server = http.createServer((req, res) => {
         // requested project workspace.
         const task = agent === "ceo"
           ? ceoFlow(prompt, session, project,
-              { logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + prompt : undefined,
+              { logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + origPrompt : origPrompt,
                 relay: true,  // mirror the CEO conversation to connected channels
                 onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
           : agent === "main"
             ? runClaude("main", prompt + directorNote(),
-                { session, project, logPrompt: prompt,
+                { session, project, logPrompt: origPrompt,
                   filterText: makeDelegateFilter(0, session),
                   onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
-            : runClaude(agent, prompt, { session, project,
+            : runClaude(agent, prompt, { session, project, logPrompt: origPrompt,
                 onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined });
         if (!wait) {
           res.writeHead(200, { "content-type": "application/json" });

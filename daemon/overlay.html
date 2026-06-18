@@ -5228,7 +5228,8 @@
     if (session === "new") SESS[target] = undefined;  // next sends continue it
     await fetch("/chat", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ agent: target, prompt, session }),
+      body: JSON.stringify({ agent: target, prompt, session,
+        files: files.map((f) => ({ path: f.path, name: f.name, kind: f.kind })) }),
     });
     refreshThreadBar();  // a fresh thread exists server-side immediately
   }
