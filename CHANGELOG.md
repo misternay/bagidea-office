@@ -4,6 +4,15 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.2] — Launch with Windows by default
+
+**Fixed**
+- A fresh install now **starts automatically with Windows.** Previously nothing wrote the
+  auto-start entry, so the office didn't come back after a reboot. The installer enables it
+  on first install (without overriding a later "off"), and existing installs get it turned
+  on **once** on their next `bagidea update` (marker-guarded, so it's never re-enabled after
+  you turn it off). Toggle anytime with `bagidea startup on|off`.
+
 ## [0.9.1] — Office files, a tool-aware toolkit skill, and a real license
 
 **Added**
