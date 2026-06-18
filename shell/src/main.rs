@@ -461,8 +461,10 @@ mod platform {
         std::thread::spawn(move || unsafe {
             use std::sync::atomic::Ordering;
             use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+            use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx, MSG, WH_KEYBOARD_LL, WM_APP,
+                GetMessageW, SetTimer, SetWindowsHookExW, UnhookWindowsHookEx, MSG,
+                WH_KEYBOARD_LL, WM_APP, WM_TIMER,
             };
             PTT_THREAD_ID.store(GetCurrentThreadId(), Ordering::SeqCst);
             // A low-level keyboard hook delivers BOTH key-down and key-up, which
@@ -471,6 +473,16 @@ mod platform {
             // thread that installed it, so we must keep pumping messages here.
             let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(ll_kbd), std::ptr::null_mut(), 0);
             ptt_beacon(if hook.is_null() { "register-FAILED" } else { "registered" });
+            // Self-healing watchdog: the LL hook can miss a key event when focus
+            // changes around the moment of a press (the reported "hold the hotkey
+            // and nothing happens, then it works after clicking elsewhere"). A
+            // missed key-UP would leave PTT_DOWN stuck true so the next real
+            // key-DOWN is swallowed as auto-repeat — PTT goes dead until a stray
+            // key-up finally arrives. Every ~150ms we reconcile our tracked state
+            // with the key's REAL physical state (GetAsyncKeyState) and fire the
+            // transition we missed, so the hotkey can never wedge. (WM_TIMER from
+            // a NULL-hwnd timer is delivered to this thread's GetMessageW pump.)
+            SetTimer(std::ptr::null_mut(), 1, 150, None);
             let mut msg: MSG = std::mem::zeroed();
             while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
                 if msg.message == WM_APP {
@@ -482,6 +494,21 @@ mod platform {
                         ptt_beacon("rehook-ok");
                     } else {
                         ptt_beacon("rehook-none");
+                    }
+                } else if msg.message == WM_TIMER {
+                    let vk = PTT_VK.load(Ordering::Relaxed) as i32;
+                    let phys_down = (GetAsyncKeyState(vk) as u16 & 0x8000) != 0;
+                    let tracked = PTT_DOWN.load(Ordering::Relaxed);
+                    if phys_down && !tracked {
+                        if !PTT_DOWN.swap(true, Ordering::SeqCst) {
+                            ptt_send(true);
+                            ptt_beacon("resync-down");
+                        }
+                    } else if !phys_down && tracked {
+                        if PTT_DOWN.swap(false, Ordering::SeqCst) {
+                            ptt_send(false);
+                            ptt_beacon("resync-up");
+                        }
                     }
                 }
             }

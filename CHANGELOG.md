@@ -7,6 +7,12 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 ## [Unreleased]
 
 **Fixed**
+- **Voice hotkey (Right Ctrl) no longer wedges** — holding the push-to-talk key
+  sometimes did nothing (then started working again after clicking elsewhere). A
+  key-up could be missed when window focus shifted around the moment of a press,
+  leaving the hotkey "stuck down" so the next press was swallowed as auto-repeat.
+  A 150 ms watchdog now reconciles the tracked state against the key's real
+  physical state, so the hotkey can never get stuck.
 - **Agents now know their gender — voice & words match** — an agent with a male voice
   could still write/speak about itself as female (e.g. saying "ค่ะ"), so the voice you
   heard and the words clashed. The gender is now read straight off the assigned voice
