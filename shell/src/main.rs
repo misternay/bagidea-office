@@ -778,10 +778,31 @@ mod platform {
     }
 
     pub fn region_circle(window: &Window, d: f64) {
-        let sf = window.scale_factor();
+        // Clip the (square, transparent) window down to its inscribed circle so the
+        // corners are not part of the window AT ALL — clicks there fall straight
+        // through to whatever is beneath (e.g. desktop icons), and only the visible
+        // orb is interactive. Size the ellipse from GetClientRect: that's the exact
+        // coordinate space SetWindowRgn uses, so the circle always matches the window
+        // (tao's inner_size / scale_factor can disagree with it and crop a crescent).
+        use windows_sys::Win32::Foundation::RECT;
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
+        let hwnd = window.hwnd() as HWND;
         unsafe {
-            let rgn = CreateEllipticRgn(0, 0, (d * sf) as i32 + 1, (d * sf) as i32 + 1);
-            SetWindowRgn(window.hwnd() as _, rgn, 1);
+            // The orb window is NOT square (Windows pads it to a min width), and its
+            // image is object-fit:contain → centred. So CENTRE the circle in the real
+            // client rect: it overlays the visible orb exactly, the side margins become
+            // click-through, and any stray title-bar pixels get clipped away too.
+            let mut rc: RECT = std::mem::zeroed();
+            let ok = GetClientRect(hwnd, &mut rc);
+            let (w, h) = if ok != 0 && rc.right - rc.left > 1 {
+                (rc.right - rc.left, rc.bottom - rc.top)
+            } else {
+                let s = (d * window.scale_factor()) as i32; (s, s)   // fallback before layout
+            };
+            let n = w.min(h);
+            let (left, top) = ((w - n) / 2, (h - n) / 2);
+            let rgn = CreateEllipticRgn(left, top, left + n + 1, top + n + 1);
+            SetWindowRgn(hwnd, rgn, 1);
         }
     }
 
@@ -1547,7 +1568,7 @@ fn main() {
         &event_loop, "BagIdea", ORB_SIZE, ORB_SIZE, orb_x, orb_y, app_icon(), true,
     );
     platform::set_no_activate(&orb);
-    let _orb_id = orb.id();
+    let orb_id = orb.id();
     let p_orb = proxy.clone();
     let _orb_view = WebViewBuilder::new()
         .with_transparent(true)
@@ -1676,12 +1697,13 @@ fn main() {
                 }
             }
             Event::WindowEvent { window_id, event: WindowEvent::Resized(_), .. } => {
-                // The orb + splash are transparent — their round shape is CSS, and the
-                // orb's corners are made non-interactive in JS (inCircle), so neither
-                // needs a clip region. Only the opaque overlay gets one.
                 if window_id == overlay_id {
                     let (w, h) = if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
                     platform::region_round(&overlay, w, h, if feed { 14.0 } else { 18.0 });
+                } else if window_id == orb_id {
+                    // Re-clip the orb to its circle on any DPI / monitor change so the
+                    // transparent corners keep falling through to the desktop.
+                    platform::region_circle(&orb, ORB_SIZE);
                 }
             }
             Event::UserEvent(ue) => match ue {
@@ -1690,6 +1712,9 @@ fn main() {
                     splash.set_visible(false);
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
                     raise_orb(&orb);
+                    // Orb is now shown at its real spot with DPI settled — clip it to a
+                    // circle so its transparent corners are click-through to the desktop.
+                    platform::region_circle(&orb, ORB_SIZE);
                 }
                 UserEvent::EditorOpening => {
                     if platform::focus_pid(editor_pid) {
