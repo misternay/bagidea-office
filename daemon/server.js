@@ -358,6 +358,13 @@ function brainRoute(agentId) {
 const OVERFLOW_RE = /larger than your account|can never fit|context[_ ]?length|context_length_exceeded|maximum context|context window|prompt is too long|input is too long|string too long|reduce the (length|number)|too many tokens|exceeds the maximum (context|number of tokens|token)/i;
 function isOverflowError(t) { return !!t && OVERFLOW_RE.test(String(t)); }
 
+// A TEMPORARY ceiling that DOES clear with time — usage/rate/quota limits, 429s, an
+// overloaded backend. Unlike overflow, retrying the SAME request later succeeds, so
+// these pause the task for auto-resume once the window resets (NOT a hard failure).
+// Guard against matching context-overflow text (handled separately above).
+const RATELIMIT_RE = /rate limit|rate-limit|\b429\b|too many requests|usage limit|quota|limit reached|limit will reset|resets at|try again later|overloaded|capacity|temporarily unavailable|service unavailable|\b503\b|insufficient_quota|billing/i;
+function isRateLimit(t) { const s = String(t || ""); return !!s && RATELIMIT_RE.test(s) && !isOverflowError(s); }
+
 // Per-backend INPUT-token budget for ONE request — the trigger for Claude-Code-style
 // proactive compaction. Set near each model's context window minus headroom for the
 // system prompt + tool schemas the office always sends (~25k). 0 = never compact
@@ -940,6 +947,51 @@ const projRuns = {};        // project id -> active AI run count
 const projAgents = {};      // project id -> {agentId: run count} (who's working)
 const projChildren = {};    // project id -> Set<ChildProcess> (so the owner can stop the work and take over)
 const runChildren = new Map();  // task id -> { child, agent } — cancel a running task mid-flight
+function agentRunning(agent) { for (const v of runChildren.values()) if (v.agent === agent) return true; return false; }
+
+// ⏸ Paused work — tasks interrupted by a TEMPORARY limit (rate/usage/overload) or by a
+// daemon restart, kept so the office RESUMES them instead of silently dropping the work.
+// Keyed by the agent's thread key (one paused entry per thread). Persisted so a restart
+// can pick up where it left off. Entry: { agent, prompt, project, key, ts, tries, state }
+// state: "active" = running right now (so a restart knows it was mid-task) · "paused" =
+// waiting for the cooldown to elapse, then auto-resumed on its own --resume thread.
+const PAUSED_FILE = path.join(__dirname, "paused.json");
+let pausedWork = loadJson(PAUSED_FILE, []);
+let _pausedTimer = null;
+function savePaused() {
+  if (_pausedTimer) return;
+  _pausedTimer = setTimeout(() => { _pausedTimer = null;
+    try { fs.writeFileSync(PAUSED_FILE, JSON.stringify(pausedWork)); } catch {} }, 400);
+}
+function pauseFind(key) { return pausedWork.find((w) => w.key === key); }
+function pauseClear(key) {
+  const n = pausedWork.length;
+  pausedWork = pausedWork.filter((w) => w.key !== key);
+  if (pausedWork.length !== n) savePaused();
+}
+// Mark a resumable task as ACTIVE (running now). Survives a restart as "was mid-task".
+function pauseActive(agent, prompt, project, key, tries) {
+  if (!key) return;
+  const w = pauseFind(key);
+  if (w) { w.state = "active"; w.agent = agent; w.prompt = prompt; w.project = project; w.tries = tries || 0; }
+  else pausedWork.push({ agent, prompt, project, key, ts: Date.now(), tries: tries || 0, state: "active" });
+  savePaused();
+}
+// A temporary limit hit the task → leave it PAUSED for the resume tick (with backoff).
+function pausePause(agent, prompt, project, key) {
+  if (!key) return;
+  const w = pauseFind(key);
+  if (w) { w.state = "paused"; w.ts = Date.now(); }
+  else pausedWork.push({ agent, prompt, project, key, ts: Date.now(), tries: 0, state: "paused" });
+  savePaused();
+}
+// Boot: anything left "active" was killed mid-task by the restart — treat it as paused
+// so the resume tick continues it. (Clear stuck-active for the CEO/non-agents defensively.)
+(function reclaimPausedOnBoot() {
+  let changed = false;
+  for (const w of pausedWork) if (w.state === "active") { w.state = "paused"; w.ts = 0; changed = true; }
+  if (changed) savePaused();
+})();
 const WINPROJ = path.join(__dirname, "winproj.ps1");
 const LIVEVIEW = path.join(__dirname, "liveview.ps1");
 
@@ -1192,6 +1244,35 @@ function heartbeat() {
       filterText: (t) => (/^\s*OK\.?\s*$/i.test(t) ? "" : t) });
 }
 
+// ▶ Resume tick: continue work that a temporary limit (or a restart) interrupted, once
+// the cooldown has elapsed — re-running on the SAME thread (--resume) so the agent picks
+// up with full context, exactly where it stopped. Exponential backoff per try; give up
+// after a few so a genuinely-stuck task can't loop forever.
+const RESUME_MAX_TRIES = 4;
+function resumePausedTick(now) {
+  for (const w of pausedWork.slice()) {
+    if (!w || w.state !== "paused") continue;
+    if (w.tries >= RESUME_MAX_TRIES) {
+      pauseClear(w.key);
+      broadcast({ type: "chat.message", agent: w.agent || "main",
+        text: "⏹ พยายามทำงานต่อหลายครั้งแล้วยังติดลิมิตอยู่ — ขอพักงานนี้ไว้ก่อนนะครับ (สั่งใหม่ได้ทุกเมื่อ)" });
+      continue;
+    }
+    // Backoff: 5, 10, 20, 40 min between attempts (ts=0 on a restart ⇒ try right away).
+    const cool = w.ts === 0 ? 0 : Math.min(40, 5 * Math.pow(2, w.tries)) * 60000;
+    if (now - w.ts < cool) continue;
+    if (agentRunning(w.agent)) continue;   // don't pile onto an agent already busy
+    w.tries++; w.state = "active"; w.ts = now; savePaused();
+    broadcast({ type: "chat.message", agent: w.agent,
+      text: "▶ โควต้าน่าจะคืนแล้ว — ขอทำงานที่ค้างไว้ต่อจากเดิมนะครับ" });
+    runClaude(w.agent,
+      "ทำงานต่อจากที่ค้างไว้ก่อนหน้า (ก่อนหน้านี้สะดุดเพราะติดลิมิตชั่วคราว/โปรแกรมรีสตาร์ท). " +
+      "ดูบริบทในเธรดนี้แล้วทำงานที่ยังไม่เสร็จให้จบ:\n\n" + String(w.prompt || ""),
+      { session: w.key, project: w.project, resumable: true, _tries: w.tries,
+        resumePrompt: w.prompt, logPrompt: "▶ ทำงานต่อ (resume)" });
+  }
+}
+
 // ---- 30-second scheduler: jobs, reminders, heartbeat.
 setInterval(() => {
   const now = Date.now();
@@ -1216,6 +1297,7 @@ setInterval(() => {
   const hb = Number(reg.heartbeatMin || 0);
   if (hb > 0 && now - lastHeartbeat >= hb * 60000 && agentBusy.size === 0)
     heartbeat();
+  resumePausedTick(now);
   socialTick(now);
   ambientTick(now);
   sweepProjects();
@@ -1318,6 +1400,8 @@ function runClaude(agent, prompt, opts = {}) {
     // The overlay's NOW-WORKING strip needs to SAY what the work is.
     title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 90) });
   statBump("runs", agent);
+  // Track resumable work as ACTIVE so a restart (or a limit) can continue it later.
+  if (opts.resumable) pauseActive(agent, opts.resumePrompt || prompt, projId, entry.key, opts._tries);
 
   // Persona + assigned skills ride in a stdin preamble (robust across
   // Windows shell quoting); resumed sessions already carry it in context.
@@ -1465,6 +1549,17 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     doneFired = true;
     runChildren.delete(task);
     releaseProj();
+    // Resume bookkeeping (delegated work + direct user tasks only): done OK → clear; hit
+    // a temporary limit → keep PAUSED for the resume tick; any other failure → clear (a
+    // genuine error shouldn't loop forever).
+    if (opts.resumable) {
+      if (ok) pauseClear(entry.key);
+      else if (isRateLimit(`${text || ""}\n${errText}\n${lastText}`)) {
+        pausePause(agent, opts.resumePrompt || prompt, projId, entry.key);
+        broadcast({ type: "chat.message", agent, task,
+          text: "⏸ ติดลิมิต (rate/usage) ชั่วคราว — พักงานไว้ก่อน เดี๋ยวจะทำต่อให้อัตโนมัติเมื่อโควต้าคืน" });
+      } else pauseClear(entry.key);
+    }
     if (opts.onDone) try { opts.onDone(text, ok); } catch (e) { console.error("[onDone]", e); }
   };
   // When a swapped-in backend rejects the request as too big (context window or
@@ -1843,6 +1938,7 @@ function makeDelegateFilter(depth, session, onHit) {
           runClaude(t, inst, {
             project: proj,
             session: proj && (!te || te.proj !== proj) ? "new" : undefined,
+            resumable: true, resumePrompt: inst,   // delegated work auto-resumes after a limit/restart
             onDone: (out, ok) => verifyThenReport(t, inst, out, ok, depth, session, proj),
           });
         }, 4500);
@@ -3046,6 +3142,7 @@ const server = http.createServer((req, res) => {
                   filterText: makeDelegateFilter(0, session),
                   onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
             : runClaude(agent, prompt, { session, project, logPrompt: origPrompt,
+                resumable: true, resumePrompt: origPrompt,  // a member's direct task auto-resumes
                 onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined });
         if (!wait) {
           res.writeHead(200, { "content-type": "application/json" });

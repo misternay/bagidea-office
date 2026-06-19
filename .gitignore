@@ -22,6 +22,7 @@ godot/bin-mac/
 daemon/journal.jsonl
 daemon/registry.json
 daemon/sessions.json
+daemon/paused.json
 daemon/map_bg.png
 daemon/mcp_*.json
 daemon/jobs.json
