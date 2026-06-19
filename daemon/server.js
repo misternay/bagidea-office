@@ -395,7 +395,10 @@ function overBudget(agent, entry, cwd) {
 // Context window per backend — the LAST-RESORT fallback when a model isn't known and
 // the provider didn't advertise a length. Per-MODEL windows (MODEL_CTX / live) and the
 // per-provider override (providerConfig.contextWindow) both take precedence.
-const CTX_WINDOW = { claude: 200000, glm: 128000, deepseek: 1000000, qwen: 256000,
+// Claude defaults to 1M because the current generation (Opus 4.8 / Sonnet 4.6) ships a
+// 1M-token window as standard; an agent on the BLANK default model lands here. The only
+// 200k Claude is Haiku 4.5, which is caught explicitly in MODEL_CTX when chosen.
+const CTX_WINDOW = { claude: 1000000, glm: 128000, deepseek: 1000000, qwen: 256000,
   minimax: 200000, moonshot: 262144, kimicode: 262144, openai: 128000, gemini: 1000000,
   openrouter: 128000, nvidia: 128000 };
 
