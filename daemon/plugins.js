@@ -71,8 +71,15 @@ module.exports = function initPlugins(ctx) {
       `plugin.json (+ optional index.js / panel.html), then ` +
       `curl -s -X POST http://127.0.0.1:8787/plugins/reload -H "x-bagidea-ui: 1". ` +
       `Full spec: docs/guide/plugins.md`;
+    // Non-ASCII on a Windows command line is mangled to "?" by the shell codepage
+    // BEFORE curl runs — so a Thai/Chinese/etc. arg passed inline arrives corrupted.
+    // Tell agents to send the JSON body from a FILE instead (the Write tool saves UTF-8).
+    const utf8 = `⚠️ If any value contains non-English text (Thai, Chinese, emoji words…), ` +
+      `do NOT pass it inline — on Windows the shell turns it into "?". Instead Write the ` +
+      `JSON body to a file (UTF-8) and send that file:\n` +
+      `  curl -s -X POST http://127.0.0.1:8787/plugin/<id>/cmd -H "content-type: application/json" --data-binary @body.json`;
     if (!cmds.length) return `\n<office-plugins>\n${create}\n</office-plugins>`;
-    return `\n<office-plugins>\nExtensions you can drive (via Bash):\n${cmds.join("\n")}\n\n${create}\n</office-plugins>`;
+    return `\n<office-plugins>\nExtensions you can drive (via Bash):\n${cmds.join("\n")}\n\n${utf8}\n\n${create}\n</office-plugins>`;
   }
 
   // HTTP dispatch for /plugin/<id>/...  — returns true if handled.

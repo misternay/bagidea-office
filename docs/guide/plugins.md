@@ -107,6 +107,12 @@ module.exports = (ctx) => ({
 custom route (see `music`'s `track` route — it streams audio with HTTP Range; and
 its `upload` route accepts a raw file body via `readBodyRaw`).
 
+> **Non-ASCII args (Thai/Chinese/emoji words):** when an agent drives a command from
+> the shell, do **not** put non-English text inline (`-d "{...}"`) — on Windows the shell
+> codepage corrupts it to `?` before `curl` even runs. Write the JSON body to a UTF-8 file
+> and send it: `curl ... --data-binary @body.json`. The daemon and panels handle UTF-8
+> fine; only the inline command line is unsafe.
+
 ---
 
 ## 4. `panel.html` — the UI
