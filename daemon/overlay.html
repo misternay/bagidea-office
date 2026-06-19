@@ -3322,7 +3322,9 @@
         curModels = [...stat, ...usable.filter((m) => !stat.includes(m))];
         // Keep the saved model on the agent's own provider; otherwise pre-select a
         // sensible default (first usable model) so the field is never left invalid.
-        const def = p === "claude" ? "" : (curModels.find(Boolean) || "");
+        // Never leave Claude on the blank/implicit model — default to the flagship
+        // (Opus 4.8, 1M window). Users can still pick "" or another model explicitly.
+        const def = p === "claude" ? "claude-opus-4-8" : (curModels.find(Boolean) || "");
         modelInput.value = (!provChanged && a.model && p === (a.provider || "claude")) ? a.model : def;
       };
       buildProviderOptions();
