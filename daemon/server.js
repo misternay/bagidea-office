@@ -85,6 +85,16 @@ function loadReg() {
   }
   reg.tools = Object.keys(BUILTIN_TOOLS);
   reg.mcpServers = reg.mcpServers || {};
+  // One-time seed: a ready-to-use WEB capability (Playwright MCP, the Claude Code
+  // browser standard). Tick "🔌 web" on an agent's tools and it can navigate,
+  // click, type, submit forms and screenshot real pages. Runs --isolated (a fresh
+  // profile, NOT logged in — fresh state each run) and --headed so you can watch
+  // it work. Seeded once (reg.seededWebMcp) so removing it in the UI sticks.
+  if (!reg.seededWebMcp) {
+    if (!reg.mcpServers.web)
+      reg.mcpServers.web = { command: "npx -y @playwright/mcp@latest --headed --isolated" };
+    reg.seededWebMcp = true;
+  }
   reg.places = reg.places || {};  // shorthand locations: "ห้องสมุด" → folder
   // Default main agent: SHINO — the owner's (CEO's) second-in-command who runs
   // the floor. A manager, not an individual contributor: few hands-on tools,
