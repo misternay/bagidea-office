@@ -1011,6 +1011,10 @@
     "🧹 ล้าง": { en: "🧹 Clear", zh: "🧹 清除", ja: "🧹 クリア" },
     "— เงียบสงบ… รอความเคลื่อนไหวในออฟฟิศ —": { en: "— quiet… waiting for office activity —", zh: "— 安静… 等待办公室动态 —", ja: "— 静か… オフィスの動きを待っています —" },
     "กำลังฟัง…": { en: "Listening…", zh: "聆听中…", ja: "聞いています…" },
+    // pin (plugins / projects / proposals)
+    "ปักหมุด": { en: "Pin", zh: "置顶", ja: "ピン留め" },
+    "เลิกปักหมุด": { en: "Unpin", zh: "取消置顶", ja: "ピン留め解除" },
+    "📌 ปักหมุด": { en: "📌 Pinned", zh: "📌 已置顶", ja: "📌 ピン留め" },
     // plugins panel
     "ถอนการติดตั้ง plugin นี้?": { en: "Uninstall this plugin?", zh: "卸载此插件？", ja: "このプラグインをアンインストールしますか？" },
     "ถอนการติดตั้ง": { en: "Uninstall", zh: "卸载", ja: "アンインストール" },
@@ -3565,13 +3569,15 @@
       box.innerHTML = `<div style="font-size:11.5px;color:var(--dim)">ยังไม่มี plugin</div>`;
     // Core (🔒) plugins pin to the top so newly installed ones never push
     // them out of view; stable within each group.
-    const ordered = [...(r.plugins || [])].sort((a, b) => (b.core ? 1 : 0) - (a.core ? 1 : 0));
+    const ordered = pinFirst("plugins",
+      [...(r.plugins || [])].sort((a, b) => (b.core ? 1 : 0) - (a.core ? 1 : 0)), (p) => p.id);
     for (const p of ordered) {
       const row = document.createElement("div");
       row.className = "arow";
       row.innerHTML = `<div class="meta"><b>${p.name}</b>
           <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
+        pinBtn("plugins", p.id) +
         (p.panel ? `<div class="winbtn" title="เปิดหน้าต่าง">⤢</div>` : "") +
         (p.core ? `<span class="hide" title="plugin หลัก ลบไม่ได้" style="opacity:.5;font-size:13px;align-self:center">🔒</span>`
                 : `<div class="winbtn hide" title="ถอนการติดตั้ง">🗑</div>`);
@@ -3595,6 +3601,7 @@
       };
       box.appendChild(row);
     }
+    wirePins(box, openPlugins);
     wireFilter(modalCard.querySelector("#plgFilter"), box);
     modalCard.querySelector("#plgReload").onclick = () =>
       api("/plugins/reload", {}).then(() => openPlugins());
@@ -3961,8 +3968,12 @@
       const box = modalCard.querySelector("#plist");
       box.innerHTML = PROJECTS_CACHE.length ? "" :
         `<div style="font-size:11.5px;color:var(--dim)">ยังไม่มีโปรเจค — สร้างข้างล่าง หรือสั่ง Director ว่า "สร้างโปรเจค X ที่ &lt;ชื่อย่อ&gt;"</div>`;
-      const groups = [["สร้างโดยออฟฟิศ 🏠", PROJECTS_CACHE.filter((p) => p.created)],
-        ["ลงทะเบียนจากภายนอก 🔗", PROJECTS_CACHE.filter((p) => !p.created)]];
+      const projId = (p) => p.dir || p.name;
+      const projPin = PROJECTS_CACHE.filter((p) => isPinned("projects", projId(p)));
+      const projRest = PROJECTS_CACHE.filter((p) => !isPinned("projects", projId(p)));
+      const groups = [[tr("📌 ปักหมุด"), projPin],
+        ["สร้างโดยออฟฟิศ 🏠", projRest.filter((p) => p.created)],
+        ["ลงทะเบียนจากภายนอก 🔗", projRest.filter((p) => !p.created)]];
       for (const [gname, list] of groups) {
         if (!list.length) continue;
         const hd = document.createElement("div");
@@ -4001,7 +4012,8 @@
             row.style.background = "rgba(74,222,128,0.06)";
           }
           row.innerHTML = `<div class="meta"><b>📁 ${p.name.replace(/</g, "&lt;")}</b>
-              <span>${p.dir.replace(/</g, "&lt;")} · ${st.join(" · ")}</span></div>` + main +
+              <span>${p.dir.replace(/</g, "&lt;")} · ${st.join(" · ")}</span></div>` +
+            pinBtn("projects", projId(p)) + main +
             `<div class="winbtn" title="เทอร์มินัลเปล่า (ไม่นับว่าเปิดโปรเจค)">🖥</div>
             <div class="winbtn" title="เปิดโฟลเดอร์">📂</div>
             <div class="winbtn hide" title="เอาออกจากรายการ (ไฟล์ยังอยู่)">✕</div>` +
@@ -4009,7 +4021,7 @@
               ? `<div class="winbtn hide" title="ลบโปรเจคออกจากเครื่องจริงๆ">🗑</div>` : "") +
             (p.ai && shellPost
               ? `<div class="winbtn" title="ดูน้องทำงาน (หน้าต่างแยก · ไม่รบกวน)">👁</div>` : "");
-          const b = [...row.querySelectorAll(".winbtn")];
+          const b = [...row.querySelectorAll(".winbtn:not(.pinbtn)")];
           const refresh = () => setTimeout(opsRefresh, 2600);
           const metaSpan = () => row.querySelector(".meta span");
           // 👁 watch — pop a read-only live stream of this project's agent(s).
@@ -4091,6 +4103,7 @@
           box.appendChild(row);
         }
       }
+      wirePins(box, () => openOps("proj"));
       // Search box + scroll memory: live status refreshes re-render the whole
       // list, which used to fling the scrollbar to the top and drop any search.
       const pf = modalCard.querySelector("#pFilter");
@@ -4189,7 +4202,7 @@
           clearSelBtn.style.pointerEvents = n ? "auto" : "none";
           clearSelBtn.textContent = n ? `${t("🧹 ล้างที่เลือก")} (${n})` : t("🧹 ล้างที่เลือก");
         };
-        for (const p of pending) {
+        for (const p of pinFirst("proposals", pending, (x) => x.id)) {
           const card = document.createElement("div");
           card.className = "arow";
           card.style.cssText = "cursor:default;display:block;padding:9px 11px";
@@ -4200,6 +4213,7 @@
                  <b style="font-size:12.5px">💡 ${p.name.replace(/</g, "&lt;")}</b>
                </label>
                <span style="display:flex;gap:6px;flex:none">
+                 ${pinBtn("proposals", p.id)}
                  <span class="winbtn" title="อนุมัติ — สร้างโปรเจคให้ทีมทำเลย">✅</span>
                  <span class="winbtn hide" title="ปฏิเสธ">✕</span>
                </span>
@@ -4208,7 +4222,7 @@
              <div style="white-space:pre-wrap;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${(p.detail || "").replace(/</g, "&lt;")}</div>
              <input class="prMsg" placeholder="ข้อความถึงทีม (ไม่บังคับ) — ใช้ทั้งตอนอนุมัติ/ไม่อนุมัติ"
                     style="width:100%;margin-top:7px;font:inherit;font-size:11px;color:var(--text);background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:8px;padding:7px 9px;outline:none">`;
-          const b = card.querySelectorAll(".winbtn");
+          const b = card.querySelectorAll(".winbtn:not(.pinbtn)");
           const msgOf = () => (card.querySelector(".prMsg").value || "").trim();
           b[0].onclick = () => api("/proposals/respond", { id: p.id, decision: "approve", message: msgOf() })
             .then(() => { addChip("✅ อนุมัติแล้ว — Director กำลังจัดทีม"); openOps("jobs"); });
@@ -4218,6 +4232,7 @@
           chk.onchange = () => { chk.checked ? selected.add(p.id) : selected.delete(p.id); syncSelBtn(); };
           box.appendChild(card);
         }
+        wirePins(box, () => openOps("jobs"));
         clearSelBtn.onclick = async () => {
           if (!selected.size) return;
           if (!await confirmDanger(t("ลบ"),
@@ -4786,6 +4801,37 @@
       body: JSON.stringify(body),
     });
     try { return await r.json(); } catch { return {}; }
+  }
+
+  // 📌 Owner pin lists (per machine, localStorage) — float favourites to the top of
+  // long lists (plugins / projects / proposals) so they're easy to find when there are
+  // many. Pins are a personal view preference, never sent to agents.
+  function pinSet(kind) { try { return new Set(JSON.parse(localStorage.getItem("pin:" + kind) || "[]")); } catch { return new Set(); } }
+  function isPinned(kind, id) { return pinSet(kind).has(String(id)); }
+  function pinToggle(kind, id) {
+    const s = pinSet(kind); id = String(id);
+    s.has(id) ? s.delete(id) : s.add(id);
+    try { localStorage.setItem("pin:" + kind, JSON.stringify([...s])); } catch {}
+  }
+  // Stable: pinned first, original order kept within each group.
+  function pinFirst(kind, arr, idOf) {
+    const s = pinSet(kind);
+    return arr.map((x, i) => [x, i]).sort((a, b) =>
+      ((s.has(String(idOf(b[0]))) ? 1 : 0) - (s.has(String(idOf(a[0]))) ? 1 : 0)) || (a[1] - b[1])
+    ).map((x) => x[0]);
+  }
+  // A pin toggle glyph for a row (📌 = pinned, 📍 = not). `onPinned` re-renders.
+  function pinBtn(kind, id) {
+    const on = isPinned(kind, id);
+    return `<div class="winbtn pinbtn" data-pinkind="${kind}" data-pinid="${esc(String(id))}" ` +
+      `title="${on ? tr("เลิกปักหมุด") : tr("ปักหมุด")}" style="${on ? "" : "opacity:.4"}">📌</div>`;
+  }
+  // Wire every pin button inside `root`; `rerender()` runs after a toggle.
+  function wirePins(root, rerender) {
+    root.querySelectorAll(".pinbtn").forEach((el) => {
+      el.onclick = (e) => { e.stopPropagation();
+        pinToggle(el.dataset.pinkind, el.dataset.pinid); rerender(); };
+    });
   }
 
   // A deliberate "are you sure?" gate for destructive actions (deleting a role,
