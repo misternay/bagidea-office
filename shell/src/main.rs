@@ -1353,13 +1353,58 @@ mod platform {
     pub fn ensure_single_instance() -> bool { true }
     pub fn spawn_hotkey_thread(_p: tao::event_loop::EventLoopProxy<UserEvent>) {}
     pub fn rebind_hotkey(_s: &str) {}
-    pub fn attach_wallpaper_when_ready(_pid: u32, _root: PathBuf, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
+    pub fn attach_wallpaper_when_ready(pid: u32, _root: PathBuf, proxy: tao::event_loop::EventLoopProxy<UserEvent>) {
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(4));
+            // Wait for Godot's first real frame (it writes this file), like Windows/macOS.
+            let ready = std::env::temp_dir().join("bagidea_world_ready");
+            let start = std::time::Instant::now();
+            while !ready.exists() && start.elapsed().as_secs() < 15 {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            // X11/Xwayland: push the Godot window to the desktop layer (below everything,
+            // on all workspaces, off the taskbar). Best-effort — if the tools are absent
+            // or the session is pure Wayland, it simply stays a fullscreen window (the
+            // accepted fallback). Godot already sizes itself to the screen in --wallpaper.
+            attach_to_desktop(pid);
             let _ = proxy.send_event(UserEvent::WorldReady);
         });
     }
-    pub fn hide_office(_pid: u32, _hidden: bool) {}
+    // X11 window ids owned by a process (needs `xdotool`).
+    fn windows_for_pid(pid: u32) -> Vec<String> {
+        let p = pid.to_string();
+        match Command::new("xdotool").args(["search", "--pid", p.as_str()]).output() {
+            Ok(o) if o.status.success() =>
+                String::from_utf8_lossy(&o.stdout).split_whitespace().map(|s| s.to_string()).collect(),
+            _ => Vec::new(),
+        }
+    }
+    fn attach_to_desktop(pid: u32) {
+        // The window may not be mapped the instant world_ready appears — retry briefly.
+        let mut ids: Vec<String> = Vec::new();
+        for _ in 0..25 {
+            ids = windows_for_pid(pid);
+            if !ids.is_empty() { break; }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        for id in &ids {
+            // wmctrl accepts at most TWO state properties per -b call → split them.
+            let _ = Command::new("wmctrl")
+                .args(["-i", "-r", id.as_str(), "-b", "add,below,sticky"]).status();
+            let _ = Command::new("wmctrl")
+                .args(["-i", "-r", id.as_str(), "-b", "add,skip_taskbar,skip_pager"]).status();
+            // Bonus: mark it a desktop-type window where the WM honours it (truer wallpaper).
+            let _ = Command::new("xprop").args([
+                "-id", id.as_str(), "-f", "_NET_WM_WINDOW_TYPE", "32a",
+                "-set", "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_DESKTOP"]).status();
+        }
+    }
+    pub fn hide_office(pid: u32, hidden: bool) {
+        let action = if hidden { "windowunmap" } else { "windowmap" };
+        for id in windows_for_pid(pid) {
+            let _ = Command::new("xdotool").args([action, id.as_str()]).status();
+        }
+    }
     pub fn focus_pid(_pid: u32) -> bool { false }
     pub fn apply_chrome(b: WindowBuilder) -> WindowBuilder { b }
     pub fn set_no_activate(_w: &Window) {}
