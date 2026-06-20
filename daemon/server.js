@@ -1047,10 +1047,26 @@ function ensureTrusted(dir) {
 // the agent runs INSIDE that directory and the project lights up 🤖.
 // Matching is forgiving: case- and space-insensitive.
 function projectFromPrompt(prompt) {
+  // Auto-route into a project only when its name appears clearly in the task —
+  // and don't get dragged in by a coincidental substring (e.g. a task "build a
+  // web scraper" must NOT enter a project named "web"). For Latin/ASCII names we
+  // require a WHOLE-WORD match; Thai/CJK has no word boundaries, so we fall back
+  // to a squashed substring there. Min length 4, and only when EXACTLY one
+  // project matches. Deliberate routing uses the Director's `@ <project>`.
+  const text = String(prompt);
+  const lower = text.toLowerCase();
   const squash = (s) => String(s).toLowerCase().replace(/\s+/g, "");
-  const text = squash(prompt);
-  const hits = projects.filter((p) =>
-    p.name.length >= 3 && text.includes(squash(p.name)));
+  const sqText = squash(text);
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hits = projects.filter((p) => {
+    const nm = p.name || "";
+    if (nm.length < 4) return false;
+    if (/^[\x00-\x7f]+$/.test(nm)) {   // Latin/ASCII name → whole-word match
+      try { return new RegExp("(^|[^a-z0-9])" + esc(nm.toLowerCase()) + "($|[^a-z0-9])", "i").test(lower); }
+      catch { return false; }
+    }
+    return sqText.includes(squash(nm));  // Thai/CJK → boundary-less substring
+  });
   return hits.length === 1 ? hits[0].id : null;
 }
 
@@ -1942,13 +1958,13 @@ function makeDelegateFilter(depth, session, onHit) {
         // Dispatch AFTER the hand-over walk — and resolve the project then,
         // so a PROJECT: line earlier in this very reply has taken effect.
         setTimeout(() => {
-          // Project routing: explicit `@ project` wins; otherwise inherit the
-          // Director's own workspace. A target whose latest thread lives
-          // elsewhere gets a fresh one.
-          const ml = sess["main"] || [];
-          const me = session ? ml.find((x) => x.key === session)
-            : (ml.length ? ml.reduce((a, b) => (a.ts > b.ts ? a : b)) : null);
-          const proj = (projName && projectByName(projName)) || (me && me.proj) ||
+          // Project routing: a delegate enters a project ONLY when explicitly
+          // routed `@ project` or when the task text names one. It must NOT
+          // inherit the Director's currently-open project — that silently
+          // dragged unrelated team work into whatever project the Director last
+          // touched ("agents wander into random projects"). No project → the
+          // shared workspace, on a fresh thread (see session below).
+          const proj = (projName && projectByName(projName)) ||
             projectFromPrompt(inst);
           // LOCK (reverse): if the owner has this project's window open, an
           // agent must NOT enter it — report back so the Director re-plans
@@ -1962,7 +1978,10 @@ function makeDelegateFilter(depth, session, onHit) {
           const te = tl.length ? tl.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
           runClaude(t, inst, {
             project: proj,
-            session: proj && (!te || te.proj !== proj) ? "new" : undefined,
+            // No project → a FRESH workspace thread so the agent never inherits a
+            // stale project binding from its previous task. With a project, fork a
+            // new thread only when the agent's latest one lives elsewhere.
+            session: proj ? ((!te || te.proj !== proj) ? "new" : undefined) : "new",
             resumable: true, resumePrompt: inst,   // delegated work auto-resumes after a limit/restart
             onDone: (out, ok) => verifyThenReport(t, inst, out, ok, depth, session, proj),
           });
