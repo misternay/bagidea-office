@@ -12,6 +12,13 @@ const RTL = new Set(["ar"]);
 const I18N = {
   en: {
     nav_features:"Features", nav_docs:"Docs", nav_install:"Install", nav_sponsors:"Sponsors",
+    nav_tools:"Tools",
+    t_title:"What your agents can do", t_sub:"Every employee is equipped with tools. Some are built in and ready the moment you hire; others you add as capabilities and grant per agent — like driving a real web browser.",
+    t_builtin_h:"🛠 Built-in tools", t_builtin_sub:"Native to every agent — tick them on in the agent editor, no setup.",
+    t_mcp_h:"🔌 Add-on capabilities", t_mcp_sub:"Wire in an MCP server (⚙ → MCP SERVERS), then assign it per agent. Copy a launch command to start.",
+    t_loading:"Loading…",
+    t_add_eyebrow:"Extend it", t_add_title:"Add any capability", t_add_lead:"BagIdea Office speaks the open MCP standard, so an agent can use anything the ecosystem offers — and the office can even build its own tools as plugins.",
+    t_add_cta:"Browse MCP servers →", t_plugins_cta:"See plugins →",
     nav_plugins:"Plugins",
     ph_title:"Plugins for your office", ph_sub:"Browse community plugins and install them into your running office with one click — or publish your own for everyone.",
     ph_install:"⬇ Open in office", ph_copy:"📋 Copy link", ph_source:"View source ↗", ph_official:"Official",
@@ -181,6 +188,13 @@ const I18N = {
 
   de: {
     nav_features:"Funktionen", nav_docs:"Dokumentation", nav_install:"Installieren", nav_sponsors:"Sponsoren",
+    nav_tools:"Werkzeuge",
+    t_title:"Was Ihre Agents können", t_sub:"Jeder Mitarbeiter ist mit Werkzeugen ausgestattet. Einige sind integriert und sofort einsatzbereit; andere fügen Sie als Fähigkeiten hinzu und weisen sie pro Agent zu — etwa das Steuern eines echten Webbrowsers.",
+    t_builtin_h:"🛠 Integrierte Werkzeuge", t_builtin_sub:"In jedem Agent vorhanden — im Agent-Editor aktivieren, keine Einrichtung nötig.",
+    t_mcp_h:"🔌 Zusätzliche Fähigkeiten", t_mcp_sub:"Binden Sie einen MCP-Server ein (⚙ → MCP SERVERS) und weisen Sie ihn pro Agent zu. Kopieren Sie einen Startbefehl, um zu beginnen.",
+    t_loading:"Wird geladen…",
+    t_add_eyebrow:"Erweitern", t_add_title:"Beliebige Fähigkeit hinzufügen", t_add_lead:"BagIdea Office spricht den offenen MCP-Standard, sodass ein Agent alles aus dem Ökosystem nutzen kann — und das Büro kann sogar eigene Werkzeuge als Plugins bauen.",
+    t_add_cta:"MCP-Server durchsuchen →", t_plugins_cta:"Plugins ansehen →",
     cta_get:"Loslegen", cta_docs:"Dokumentation lesen", cta_github:"GitHub", upd_eyebrow:"Immer besser", upd_title:"Ständig aktualisiert", upd_sub:"BagIdea Office erhält ständig Updates — Fehlerbehebungen, neue Funktionen und Feinschliff. Jedes Office bekommt eine Update-Benachrichtigung mit einem Klick.", upd_latest:"Neueste", upd_cta:"Was ist neu →",
     hero_title:'Ihr Hintergrundbild <span class="grad">geht arbeiten</span>.',
     hero_sub:"BagIdea Office verwandelt deinen Desktop in ein lebendiges HD-2D-Büro, in dem jeder KI-Agent ein echter Claude ist, der an seinen Schreibtisch geht, um Erlaubnis bittet, Meetings abhält und Arbeit erledigt – hinter deinen Icons.",
@@ -296,6 +310,13 @@ const I18N = {
 
   th: {
     nav_features:"ฟีเจอร์", nav_docs:"คู่มือ", nav_install:"ติดตั้ง", nav_sponsors:"สปอนเซอร์",
+    nav_tools:"เครื่องมือ",
+    t_title:"น้องๆ ทำอะไรได้บ้าง", t_sub:"พนักงานทุกคนมีเครื่องมือติดตัว บางอย่างมาในตัวพร้อมใช้ทันทีที่จ้าง บางอย่างคุณเพิ่มเป็นความสามารถแล้ว assign ให้ทีละ agent — เช่น ขับเบราว์เซอร์จริง",
+    t_builtin_h:"🛠 เครื่องมือมาในตัว", t_builtin_sub:"มีในทุก agent — ติ๊กเปิดในหน้าแก้ไข agent ไม่ต้องตั้งค่า",
+    t_mcp_h:"🔌 ความสามารถเสริม", t_mcp_sub:"ต่อ MCP server (⚙ → MCP SERVERS) แล้ว assign ให้ทีละ agent · คัดลอกคำสั่งรันเพื่อเริ่ม",
+    t_loading:"กำลังโหลด…",
+    t_add_eyebrow:"ต่อยอด", t_add_title:"เพิ่มความสามารถอะไรก็ได้", t_add_lead:"BagIdea Office รองรับมาตรฐาน MCP แบบเปิด น้องจึงใช้อะไรก็ได้ใน ecosystem — และออฟฟิศยังสร้างเครื่องมือของตัวเองเป็น plugin ได้ด้วย",
+    t_add_cta:"ดู MCP servers →", t_plugins_cta:"ดู plugins →",
     nav_plugins:"ปลั๊กอิน",
     ph_title:"ปลั๊กอินสำหรับออฟฟิศของคุณ", ph_sub:"เลือกดู plugin จากชุมชน แล้วกดติดตั้งเข้าออฟฟิศที่เปิดอยู่ได้ทีเดียวจบ — หรือเผยแพร่ของคุณเองให้ทุกคนใช้",
     ph_install:"⬇ เปิดในออฟฟิศ", ph_copy:"📋 คัดลอกลิงก์", ph_source:"ดูซอร์ส ↗", ph_official:"ทางการ",

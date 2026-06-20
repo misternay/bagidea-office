@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools — BagIdea Office</title>
+<meta name="description" content="Everything your AI agents can be equipped with — built-in tools and add-on MCP capabilities like browsing the web.">
+<meta property="og:title" content="BagIdea Office — Tools">
+<meta property="og:description" content="The tools and capabilities your AI agents wield — built-in, plus add-on MCP integrations.">
+<meta property="og:image" content="img/swappable-brains.png">
+<link rel="icon" href="img/logo.png">
+<link rel="stylesheet" href="assets/site.css">
+<script defer src="assets/i18n.js"></script>
+<style>
+  .phwrap { max-width:1040px; }
+  .tgrp { margin-top:34px; }
+  .tgrp > .gh { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .tgrp > .gh h2 { margin:0; font-size:22px; }
+  .tgrp > .gh .ghsub { color:var(--dim); font-size:14px; }
+  .pgrid { display:flex; flex-wrap:wrap; gap:16px; margin-top:18px; }
+  .pcard { flex:1 1 300px; max-width:calc(33.33% - 11px); background:var(--card,rgba(255,255,255,.03));
+    border:1px solid var(--line,rgba(255,255,255,.1)); border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; }
+  @media(max-width:900px){ .pcard { max-width:calc(50% - 8px); } }
+  @media(max-width:600px){ .pcard { max-width:100%; } }
+  .pcard .tic { font-size:26px; line-height:1; }
+  .pcard h3 { margin:8px 0 0; font-size:18px; }
+  .pcard .pdesc { color:var(--dim); font-size:13.5px; margin:9px 0 0; flex:1; line-height:1.6; }
+  .ptags { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .ptag { font-size:11px; padding:2px 9px; border-radius:999px; border:1px solid var(--line,rgba(255,255,255,.12)); color:var(--dim); }
+  .ptag.official { color:var(--accent); border-color:rgba(94,200,255,.5); }
+  .ptag.builtin { color:#8fe3b0; border-color:rgba(143,227,176,.4); }
+  .tcmd { font-family:ui-monospace,Consolas,monospace; font-size:11.5px; color:var(--dim);
+    background:rgba(0,0,0,.25); border:1px solid var(--line,rgba(255,255,255,.08)); border-radius:8px;
+    padding:7px 10px; margin-top:12px; overflow-x:auto; white-space:nowrap; }
+  .prow { display:flex; gap:9px; align-items:center; margin-top:13px; flex-wrap:wrap; }
+  .prow .src { margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none; }
+  .prow .src:hover { text-decoration:underline; }
+  .btn.sm { padding:8px 14px; font-size:13.5px; border-radius:10px; }
+  #ptoast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#13203a;
+    border:1px solid var(--accent); border-radius:10px; padding:10px 18px; opacity:0; transition:opacity .2s; max-width:90%; z-index:50; }
+  #ptoast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><img src="img/logo.png" alt="BagIdea Office logo"> BAG<span>IDEA</span> Office</a>
+    <div class="links">
+      <a class="nav-hide" href="index.html#features" data-i18n="nav_features">Features</a>
+      <a class="nav-hide" href="docs.html" data-i18n="nav_docs">Docs</a>
+      <a class="nav-hide" href="tools.html" data-i18n="nav_tools">Tools</a>
+      <a class="nav-hide" href="plugins.html" data-i18n="nav_plugins">Plugins</a>
+      <a class="nav-hide" href="index.html#install" data-i18n="nav_install">Install</a>
+      <a class="btn ghost" href="https://github.com/bagidea/bagidea-office" target="_blank" rel="noopener" data-i18n="cta_github">GitHub</a>
+      <div class="langpick"><button class="toggle">🌐 <span class="cur">EN</span></button></div>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow" data-i18n="nav_tools">Tools</p>
+    <h1 data-i18n="t_title">What your agents can do</h1>
+    <p class="sub" data-i18n="t_sub">Every employee is equipped with tools. Some are built in and ready the moment you hire; others you add as capabilities and grant per agent — like driving a real web browser.</p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap phwrap">
+    <div class="tgrp">
+      <div class="gh"><h2 data-i18n="t_builtin_h">🛠 Built-in tools</h2><span class="ghsub" data-i18n="t_builtin_sub">Native to every agent — tick them on in the agent editor, no setup.</span></div>
+      <div class="pgrid" id="grid-builtin"><p class="muted" data-i18n="t_loading">Loading…</p></div>
+    </div>
+    <div class="tgrp">
+      <div class="gh"><h2 data-i18n="t_mcp_h">🔌 Add-on capabilities</h2><span class="ghsub" data-i18n="t_mcp_sub">Wire in an MCP server (⚙ → MCP SERVERS), then assign it per agent. Copy a launch command to start.</span></div>
+      <div class="pgrid" id="grid-mcp"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap phwrap">
+    <p class="eyebrow" data-i18n="t_add_eyebrow">Extend it</p>
+    <h2 class="title" data-i18n="t_add_title">Add any capability</h2>
+    <p class="lead" data-i18n="t_add_lead">BagIdea Office speaks the open MCP standard, so an agent can use anything the ecosystem offers — and the office can even build its own tools as plugins.</p>
+    <div class="cta" style="margin-top:24px;justify-content:center">
+      <a class="btn primary" href="https://github.com/modelcontextprotocol/servers" target="_blank" rel="noopener" data-i18n="t_add_cta">Browse MCP servers →</a>
+      <a class="btn ghost" href="plugins.html" data-i18n="t_plugins_cta">See plugins →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="col" style="max-width:280px">
+      <a class="brand" href="index.html" style="display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;color:var(--text)"><img src="img/logo.png" alt="" style="width:28px;height:28px;border-radius:6px"> BAG<span style="color:var(--accent)">IDEA</span> Office</a>
+      <p style="margin-top:12px" data-i18n="foot_tag">Your wallpaper goes to work.</p>
+      <p style="margin-top:8px;font-size:13px" data-i18n="foot_made">Built with Claude Code.</p>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_product">Product</h4>
+      <a href="index.html#features" data-i18n="foot_features">Features</a>
+      <a href="index.html#install" data-i18n="foot_install">Install</a>
+      <a href="docs.html" data-i18n="foot_docs">Documentation</a>
+      <a href="tools.html" data-i18n="nav_tools">Tools</a>
+      <a href="plugins.html" data-i18n="nav_plugins">Plugins</a>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_resources">Resources</h4>
+      <a href="https://github.com/bagidea/bagidea-office" target="_blank" rel="noopener" data-i18n="foot_github">GitHub repo</a>
+      <a href="https://github.com/modelcontextprotocol/servers" target="_blank" rel="noopener" data-i18n="t_add_cta">MCP servers</a>
+      <a href="https://github.com/bagidea/bagidea-office/issues" target="_blank" rel="noopener" data-i18n="foot_issues">Report an issue</a>
+    </div>
+    <div class="col">
+      <h4 data-i18n="foot_company">Company</h4>
+      <a href="index.html#sponsors" data-i18n="foot_sponsors">Sponsors</a>
+      <a href="mailto:wrxbgid@warrix.co.th" data-i18n="foot_contact">Contact</a>
+    </div>
+  </div>
+  <div class="copyright" data-i18n="copyright">© 2026 BagIdea Innovation Co., Ltd. · MIT-licensed open source.</div>
+</footer>
+
+<div id="ptoast"></div>
+<a href="#" class="toplink" aria-label="Back to top">↑</a>
+<script>
+  const TT = {
+    en: { copy:"📋 Copy command", copied:"📋 Copied — paste it in the office's ⚙ → MCP SERVERS.",
+          source:"Docs ↗", official:"Official · built-in", builtin:"Built-in", empty:"No tools listed yet." },
+    th: { copy:"📋 คัดลอกคำสั่ง", copied:"📋 คัดลอกแล้ว — เอาไปวางใน ⚙ → MCP SERVERS ของออฟฟิศ",
+          source:"คู่มือ ↗", official:"ทางการ · มาในตัว", builtin:"มาในตัว", empty:"ยังไม่มีเครื่องมือในรายการ" },
+  };
+  let CATALOG = [];
+  const lang = () => (document.documentElement.lang === "th" ? "th" : "en");
+  const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;" }[c]));
+
+  function card(t, u, L) {
+    const desc = (t[L] && t[L].desc) || (t.en && t.en.desc) || (t.th && t.th.desc) || "";
+    if (t.kind === "builtin") {
+      return `<div class="pcard"><div class="tic">${esc(t.icon)}</div><h3>${esc(t.name)}</h3>
+        <p class="pdesc">${esc(desc)}</p>
+        <div class="ptags"><span class="ptag builtin">${u.builtin}</span></div></div>`;
+    }
+    const tag = t.official ? `<span class="ptag official">${u.official}</span>` : "";
+    const cmd = t.cmd ? `<div class="tcmd">${esc(t.cmd)}</div>` : "";
+    const btn = t.cmd
+      ? `<button class="btn primary sm" onclick="copyCmd(this,'${esc(t.cmd)}')">${u.copy}</button>` : "";
+    const src = t.repo ? `<a class="src" href="${esc(t.repo)}" target="_blank" rel="noopener">${u.source}</a>` : "";
+    return `<div class="pcard"><div class="tic">${esc(t.icon)}</div><h3>${esc(t.name)}</h3>
+      <p class="pdesc">${esc(desc)}</p>
+      <div class="ptags">${tag}</div>${cmd}
+      <div class="prow">${btn}${src}</div></div>`;
+  }
+  function render() {
+    const L = lang(), u = TT[L] || TT.en;
+    const gB = document.getElementById("grid-builtin"), gM = document.getElementById("grid-mcp");
+    if (!CATALOG.length) { gB.innerHTML = `<p class="muted">${u.empty}</p>`; gM.innerHTML = ""; return; }
+    gB.innerHTML = CATALOG.filter((t) => t.kind === "builtin").map((t) => card(t, u, L)).join("");
+    gM.innerHTML = CATALOG.filter((t) => t.kind === "mcp").map((t) => card(t, u, L)).join("");
+  }
+  function copyCmd(btn, cmd) {
+    const u = TT[lang()] || TT.en;
+    const done = () => toast(u.copied);
+    if (navigator.clipboard) navigator.clipboard.writeText(cmd).then(done).catch(() => prompt(u.copy, cmd));
+    else prompt(u.copy, cmd);
+  }
+  let tt; function toast(t){ const e=document.getElementById("ptoast"); e.textContent=t; e.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>e.classList.remove("show"),3600); }
+
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+  fetch("tools.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+    CATALOG = (d.tools || []).filter((t) => t && t.id && t.kind);
+    render();
+  }).catch(() => render());
+
+  const topBtn = document.querySelector(".toplink");
+  addEventListener("scroll", () => topBtn.classList.toggle("show", scrollY > 600));
+</script>
+</body>
+</html>

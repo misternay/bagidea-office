@@ -190,5 +190,18 @@
   "d_install_lin_p": "Ubuntu/Debian (apt) por enquanto. Abra um terminal e execute o comando abaixo. Ele instala as dependências (Node 20, Rust, Git, WebKitGTK, GTK, wmctrl/xdotool, utilitários do PulseAudio, Godot 4.6.3), compila o shell de desktop, conecta os hooks do Claude, cria um symlink do bagidea em ~/.local/bin e adiciona uma entrada de autostart XDG. No X11/Xorg, o escritório se integra como o verdadeiro papel de parede da área de trabalho; no Wayland, recorre a uma janela em tela cheia fixada abaixo de tudo. Por favor, relate problemas informando sua distro, seu desktop e a saída de \"echo $XDG_SESSION_TYPE\".",
   "f_web_t": "Os agentes navegam na web",
   "f_web_d": "Marque uma habilidade e um agente conduz um navegador real — abre páginas, clica, digita, preenche formulários e captura telas — para executar tarefas na web por você. Assista ao vivo ou deixe-o trabalhar discretamente em segundo plano; ele usa um perfil isolado (sem login) e cada ação ainda passa pelo Centro de Segurança.",
-  "foot_pitch": "Pitch deck"
+  "foot_pitch": "Pitch deck",
+  "nav_tools": "Ferramentas",
+  "t_title": "O que seus agentes podem fazer",
+  "t_sub": "Cada funcionário é equipado com ferramentas. Algumas já vêm embutidas e prontas no momento em que você contrata; outras você adiciona como capacidades e concede por agente — como dirigir um navegador web real.",
+  "t_builtin_h": "🛠 Ferramentas embutidas",
+  "t_builtin_sub": "Nativas de todo agente — ative-as no editor de agentes, sem configuração.",
+  "t_mcp_h": "🔌 Capacidades adicionais",
+  "t_mcp_sub": "Conecte um servidor MCP (⚙ → MCP SERVERS) e depois atribua-o por agente. Copie um comando de inicialização para começar.",
+  "t_loading": "Carregando…",
+  "t_add_eyebrow": "Amplie",
+  "t_add_title": "Adicione qualquer capacidade",
+  "t_add_lead": "O BagIdea Office fala o padrão aberto MCP, então um agente pode usar tudo o que o ecossistema oferece — e o escritório pode até construir suas próprias ferramentas como plugins.",
+  "t_add_cta": "Explorar servidores MCP →",
+  "t_plugins_cta": "Ver plugins →"
 }

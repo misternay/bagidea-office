@@ -190,5 +190,18 @@
   "d_install_lin_p": "目前支持 Ubuntu/Debian（apt）。打开终端并运行下面的命令。它会安装依赖项（Node 20、Rust、Git、WebKitGTK、GTK、wmctrl/xdotool、PulseAudio 工具、Godot 4.6.3），构建桌面外壳，接入 Claude 钩子，将 bagidea 软链接到 ~/.local/bin，并添加一个 XDG 自启动项。在 X11/Xorg 上，办公室会作为真正的桌面壁纸嵌入；在 Wayland 上，则回退为固定在最底层的全屏窗口。如遇问题，请反馈你的发行版（distro）、桌面环境以及 \"echo $XDG_SESSION_TYPE\" 的输出。",
   "f_web_t": "智能体浏览网页",
   "f_web_d": "勾选一项技能，智能体便会驱动一个真实的浏览器——打开页面、点击、输入、填写表单并截图——替你在网上执行任务。你可以实时观看，也可以让它在后台静静工作；它使用一个隔离的（未登录的）配置文件，而且每一个操作仍需经过安全中心。",
-  "foot_pitch": "项目路演稿"
+  "foot_pitch": "项目路演稿",
+  "nav_tools": "工具",
+  "t_title": "你的智能体能做什么",
+  "t_sub": "每位员工都配备了工具。有些是内置的，雇用即用；另一些则作为能力添加，并按智能体逐个授予——比如驾驭一个真实的网页浏览器。",
+  "t_builtin_h": "🛠 内置工具",
+  "t_builtin_sub": "每个智能体原生具备——在智能体编辑器中勾选开启，无需任何配置。",
+  "t_mcp_h": "🔌 附加能力",
+  "t_mcp_sub": "接入一个 MCP 服务器（⚙ → MCP SERVERS），然后按智能体逐个分配。复制启动命令即可开始。",
+  "t_loading": "加载中…",
+  "t_add_eyebrow": "扩展它",
+  "t_add_title": "添加任意能力",
+  "t_add_lead": "BagIdea Office 采用开放的 MCP 标准，因此智能体可以使用整个生态系统所提供的任何东西——办公室甚至能以插件的形式构建自己的工具。",
+  "t_add_cta": "浏览 MCP 服务器 →",
+  "t_plugins_cta": "查看插件 →"
 }

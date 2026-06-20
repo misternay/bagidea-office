@@ -190,5 +190,18 @@
   "d_install_lin_p": "Ubuntu/Debian (apt) untuk saat ini. Buka terminal dan jalankan perintah di bawah. Perintah ini memasang dependensi (Node 20, Rust, Git, WebKitGTK, GTK, wmctrl/xdotool, utilitas PulseAudio, Godot 4.6.3), membangun shell desktop, menyambungkan hook Claude, membuat symlink bagidea ke ~/.local/bin, dan menambahkan entri autostart XDG. Di X11/Xorg, office menyatu sebagai wallpaper desktop yang sebenarnya; di Wayland, ia beralih ke jendela layar penuh yang disematkan di bawah segalanya. Mohon laporkan masalah dengan menyertakan distro, desktop, dan keluaran dari \"echo $XDG_SESSION_TYPE\" Anda.",
   "f_web_t": "Agen menjelajahi web",
   "f_web_d": "Centang satu skill dan agen mengendalikan browser sungguhan — membuka halaman, mengklik, mengetik, mengisi formulir, dan mengambil tangkapan layar — untuk menjalankan tugas di web untukmu. Tonton secara langsung atau biarkan ia bekerja diam-diam di latar belakang; ia menggunakan profil terisolasi (tidak masuk akun) dan setiap tindakan tetap melewati Pusat Keamanan.",
-  "foot_pitch": "Pitch deck"
+  "foot_pitch": "Pitch deck",
+  "nav_tools": "Alat",
+  "t_title": "Apa yang bisa dilakukan agenmu",
+  "t_sub": "Setiap karyawan dilengkapi dengan alat. Sebagian sudah bawaan dan siap pakai begitu kamu mempekerjakannya; sebagian lagi kamu tambahkan sebagai kemampuan dan berikan per agen — seperti mengendalikan browser web sungguhan.",
+  "t_builtin_h": "🛠 Alat bawaan",
+  "t_builtin_sub": "Bawaan setiap agen — aktifkan saja di editor agen, tanpa pengaturan.",
+  "t_mcp_h": "🔌 Kemampuan tambahan",
+  "t_mcp_sub": "Hubungkan server MCP (⚙ → MCP SERVERS), lalu tetapkan per agen. Salin perintah peluncuran untuk memulai.",
+  "t_loading": "Memuat…",
+  "t_add_eyebrow": "Perluas",
+  "t_add_title": "Tambahkan kemampuan apa pun",
+  "t_add_lead": "BagIdea Office menggunakan standar terbuka MCP, sehingga agen dapat memakai apa pun yang ditawarkan ekosistem — dan office bahkan bisa membangun alatnya sendiri sebagai plugin.",
+  "t_add_cta": "Jelajahi server MCP →",
+  "t_plugins_cta": "Lihat plugin →"
 }

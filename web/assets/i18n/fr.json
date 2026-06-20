@@ -190,5 +190,18 @@
   "d_install_lin_p": "Ubuntu/Debian (apt) pour l'instant. Ouvrez un terminal et exécutez la commande ci-dessous. Elle installe les dépendances (Node 20, Rust, Git, WebKitGTK, GTK, wmctrl/xdotool, utilitaires PulseAudio, Godot 4.6.3), compile le shell de bureau, branche les hooks de Claude, crée un lien symbolique de bagidea dans ~/.local/bin et ajoute une entrée de démarrage automatique XDG. Sous X11/Xorg, le bureau s'intègre comme véritable fond d'écran ; sous Wayland, il se rabat sur une fenêtre plein écran épinglée sous tout le reste. Veuillez signaler les problèmes en précisant votre distro, votre bureau et la sortie de \"echo $XDG_SESSION_TYPE\".",
   "f_web_t": "Les agents naviguent sur le web",
   "f_web_d": "Cochez une compétence et un agent pilote un vrai navigateur — il ouvre des pages, clique, saisit du texte, remplit des formulaires et prend des captures d'écran — pour accomplir des tâches sur le web à votre place. Regardez-le en direct ou laissez-le travailler discrètement en arrière-plan ; il utilise un profil isolé (non connecté) et chaque action passe toujours par le Centre de Sécurité.",
-  "foot_pitch": "Pitch deck"
+  "foot_pitch": "Pitch deck",
+  "nav_tools": "Outils",
+  "t_title": "Ce que vos agents savent faire",
+  "t_sub": "Chaque employé est équipé d'outils. Certains sont intégrés et prêts dès l'embauche ; d'autres s'ajoutent comme des capacités que vous accordez agent par agent — comme piloter un vrai navigateur web.",
+  "t_builtin_h": "🛠 Outils intégrés",
+  "t_builtin_sub": "Natifs à chaque agent — cochez-les dans l'éditeur d'agent, sans aucune configuration.",
+  "t_mcp_h": "🔌 Capacités complémentaires",
+  "t_mcp_sub": "Branchez un serveur MCP (⚙ → MCP SERVERS), puis attribuez-le agent par agent. Copiez une commande de lancement pour démarrer.",
+  "t_loading": "Chargement…",
+  "t_add_eyebrow": "Étendez-le",
+  "t_add_title": "Ajoutez n'importe quelle capacité",
+  "t_add_lead": "BagIdea Office parle le standard ouvert MCP, donc un agent peut utiliser tout ce que l'écosystème propose — et l'office peut même construire ses propres outils sous forme de plugins.",
+  "t_add_cta": "Parcourir les serveurs MCP →",
+  "t_plugins_cta": "Voir les plugins →"
 }
