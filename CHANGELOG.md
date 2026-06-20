@@ -4,6 +4,19 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.10] — Solid plugin install / uninstall
+
+**Fixed**
+- **Uninstalling a plugin is clean** — it no longer pops a stray "unknown plugin" window
+  (the trash click used to fall through and open the just-removed plugin's panel). It now
+  asks for confirmation first and shows an in-app toast when done.
+- **The Plugins panel and Hub stay in sync** — both now refresh on the office's
+  `plugins.changed` events, so installing/removing in one place is reflected everywhere
+  (no more "not installed" when it is, or "already exists" after a remove).
+- **Reinstalling asks what you want** — installing a plugin whose id already exists no
+  longer hard-fails; you're asked to **Overwrite** the existing one or install a **new
+  copy** (cloned as `id-2`, `id-3`, … with its own manifest id).
+
 ## [0.9.9] — Resilient work, smarter brains, a livelier office
 
 **Added**
