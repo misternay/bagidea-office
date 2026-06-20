@@ -1089,7 +1089,7 @@ func whiteboard_add(who: String, text: String) -> void:
 
 # ---------------------------------------------------------------- board
 
-func board_set(key: String, state: String, label := "") -> void:
+func board_set(key: String, state: String, label := "", face: Texture2D = null) -> void:
 	if state == "none":
 		if _board_slots.has(key):
 			_board_free.append(_board_slots[key].idx)
@@ -1101,22 +1101,33 @@ func board_set(key: String, state: String, label := "") -> void:
 		if _board_free.is_empty():
 			return
 		var idx: int = _board_free.pop_front()
+		# A square "framed photo" tile flush to the wall: the character's face fills it,
+		# the state colour is the glowing frame, a small name plate sits underneath.
 		var box := CSGBox3D.new()
-		box.size = Vector3(0.5, 0.26, 0.04)
+		box.size = Vector3(0.46, 0.46, 0.03)
 		add_child(box)
-		box.position = Vector3(_board_x + ((idx % 3) - 1) * 0.6, _board_y0 - float(idx / 3) * 0.4, _board_z)
+		box.position = Vector3(_board_x + ((idx % 3) - 1) * 0.56, _board_y0 - float(idx / 3) * 0.54, _board_z)
+		var spr := Sprite3D.new()
+		if face:
+			spr.texture = face
+		spr.pixel_size = 0.0092          # 36px face → ~0.33 wide, leaving a frame
+		spr.position = Vector3(0, 0.045, 0.02)
+		box.add_child(spr)
 		var lbl := Label3D.new()
 		lbl.text = label if label != "" else key
-		lbl.font_size = 40
-		lbl.outline_size = 10
-		lbl.pixel_size = 0.0032
+		lbl.font_size = 30
+		lbl.outline_size = 9
+		lbl.pixel_size = 0.0024
+		lbl.position = Vector3(0, -0.165, 0.025)
 		box.add_child(lbl)
-		lbl.position = Vector3(0, 0, 0.05)
-		_board_slots[key] = {"box": box, "idx": idx, "state": ""}
+		_board_slots[key] = {"box": box, "idx": idx, "state": "", "spr": spr}
 	var slot: Dictionary = _board_slots[key]
+	# The face may arrive on a later event than the first — set it once available.
+	if face and slot.has("spr") and is_instance_valid(slot.spr):
+		slot.spr.texture = face
 	slot.state = state
 	var c: Color = BOARD_COLORS.get(state, Color(0.5, 0.5, 0.5))
-	slot.box.material = _mat(c.darkened(0.65), 0.4, c, 1.8)
+	slot.box.material = _mat(c.darkened(0.5), 0.45, c, 1.5)
 
 func board_clear_if_finished(key: String) -> void:
 	if _board_slots.has(key) and _board_slots[key].state in ["done", "failed"]:

@@ -304,20 +304,20 @@ func handle(evt: Dictionary) -> void:
 				Sfx.play("blip", 600)
 				_maybe_focus(a.node, 0.3)
 				_focus_kick(a.node, 6.0)
-				world.board_set(task, "running", id)
+				world.board_set(task, "running", id, _face_for(id))
 		"task.progress":
 			if a.state != "working":
 				a.tasks[task] = true
 				_to_desk(a)
 				if not theatrical:
-					world.board_set(task, "running", id)
+					world.board_set(task, "running", id, _face_for(id))
 			a.node.set_status(str(evt.get("tool", "working…")))
 		"task.completed":
 			a.tasks.erase(task)
 			_fx(a, "success")
 			if not theatrical:
 				Sfx.play("chime")
-				world.board_set(task, "done", id)
+				world.board_set(task, "done", id, _face_for(id))
 				_board_clear_later(task)
 				_end_supervision(id)
 			if a.tasks.is_empty():
@@ -331,7 +331,7 @@ func handle(evt: Dictionary) -> void:
 			_fx(a, "failure")
 			if not theatrical:
 				Sfx.play("buzz")
-				world.board_set(task, "failed", id)
+				world.board_set(task, "failed", id, _face_for(id))
 				_board_clear_later(task)
 				_end_supervision(id)
 			if a.tasks.is_empty():
@@ -358,7 +358,7 @@ func handle(evt: Dictionary) -> void:
 			if a.desk != "":
 				_walk(a.node, a.desk)
 			if not theatrical:
-				world.board_set(task, "running", id)
+				world.board_set(task, "running", id, _face_for(id))
 		"perm.denied":
 			_sec_pending.erase(task)
 			if not theatrical:
@@ -366,7 +366,7 @@ func handle(evt: Dictionary) -> void:
 			a.tasks.erase(task)
 			_fx(a, "thumbs_down")
 			if not theatrical:
-				world.board_set(task, "failed", id)
+				world.board_set(task, "failed", id, _face_for(id))
 				_board_clear_later(task)
 			if a.tasks.is_empty():
 				_finish(a, "denied ✗")
@@ -692,7 +692,7 @@ func _security_walk_after_grace(a: Dictionary, id: String, task: String) -> void
 		return
 	_walk(a.node, "sec_window")
 	_pulse_security()
-	world.board_set(task, "blocked", id)
+	world.board_set(task, "blocked", id, _face_for(id))
 
 ## Same grace for a ghost: only head down to Security if still unresolved.
 func _ghost_security_after_grace(id: String) -> void:
@@ -828,7 +828,27 @@ func _to_desk(a: Dictionary) -> void:
 	if a.id == "main" and Time.get_ticks_msec() / 1000.0 < float(a.get("hold_at_ceo", 0.0)):
 		return
 	# Face the monitor (north) once seated — DIR_UP = 2 in agent_sprite.
-	_walk(a.node, a.desk, a.node.DIR_UP)
+	if a.desk == "ops_c":
+		# Overflow (all 6 desks taken): line them up SIDE BY SIDE at the shared ops
+		# bench, facing the monitors — like a team working together, never a pile.
+		_walk_to_spot(a.node, _ops_spot(a.id), a.node.DIR_UP)
+	else:
+		_walk(a.node, a.desk, a.node.DIR_UP)
+
+## A tidy side-by-side slot at the shared ops bench for an overflow worker — a row that
+## wraps every 4, kept within the proven clear area around the ops centre.
+func _ops_spot(id: String) -> Vector3:
+	var n := 0
+	for k in agents:
+		if k != id and str(agents[k].get("desk", "")) == "ops_c":
+			n += 1
+	var base: Vector3 = world.WP.get("ops_c", Vector3(3, 0.86, -6.75))
+	var col := n % 4
+	var row := n / 4
+	return base + Vector3(-0.9 + 0.6 * float(col), 0.0, 0.6 * float(row))
+
+func _walk_to_spot(node: Sprite3D, spot: Vector3, face_dir := -1) -> float:
+	return node.walk_to(world.path_between(node.position, spot), face_dir)
 
 ## Finished delegated work gets WALKED to the Director — a real hand-back.
 func _deliver_to_main(a: Dictionary) -> void:
@@ -883,6 +903,13 @@ func _wb_clear_later(delay := 8.0) -> void:
 func _board_clear_later(id: String, delay := 10.0) -> void:
 	await get_tree().create_timer(delay).timeout
 	world.board_clear_if_finished(id)
+
+# The agent's face for a board card (the head region of their sheet). null → the card
+# falls back to a name label.
+func _face_for(id: String) -> Texture2D:
+	if agents.has(id) and is_instance_valid(agents[id].node) and agents[id].node.has_method("_portrait"):
+		return agents[id].node._portrait()
+	return null
 
 func _clear_status_later(a: Dictionary, delay: float) -> void:
 	await get_tree().create_timer(delay).timeout
