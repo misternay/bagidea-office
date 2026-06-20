@@ -3864,8 +3864,10 @@
         · perms ค้าง ${s.pendingPerms}</div>`;
   }
 
+  let opsSeq = 0;   // render token: only the newest openOps() commits async DOM
   async function openOps(tab) {
     modal.classList.add("open");
+    const seq = ++opsSeq;
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
     const tabs = `<div class="tabs">${T("proj", "📁 PROJECTS")}${T("jobs", "📋 TASKS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}${T("dash", "📊 STATS")}</div>`;
     let body = "";
@@ -3962,7 +3964,14 @@
         if (modal.classList.contains("open") && modalCard.querySelector("#plist"))
           openOps("proj");
       };
-      const r = await fetch("/projects").then((x) => x.json()).catch(() => ({ projects: [], places: {} }));
+      const r = await fetch("/projects").then((x) => x.json()).catch(() => null);
+      // A newer openOps() (a racing broadcast refresh, a tab switch) started after
+      // us — abort so two async renders can't both append and DOUBLE the list, or
+      // slam stale content over the panel the user just navigated to.
+      if (seq !== opsSeq) return;
+      // Transient fetch error (the daemon is mid-delete, closing a window / rm) —
+      // keep what's on screen instead of blanking the whole list to "no projects".
+      if (!r) return;
       PROJECTS_CACHE = r.projects || [];
       // Project rows with live status + actions, grouped by origin.
       const box = modalCard.querySelector("#plist");
