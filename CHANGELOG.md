@@ -4,6 +4,26 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.13] — Installer: the hooks were never wired (perm + task hooks dead)
+
+**Fixed**
+- **Permission prompts (Security Center) and the task feed (Mission Control) now work
+  after a one-shot install.** The committed `.claude/settings.json` carry the dev
+  machine's absolute paths; install.ps1's Step 10 tried to rewrite them, but the regex
+  couldn't cross the escaped quotes (`\"`) wrapping the path in the JSON command string,
+  so it matched nothing and silently left a non-existent path in place — the `PreToolUse`
+  permission hook and the `task.*` hooks then never fired. The installer now **regenerates**
+  both `settings.json` from scratch against the real install path via the new
+  `installer/wire-hooks.ps1` (Windows) / `installer/wire-hooks.sh` (macOS/Linux, shared
+  with build-mac.sh & build-linux.sh). `update.ps1` / `update-linux.sh` check the files out
+  before `git pull` (so `--ff-only` can't abort on the per-machine edits) and re-wire right
+  after. Reported on Discord by a one-shot-installer user. **Existing users:** run
+  `bagidea update` (or re-run the installer) to repair the hooks.
+
+**Docs**
+- README, the `/docs` guide, and the website now document the experimental Linux build
+  across all 14 UI languages.
+
 ## [0.9.12] — Linux support (experimental) + macOS CLI fix
 
 **Added**
