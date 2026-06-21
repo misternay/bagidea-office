@@ -203,5 +203,17 @@
   "t_add_title": "Tambahkan kemampuan apa pun",
   "t_add_lead": "BagIdea Office menggunakan standar terbuka MCP, sehingga agen dapat memakai apa pun yang ditawarkan ekosistem — dan office bahkan bisa membangun alatnya sendiri sebagai plugin.",
   "t_add_cta": "Jelajahi server MCP →",
-  "t_plugins_cta": "Lihat plugin →"
+  "t_plugins_cta": "Lihat plugin →",
+  "dn_guides": "📚 Panduan lengkap",
+  "d_guides_h": "📚 Panduan lengkap — cara menggunakan setiap fitur",
+  "d_guides_p": "Halaman ini adalah ikhtisar. Untuk panduan langkah demi langkah setiap fitur — merekrut agen, proyek, kanal, otomasi web, suara, plugin, model, dan lainnya — buka panduan lengkap (ditampilkan di GitHub):",
+  "dg_start": "🚀 Memulai",
+  "dg_agents": "🧑‍💼 Agen & perekrutan",
+  "dg_ops": "🗂 Office Ops",
+  "dg_channels": "📡 Kanal",
+  "dg_web": "🧭 Otomasi web",
+  "dg_hub": "🧩 Plugin Hub",
+  "dg_ai": "✨ Fitur AI",
+  "dg_trouble": "🛠 Pemecahan masalah",
+  "dg_all": "Jelajahi semua panduan di GitHub ↗"
 }

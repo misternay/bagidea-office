@@ -203,5 +203,17 @@
   "t_add_title": "어떤 능력이든 추가하세요",
   "t_add_lead": "BagIdea Office는 개방형 MCP 표준을 사용하므로, 에이전트는 생태계가 제공하는 무엇이든 사용할 수 있습니다 — 게다가 오피스는 자체 도구를 플러그인으로 직접 만들 수도 있습니다.",
   "t_add_cta": "MCP 서버 둘러보기 →",
-  "t_plugins_cta": "플러그인 보기 →"
+  "t_plugins_cta": "플러그인 보기 →",
+  "dn_guides": "📚 전체 가이드",
+  "d_guides_h": "📚 전체 가이드 — 모든 기능 사용법",
+  "d_guides_p": "이 페이지는 개요입니다. 각 기능의 단계별 사용법 — 에이전트 고용, 프로젝트, 채널, 웹 자동화, 음성, 플러그인, 모델 등 — 은 전체 가이드를 열어 확인하세요 (GitHub에서 표시됩니다):",
+  "dg_start": "🚀 시작하기",
+  "dg_agents": "🧑‍💼 에이전트 및 고용",
+  "dg_ops": "🗂 Office Ops",
+  "dg_channels": "📡 채널",
+  "dg_web": "🧭 웹 자동화",
+  "dg_hub": "🧩 Plugin Hub",
+  "dg_ai": "✨ AI 기능",
+  "dg_trouble": "🛠 문제 해결",
+  "dg_all": "GitHub에서 모든 가이드 보기 ↗"
 }

@@ -203,5 +203,17 @@
   "t_add_title": "Thêm bất kỳ năng lực nào",
   "t_add_lead": "BagIdea Office sử dụng chuẩn mở MCP, nên một agent có thể dùng bất cứ thứ gì mà hệ sinh thái cung cấp — và văn phòng thậm chí có thể tự xây dựng công cụ riêng dưới dạng plugin.",
   "t_add_cta": "Duyệt các máy chủ MCP →",
-  "t_plugins_cta": "Xem plugin →"
+  "t_plugins_cta": "Xem plugin →",
+  "dn_guides": "📚 Hướng dẫn đầy đủ",
+  "d_guides_h": "📚 Hướng dẫn đầy đủ — cách dùng mọi tính năng",
+  "d_guides_p": "Trang này là phần tổng quan. Để xem hướng dẫn từng bước cho mọi tính năng — tuyển agent, dự án, kênh, tự động hóa web, giọng nói, plugin, mô hình và nhiều hơn nữa — hãy mở hướng dẫn đầy đủ (hiển thị trên GitHub):",
+  "dg_start": "🚀 Bắt đầu",
+  "dg_agents": "🧑‍💼 Agent & tuyển dụng",
+  "dg_ops": "🗂 Office Ops",
+  "dg_channels": "📡 Kênh",
+  "dg_web": "🧭 Tự động hóa web",
+  "dg_hub": "🧩 Plugin Hub",
+  "dg_ai": "✨ Tính năng AI",
+  "dg_trouble": "🛠 Khắc phục sự cố",
+  "dg_all": "Xem tất cả hướng dẫn trên GitHub ↗"
 }

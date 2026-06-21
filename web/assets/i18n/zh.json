@@ -203,5 +203,17 @@
   "t_add_title": "添加任意能力",
   "t_add_lead": "BagIdea Office 采用开放的 MCP 标准，因此智能体可以使用整个生态系统所提供的任何东西——办公室甚至能以插件的形式构建自己的工具。",
   "t_add_cta": "浏览 MCP 服务器 →",
-  "t_plugins_cta": "查看插件 →"
+  "t_plugins_cta": "查看插件 →",
+  "dn_guides": "📚 完整指南",
+  "d_guides_h": "📚 完整指南 — 如何使用每一项功能",
+  "d_guides_p": "本页是总览。若需每项功能的分步操作指南——雇用智能体、项目、频道、网页自动化、语音、插件、模型等等——请打开完整指南（它们在 GitHub 上呈现）：",
+  "dg_start": "🚀 快速开始",
+  "dg_agents": "🧑‍💼 智能体与雇用",
+  "dg_ops": "🗂 Office Ops",
+  "dg_channels": "📡 频道",
+  "dg_web": "🧭 网页自动化",
+  "dg_hub": "🧩 Plugin Hub",
+  "dg_ai": "✨ AI 功能",
+  "dg_trouble": "🛠 故障排查",
+  "dg_all": "在 GitHub 上浏览所有指南 ↗"
 }

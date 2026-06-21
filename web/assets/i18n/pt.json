@@ -203,5 +203,17 @@
   "t_add_title": "Adicione qualquer capacidade",
   "t_add_lead": "O BagIdea Office fala o padrão aberto MCP, então um agente pode usar tudo o que o ecossistema oferece — e o escritório pode até construir suas próprias ferramentas como plugins.",
   "t_add_cta": "Explorar servidores MCP →",
-  "t_plugins_cta": "Ver plugins →"
+  "t_plugins_cta": "Ver plugins →",
+  "dn_guides": "📚 Guias completos",
+  "d_guides_h": "📚 Guias completos — como usar cada recurso",
+  "d_guides_p": "Esta página é a visão geral. Para o passo a passo de cada recurso — contratar agentes, projetos, canais, automação web, voz, plugins, modelos e muito mais — abra os guias completos (eles são exibidos no GitHub):",
+  "dg_start": "🚀 Primeiros passos",
+  "dg_agents": "🧑‍💼 Agentes e contratação",
+  "dg_ops": "🗂 Office Ops",
+  "dg_channels": "📡 Canais",
+  "dg_web": "🧭 Automação web",
+  "dg_hub": "🧩 Plugin Hub",
+  "dg_ai": "✨ Recursos de IA",
+  "dg_trouble": "🛠 Solução de problemas",
+  "dg_all": "Ver todos os guias no GitHub ↗"
 }
