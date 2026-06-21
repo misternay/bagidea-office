@@ -263,6 +263,90 @@ const I18N = {
 
     d_title:"Dokumentation", d_sub:"Alles über BagIdea Office — was es ist, jede Funktion, wie man es installiert und die vollständige CLI.",
     d_back:"← Startseite",
+
+    nav_plugins:"Plugins",
+    ph_title:"Plugins für Ihr Büro",
+    ph_sub:"Durchsuchen Sie Community-Plugins und installieren Sie sie mit einem Klick in Ihr laufendes Büro — oder veröffentlichen Sie Ihr eigenes für alle.",
+    ph_install:"⬇ Im Büro öffnen",
+    ph_copy:"📋 Link kopieren",
+    ph_source:"Quellcode ansehen ↗",
+    ph_official:"Offiziell",
+    ph_open_note:"Falls Ihr Büro nicht aufpoppt, wurde der Link kopiert — fügen Sie ihn im 🧩 Plugins-Panel des Büros ein.",
+    ph_loading:"Plugins werden geladen…",
+    ph_empty:"Noch keine Plugins im Katalog.",
+    ph_count:"Plugins im Katalog",
+    ph_submit_eyebrow:"Beitragen",
+    ph_submit_title:"Veröffentlichen Sie Ihr eigenes Plugin",
+    ph_submit_lead:"Etwas Nützliches gebaut? Ein Plugin kann ein Werkzeug-Panel, Agent-Befehle oder ganz neue Fähigkeiten hinzufügen — teilen Sie es mit jedem Büro.",
+    ph_s1_h:"1 · Bauen Sie es",
+    ph_s1_p:"Starten Sie mit der offiziellen Vorlage — sie hat bereits ein Panel, eine Route und einen Agent-Befehl verdrahtet. Formen Sie sie zu Ihrem eigenen Plugin.",
+    ph_s2_h:"2 · Auf GitHub veröffentlichen",
+    ph_s2_p:"Pushen Sie Ihr Plugin in ein öffentliches GitHub-Repo mit einem plugin.json-Manifest. Aus diesem Repo installieren die Leute es.",
+    ph_s3_h:"3 · Einen PR öffnen",
+    ph_s3_p:"Fügen Sie einen Eintrag zum Katalog (web/plugins.json) per Pull Request hinzu. Wir prüfen jede Einreichung — Plugins führen echten Code auf den Rechnern der Leute aus — danach erscheint es hier.",
+    ph_submit_cta:"Den Einreichungsleitfaden lesen →",
+    ph_template_cta:"Die Vorlage holen →",
+    ph_safety:"⚠️ Plugins führen echten Code auf Ihrem Rechner aus. Installieren Sie nur solche, denen Sie vertrauen; „Offiziell“-Einträge werden vom BagIdea-Team gepflegt.",
+    f_brain_t:"Austauschbare Gehirne",
+    f_brain_d:"Betreiben Sie jeden Agent mit seinem eigenen Modell — 18 Anbieter integriert: Claude/GLM/DeepSeek/Qwen/MiniMax/Kimi direkt, OpenAI/Gemini/OpenRouter/NVIDIA/Groq/Cerebras/xAI/Mistral/Together/Fireworks über einen integrierten abhängigkeitsfreien Proxy (kein LiteLLM) sowie lokales Ollama/LM Studio ohne API-Schlüssel. Auswahlfelder rufen live Modelllisten ab; Auto-Compact verhindert, dass lange Chats bei jedem Modell verstopfen.",
+    f_workflow_t:"Workflow Builder",
+    f_workflow_d:"Planen Sie Arbeit als Knoten in einfacher Sprache auf einer Drag-and-Drop-Leinwand. Der Director analysiert Ihren Ablauf und sagt Ihnen, welche Fähigkeiten, Werkzeuge, Berechtigungen und Agents er benötigt — so kann jeder Arbeit planen und das Team herausfinden lassen, wie sie auszuführen ist.",
+    tour_brain_h:"Jedes Modell, pro Agent",
+    tour_brain_p:"Wählen Sie Anbieter und Modell für jeden Agent in ⚙ CONNECT → 🧠 MODELS/PROVIDERS. Jede Nachricht wird mit ihrem Modell gekennzeichnet und die Thread-Leiste zeigt einen live Kontext-Nutzungsmesser — und Auto-Compact hält selbst kleine Modelle in langen Sitzungen am Laufen, ganz ohne Zutun.",
+    sp_thanks:"Stolz unterstützt von",
+    sp_gold_p:"3.000 $+ / Monat",
+    sp_silver_p:"300 $+ / Monat",
+    sp_bronze_p:"30 $+ / Monat",
+    sp_supporter_t:"Unterstützer",
+    sp_supporter_p:"Beliebiger Betrag / Monat",
+    sp_supporter_1:"Ihr Name auf der Unterstützerwand",
+    sp_supporter_2:"Ein Link zu Ihrer Website oder Ihren Social-Media-Profilen",
+    sp_supporter_3:"Ein Schub guten Karmas 💛",
+    sphow_h:"So funktioniert das Sponsoring",
+    sphow_1_h:"Wählen Sie eine Stufe und sponsern Sie.",
+    sphow_1_p:"Klicken Sie auf „💖 Auf GitHub sponsern“, wählen Sie eine monatliche Stufe, und GitHub wickelt die wiederkehrende monatliche Zahlung sicher ab — wie eine YouTube- oder Patreon-Mitgliedschaft.",
+    sphow_2_h:"Ihr Logo und Link kommen aus Ihrem GitHub-Profil.",
+    sphow_2_p:"Ihr Avatar, Name und Link werden automatisch aus Ihrem GitHub-Konto übernommen — Sie müssen uns nichts schicken. Um Ihren Link zu steuern, füllen Sie das Feld „Website“ in Ihrem GitHub-Profil aus (Einstellungen → Profil). Als GitHub-Organisation zu sponsern zeigt Ihr Firmenlogo und Ihre Website.",
+    sphow_3_h:"Sie erscheinen innerhalb von ~6 Stunden.",
+    sphow_3_p:"Solange Sie an der Kasse „Make my sponsorship public“ wählen, fügt unsere Automatisierung Sie zu dieser Unterstützerwand und der Projekt-README hinzu, nach Stufe sortiert. Ihr Beitragsbetrag wird nie angezeigt.",
+    sphow_note:"Künftig treten alle über GitHub Sponsors bei (automatisch und wiederkehrend). Die einzige Ausnahme ist ein vorgestellter Partner wie WARRIX; Reuannamphung wird aus Höflichkeit angezeigt, bis sie zu GitHub Sponsors wechseln.",
+    dn_install_fix:"Wenn es fehlschlägt",
+    dn_updates:"Updates & Start",
+    dn_brains:"Austauschbare Gehirne",
+    dn_workflow:"Workflow Builder",
+    dn_sponsors:"Sponsoring",
+    d_install_fix_h:"Wenn die Installation fehlschlägt",
+    d_install_fix_p:"Der Installer ist darauf ausgelegt, auf einem leeren Rechner durchzulaufen, aber hier sind die häufigen Stolpersteine und ihre Lösungen. Fast alle werden behoben, indem Sie ein NEUES Terminal öffnen und den Installer erneut ausführen — erneute Ausführungen sind sicher und behalten Ihre Daten.",
+    d_install_fix_l1:"<b>Fehler bei der Ausführungsrichtlinie</b> — führen Sie aus: <code>powershell -ExecutionPolicy Bypass -Command \"irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex\"</code>",
+    d_install_fix_l2:"<b>winget nicht gefunden</b> — installieren Sie „App Installer“ aus dem Microsoft Store, öffnen Sie das Terminal erneut und führen Sie es nochmal aus.",
+    d_install_fix_l3:"<b>BUILD FAILED / Linker 'link.exe' nicht gefunden</b> — die C++ Build Tools fehlen. Führen Sie <code>winget install Microsoft.VisualStudio.2022.BuildTools --override \"--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"</code> aus (oder fügen Sie „Desktopentwicklung mit C++“ im Visual Studio Installer hinzu), öffnen Sie ein neues Terminal und führen Sie es nochmal aus.",
+    d_install_fix_l4:"<b>git / node / cargo direkt nach der Installation nicht gefunden</b> — winget aktualisiert den PATH in der Registry, nicht in der offenen Shell. Öffnen Sie ein neues Terminal und führen Sie es nochmal aus; es macht da weiter, wo es aufgehört hat.",
+    d_install_fix_l5:"<b>SmartScreen / Defender blockiert das Skript</b> — es ist Open Source (lesen Sie es im Repo). Wählen Sie „Weitere Informationen → Trotzdem ausführen“, oder laden Sie install.ps1 herunter und führen Sie es selbst aus.",
+    d_install_fix_l6:"<b>Befehl bagidea nach einem erfolgreichen Build nicht gefunden</b> — er wurde gerade zum PATH hinzugefügt; öffnen Sie ein neues Terminal oder starten Sie über das Startmenü → „BagIdea Office“.",
+    d_org_p:"Die gesamte Belegschaft ordnet sich selbst in ein Organigramm (🗂 → ORG): CEO → Director → mittlere Ebene → Mitarbeiter. Stellen Sie über ⚙ → AGENTS ein: Name, Rolle, Avatar + Aura, Stufe, ein Persona-Copilot, der den Prompt ausfüllt und passende Fähigkeiten + Werkzeuge auswählt, eine von 16 Stimmen und die genauen Werkzeuge, die jeder Agent ausführen darf.",
+    d_updates_h:"Updates & Start",
+    d_updates_p:"Eine VERSION-Datei kennzeichnet echte Releases: das Büro zeigt das 🔄 Update-Banner nur, wenn die Version von main neuer ist als Ihre, sodass Routine-Commits Sie nie nerven. Klicken Sie auf das Banner oder führen Sie bagidea update aus, um zu pullen, neu zu bauen und neu zu starten (Ihre Daten bleiben erhalten). Stellen Sie es so ein, dass es mit Windows startet — über das Tray, die Einstellungen oder bagidea startup on.",
+    d_brain_h:"Austauschbare Gehirne (jedes Modell)",
+    d_brain_p:"Betreiben Sie jeden Agent mit seinem eigenen Modell. Claude Code bleibt die Engine — nur das Gehirn dahinter wird ausgetauscht, und es fällt sicher auf Claude zurück, sodass sich nichts ändert, bis Sie einen Agent dafür anmelden. <b>Kein LiteLLM oder Python zu installieren</b> — ein Übersetzungs-Proxy ist im Daemon eingebaut.",
+    d_brain_direct:"<b>Direkt (Anthropic-kompatibel):</b> Claude · GLM (Z.AI) · DeepSeek · Qwen (Alibaba) · MiniMax · Kimi (Moonshot)",
+    d_brain_proxy:"<b>Über den integrierten Proxy (OpenAI-kompatibel):</b> OpenAI · Gemini · OpenRouter · NVIDIA · Groq · Cerebras · xAI (Grok) · Mistral · Together · Fireworks — plus <b>lokales Ollama / LM Studio ohne API-Schlüssel</b>. Auswahlfelder rufen die live Modellliste jedes Anbieters ab.",
+    d_brain_custom:"<b>Eigene Anbieter:</b> fügen Sie Ihren eigenen hinzu — Name + Base-URL + Schlüssel, im Anthropic- oder OpenAI-Stil (richten Sie ihn auf ein LiteLLM-Gateway, falls Sie eines betreiben).",
+    d_brain_setup:"<b>So richten Sie es ein:</b> ⚙ CONNECT → 🧠 MODELS/PROVIDERS → Schlüssel einfügen → Connect (✅). Dann ✏️ einen Agent bearbeiten → 🧠 Brain → Anbieter + Modell wählen (ein funktionierender Standard wird automatisch ausgewählt) → Speichern.",
+    d_brain_free:"<b>Kostenlos zum Ausprobieren, mit Limits:</b> der NVIDIA-Build ist kostenlos, aber ratenbegrenzt (~40 Anfragen/Min); OpenRouter hat kostenlose <code>:free</code>-Modelle mit Tageslimit (verwenden Sie <code>vendor/model</code>-IDs); Gemini hat ein großzügiges Gratiskontingent; OpenAI Tier 1 (30k Token/Min) ist für schwere Agent-Arbeit klein.",
+    d_brain_compact:"<b>Auto-Compact + Auto-Neuer-Thread — für jedes Modell.</b> Lange Chats verstopfen nie: vor jeder Runde misst das Büro den Thread gegen das Kontextfenster des Modells und fasst ihn, wenn er sich füllt, mit Claude zusammen und macht in einem frischen Thread weiter — und erholt sich genauso, wenn ein Backend eine zu große Anfrage ablehnt. Die Kontinuität bleibt erhalten (die Zusammenfassung wird von Claude geschrieben) und die Ansicht folgt Ihnen in den neuen Thread.",
+    d_brain_monitor:"<b>Behalten Sie es im Blick:</b> jede Nachricht wird mit ihrem Modell gekennzeichnet, die Thread-Leiste zeigt einen live Kontextmesser (z. B. <code>gpt-4o · 40k/128k</code>), das 🧠 BRAINS-Panel verfolgt jeden Anbieter + Agent, und STATS schätzt die Ausgaben pro Anbieter.",
+    d_wf_h:"Workflow Builder",
+    d_wf_p:"Planen Sie Arbeit als Knoten in einfacher Sprache auf einer Drag-and-Drop-Leinwand (⋯-Menü → Workflow Builder) — jeder Knoten ist ein Schritt (Trigger / Abruf / Aktion / Entscheidung / Ausgabe) und der Ablauf liest sich von oben nach unten. Drücken Sie Analyze und der Director liest Ihren Plan und sagt Ihnen, welche Fähigkeiten und Werkzeuge er braucht, welche Berechtigungen oder zusätzlichen Agents hinzuzufügen sind und was noch unentschieden ist — so können Sie Arbeit planen, selbst wenn Sie nicht wissen, wie man sie anweist, und das Team die Ausführung erarbeiten lassen.",
+    d_wf_1:"<b>Knoten hinzufügen & in einfacher Sprache schreiben.</b> z. B. „jeden Morgen die KI-News zusammenfassen, dann an Telegram senden“. Ziehen Sie Karten, um den Ablauf von oben nach unten zu ordnen.",
+    d_wf_2:"<b>Analysieren, dann handeln.</b> Der Director liefert einen Plan zurück (Fähigkeiten/Werkzeuge, Berechtigungen/Agents, offene Fragen). Dann <b>▶️ Jetzt ausführen</b>, damit das Team ihn ausführt, oder <b>🧠 Als Skill speichern</b>, um ihn in eine wiederverwendbare Fähigkeit zu verwandeln, die Sie einem Agent zuweisen.",
+    d_wf_3:"<b>Tabs & Beispiele.</b> Öffnen Sie mehrere Workflows in Tabs; 7 schreibgeschützte Beispiele (einfach→fortgeschritten) sind enthalten — speichern Sie eines, um eine bearbeitbare Kopie zu forken. Ihre eigenen Workflows liegen in workspace/workflows.",
+    d_sponsors_h:"Sponsoring",
+    d_sponsors_p:"BagIdea Office ist kostenlos und Open Source; Sponsoring finanziert Entwicklung, Kunstlizenzen und plattformübergreifende Backends. Es ist ein wiederkehrendes monatliches Abonnement, das vollständig über GitHub Sponsors läuft (wie eine YouTube- oder Patreon-Mitgliedschaft) — sichere Zahlungen, Steuern und Auszahlungen sind GitHubs Aufgabe, nicht unsere. Vier monatliche Stufen: 💛 Unterstützer (5 $), 🥉 Bronze / Backer (30 $), 🥈 Silver Partner (300 $), 👑 Gold Partner (3.000 $).",
+    d_sponsors_1:"<b>Wählen Sie eine Stufe &amp; sponsern Sie.</b> Nutzen Sie die Schaltfläche „💖 Auf GitHub sponsern“ auf der Website (oder github.com/sponsors/bagidea), wählen Sie eine monatliche Stufe und bestätigen Sie — GitHub belastet Sie jeden Monat, bis Sie kündigen.",
+    d_sponsors_2:"<b>Ihr Logo &amp; Link kommen aus Ihrem GitHub-Profil — automatisch.</b> Ihr Avatar, Anzeigename und Link werden direkt aus Ihrem GitHub-Konto übernommen; Sie müssen uns nichts schicken. Um den Link zu steuern, setzen Sie das Feld <b>Website</b> in Ihrem GitHub-Profil (Einstellungen → Öffentliches Profil). Als GitHub-Organisation zu sponsern zeigt Ihr Firmenlogo und Ihre Website.",
+    d_sponsors_3:"<b>Sie erscheinen innerhalb von ~6 Stunden.</b> Solange Sie an der Kasse „Make my sponsorship public“ wählen, zieht ein automatisierter Workflow die live Liste, ordnet jeden Sponsor nach Betrag einer Stufe zu und aktualisiert die Unterstützerwand auf der Website und die README — nach Stufe sortiert, Beträge werden nie gezeigt. Private Sponsoren werden respektiert und nicht gelistet.",
+    d_sponsors_note:"Alle treten über GitHub Sponsors bei. Die einzigen Ausnahmen sind von Hand hinzugefügte vorgestellte Partner (z. B. WARRIX, an erster Stelle angeheftet); Reuannamphung wird aus Höflichkeit angezeigt, bis sie zu GitHub Sponsors wechseln.",
+
     dn_guides:"📚 Alle Anleitungen",
     d_guides_h:"📚 Alle Anleitungen — jede Funktion Schritt für Schritt",
     d_guides_p:"Diese Seite ist die Übersicht. Schritt-für-Schritt-Anleitungen zu jeder Funktion — Agents einstellen, Projekte, Kanäle, Web-Automatisierung, Sprache, Plugins, Modelle und mehr — finden Sie in den vollständigen Anleitungen (auf GitHub):",
@@ -505,11 +589,16 @@ const I18N = {
 /* ---------- engine ---------- */
 (function () {
   const KEY = "bagidea_site_lang";
+  // Valid codes come from LANGS — NOT from I18N: the 11 non-inline languages
+  // (es/zh/ja/…) load their JSON on demand, so I18N[code] is still empty at pick
+  // time. Checking I18N here meant a saved es/zh/… was treated as invalid and
+  // silently fell back to the browser language — i.e. the choice wasn't remembered.
+  const CODES = new Set(LANGS.map((l) => l[0]));
   function pick() {
     const saved = localStorage.getItem(KEY);
-    if (saved && I18N[saved]) return saved;
+    if (saved && CODES.has(saved)) return saved;
     const b = (navigator.language || "en").slice(0, 2).toLowerCase();
-    return I18N[b] ? b : "en";
+    return CODES.has(b) ? b : "en";
   }
   function t(lang, key) {
     return (I18N[lang] && I18N[lang][key] != null) ? I18N[lang][key]
