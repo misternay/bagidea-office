@@ -4,6 +4,26 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.15] — More channels + a Channels settings tab
+
+**Added**
+- **Three more ways to reach the office — Slack, WhatsApp and Messenger** (experimental 🧪),
+  alongside Telegram / Discord / LINE. Each is a webhook adapter (public HTTPS, e.g.
+  cloudflared) mirroring LINE: Slack via the Events API (signing-secret verified), WhatsApp
+  via the Meta Cloud API, and Messenger via the Meta Graph — both with the standard
+  `hub.challenge` verify handshake. Configure a bot token / verify token and the office
+  answers from those apps too. See [docs/guide/channels.md](docs/guide/channels.md).
+- **Channels get their own ⚙ settings tab.** They moved out of the crowded CONNECT tab
+  into a dedicated "📡 CHANNELS" category so they're easy to find as the list grows.
+
+**Fixed**
+- Saving a channel no longer drops the `phone` / `verify` fields the new channels need
+  (the config whitelist only kept token/secret before).
+
+**Web**
+- A new **Tools page** on the site (built-in tools + add-on MCP capabilities) and a
+  redesigned, public **pitch deck** with real screenshots — both at bagidea.github.io.
+
 ## [0.9.14] — The office browses the web + a batch of polish
 
 **Added**
