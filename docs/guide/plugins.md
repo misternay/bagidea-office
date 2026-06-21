@@ -11,7 +11,29 @@ step, zero dependencies. Drop one in `plugins/` and reload.
 > template ทางการได้: `github.com/bagidea/bagidea-office-template`)
 
 This guide is written so a **person** OR an **agent** can build a working plugin
-from scratch. The shipped `music` and `calculator` plugins are full examples.
+from scratch. The `music` and `calculator` plugins (§7) are full examples to read.
+
+> 📦 **ออฟฟิศติดตั้งมาแบบว่างเปล่า — ไม่มีปลั๊กอินติดมาให้** เลย (ดู `.gitignore`:
+> `plugins/*`). เจ้าของออฟฟิศเป็นคนเลือกติดตั้งเองจาก **Plugins Hub** ทีละตัว
+> (แต่ละตัวคือ GitHub repo ที่ clone เข้ามา) ดูวิธีใช้ในหัวข้อ **"ใช้ปลั๊กอินสำเร็จรูป"** ด้านล่าง
+
+## ใช้ปลั๊กอินสำเร็จรูป (เริ่มจาก 🎵 Music Player)
+
+ครั้งแรกที่เปิดออฟฟิศจะ **ยังไม่มีปลั๊กอินสักตัว** ติดเองได้จาก ⚙ → **🧩 PLUGINS**:
+
+1. เปิดแผง **🧩 PLUGINS** แล้วไปแท็บ **Hub** (แคตาล็อกทางการอยู่ที่ `web/plugins.json`)
+2. กดติดตั้ง **🎵 Music Player** (ปลั๊กอินทางการตัวแรก) — ออฟฟิศจะ clone จาก repo ให้อัตโนมัติ
+3. (หรือวาง URL ของ GitHub repo ใดก็ได้ที่มี `plugin.json` แล้วกดติดตั้ง)
+
+**ใช้งาน 🎵 Music Player** — เปิดแผงของมันแล้ว:
+- **เพิ่มเพลง** — อัปโหลดไฟล์เสียงเข้าเพลย์ลิสต์ (รองรับชื่อไฟล์ภาษาไทย/หลายภาษา)
+- **เล่น/หยุด/เพลงถัดไป-ก่อนหน้า** — ปุ่มควบคุม + แถบ seek เลื่อนตำแหน่งได้
+- **วนเพลย์ลิสต์ (loop) + ปรับเสียง (volume)**
+- **ลบหลายเพลงพร้อมกัน** — เลือกหลายรายการ (multi-select) แล้วลบทีเดียว
+- **agents สั่งได้ด้วย** — คำสั่งในมือ agent: `play / pause / next / prev / loop / volume / remove / status`
+  (เช่นพิมพ์สั่งว่า "เปิดเพลง" ทีมก็เปิดให้ และแผงที่เปิดอยู่หน้าจอจะอัปเดตสด)
+
+ลบปลั๊กอินได้จากปุ่ม 🗑 บนแผง 🧩 (ดูหัวข้อ §6 ติดตั้ง/ลบ)
 
 ---
 
@@ -199,13 +221,15 @@ Point the agent at this guide and it has everything it needs.
 
 ## 7. Two worked examples
 
-- **🎵 `plugins/music`** — playlist with upload/remove, play/pause/next/prev/loop/
-  volume, a seek bar, audio streamed with HTTP Range, agent commands, live WS sync.
+These are reference folders to **read while building** (they cover every pattern
+here). Only the Music Player is published to the Hub; the calculator is an example.
+
+- **🎵 `plugins/music`** — the official Music Player (install it from the 🧩 Hub):
+  playlist with upload/multi-select-remove, play/pause/next/prev/loop/volume, a seek
+  bar, audio streamed with HTTP Range, agent commands, live WS sync.
 - **🧮 `plugins/calculator`** — a safe shunting-yard math engine (no `eval`):
   basic arithmetic + trig/logs/powers/roots/factorial/constants, shared by the
   panel UI and the `calc` agent command.
-
-Read those two folders next to this guide — they cover every pattern here.
 
 ---
 
