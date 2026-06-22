@@ -13,6 +13,16 @@
       "en": { "desc": "An in-office music player — play / pause / skip / loop a playlist for a nicer working vibe. Agents can start a track too." }
     },
     {
+      "id": "calculator",
+      "name": "🧮 Calculator",
+      "author": "bagidea",
+      "repo": "https://github.com/bagidea/bagidea-office-calculator-plugin",
+      "tags": ["tools", "official"],
+      "official": true,
+      "th": { "desc": "เครื่องคิดเลขในออฟฟิศ — เลขคณิตพื้นฐานและคณิตขั้นสูง (ตรีโกณ, ลอการิทึม, ยกกำลัง, ราก, แฟกทอเรียล, ค่าคงที่) ประเมินนิพจน์อย่างปลอดภัย ไม่ใช้ eval · agents สั่ง calc คำนวณได้" },
+      "en": { "desc": "An in-office calculator — basic arithmetic and advanced math (trig, logs, powers, roots, factorial, constants), evaluated safely with no eval. Agents can compute via the calc command." }
+    },
+    {
       "id": "hello",
       "name": "👋 Hello Office",
       "author": "bagidea",

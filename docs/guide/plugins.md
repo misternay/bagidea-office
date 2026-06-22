@@ -220,13 +220,17 @@ Point the agent at this guide and it has everything it needs.
 
 ---
 
-## 7. Two worked examples
+## 7. Three worked examples
 
-Real, complete plugins to **read while building** — both installable from the 🧩 Hub:
+Real, complete plugins to **read while building** — all installable from the 🧩 Hub:
 
 - **🎵 Music Player** ([repo](https://github.com/bagidea/bagidea-office-music-player-plugin))
   — playlist with upload/multi-select-remove, play/pause/next/prev/loop/volume, a seek bar,
   audio streamed with HTTP Range, agent commands, live WS sync.
+- **🧮 Calculator** ([repo](https://github.com/bagidea/bagidea-office-calculator-plugin))
+  — a safe math evaluator (tokenizer → shunting-yard → RPN, **no `eval`/`Function`**):
+  arithmetic plus trig/logs/powers/roots/factorial/constants, shared by the panel and the
+  `calc` agent command — one engine behind both a panel and a command.
 - **👋 Hello Office** — the official **template**
   ([repo](https://github.com/bagidea/bagidea-office-template)): reads live office data, posts
   to the feed, `greet`/`roster` commands, and shows every plugin pattern. Fork it to start your own.
