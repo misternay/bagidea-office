@@ -4,6 +4,32 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.21] — Token economy: cheaper agents by default
+
+**Changed — the office spends far fewer tokens, same smarts**
+- **Agents stop fanning out "always."** They now split into parallel sub-agents only when a
+  task *genuinely* has independent parallel parts worth it (default is "do it yourself") —
+  this was the single biggest multiplier (one order could explode into 15–25 runs).
+- **Auto-learn is now adaptive.** Skill reflection (a full extra run) used to fire after
+  *every* tool-using task. It's still on by default and **eager while the office is young**
+  (so new users see their agents grow skills), then **throttles itself** once there's a
+  healthy skill library (≥5 tools, ≤1 / 15 min).
+- **Idle social is lighter.** Autonomous group hangouts are rarer and smaller (≤3, one
+  round), lean more on free canned banter, and **run with no web tools**; the default cadence
+  is 120 min for new offices. (Meetings you trigger yourself still get full tools.)
+- **Long Claude threads are compacted proactively** (~200k tokens) instead of growing toward
+  the ~1M window before self-compaction. Set `CTX_BUDGET.claude` back to 0 to revert.
+
+Reminder: each agent does its real work on **its own brain** — route worker agents to a
+cheap, capable model (GLM / DeepSeek / Qwen / Gemini Flash / Groq) and keep an expensive one
+only where it matters. See the new **[Cost, cheap setups & vision](docs/guide/cost-and-vision.md)** guide.
+
+**Added**
+- **`npx bagidea`** — a short alias for `npx bagidea-office` (both work). The npm pages now
+  carry a hero image + badges, and the site/README lead with the shorter command.
+- A detailed **Cost & vision** guide: running cheaply (even with **no Claude** — GLM/DeepSeek
+  only, plus a free Gemini key as the office's "eyes"), and how agents read images.
+
 ## [0.9.20] — Run-lifecycle safety + TTS hardening
 
 **Fixed** (thanks @misternay 🙏)
