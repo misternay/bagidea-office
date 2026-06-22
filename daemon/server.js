@@ -1094,9 +1094,16 @@ function createProject(name, place, pathArg) {
   let dir = String(pathArg || "").trim();
   if (!dir && place && reg.places[place]) dir = path.join(reg.places[place], name);
   if (!dir) throw new Error("need place or path");
-  dir = dir.replace(/\//g, "\\");
+  if (process.platform === "win32") {
+    dir = dir.replace(/\//g, "\\");
+  }
   // Separator-proof normalization for every duplicate check.
-  const norm = (s) => String(s).replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+  const norm = (s) => {
+    if (process.platform === "win32") {
+      return String(s).replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+    }
+    return String(s).replace(/\/+$/, "");
+  };
   if (projects.some((x) => norm(x.dir) === norm(dir)))
     throw new Error("โปรเจคนี้อยู่ในรายการแล้ว (path ซ้ำ)");
   if (projects.some((x) => x.name.toLowerCase() === name.toLowerCase()))
@@ -3582,9 +3589,12 @@ const server = http.createServer((req, res) => {
             spawn("cmd.exe", [line],
               { windowsVerbatimArguments: true, windowsHide: true, detached: true });
           } else if (process.platform === "darwin") {
-            // macOS: Open a new terminal window in the project directory
-            // We use AppleScript to ensure it opens a fresh window at the right path
-            const script = `tell application "Terminal" to do script "cd '${dir}'"`;
+            // macOS: Open a new terminal window, cd to project dir, run claude
+            const cmd = psCmd || "";
+            // psCmd on Windows is `-Command "..."` — extract the inner command for macOS
+            const innerCmd = cmd.match(/-Command\s+"(.+)"/)?.[1] || "";
+            const shellCmd = innerCmd || "exec bash";
+            const script = `tell application "Terminal" to do script "cd '${dir}' && ${shellCmd}"`;
             spawn("osascript", ["-e", script], { detached: true });
           } else {
             // Linux: open a terminal at `dir` running the command. The Windows psCmd is
@@ -3715,11 +3725,19 @@ const server = http.createServer((req, res) => {
       const q = new URL(req.url, "http://x").searchParams;
       let dir = q.get("dir") || "";
       const drives = [];
-      for (let c = 65; c <= 90; c++) {
-        const d = String.fromCharCode(c) + ":\\";
-        try { if (fs.existsSync(d)) drives.push(d); } catch {}
+      if (process.platform === "win32") {
+        for (let c = 65; c <= 90; c++) {
+          const d = String.fromCharCode(c) + ":\\";
+          try { if (fs.existsSync(d)) drives.push(d); } catch {}
+        }
       }
-      if (!dir) dir = drives.includes("D:\\") ? "D:\\" : drives[0] || "C:\\";
+      if (!dir) {
+        if (process.platform === "win32") {
+          dir = drives.includes("D:\\") ? "D:\\" : drives[0] || "C:\\";
+        } else {
+          dir = require("os").homedir();
+        }
+      }
       let dirs = [];
       try {
         dirs = fs.readdirSync(dir, { withFileTypes: true })
@@ -5145,13 +5163,25 @@ const server = http.createServer((req, res) => {
   } else if (req.method === "POST" && req.url === "/update") {
     // Human-triggered only (in-app 🔄 button or the CLI).
     if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
-    const ps = path.join(__dirname, "..", "installer", "update.ps1");
-    // Launch in a REAL, visible console window via `cmd start` so the user can
-    // watch git pull + the rebuild — a silent detached process looked hung. It
-    // also outlives this daemon (the updater kills + relaunches the whole suite).
-    spawn("cmd.exe", ["/c", "start", "BagIdea Update", "powershell",
-      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
-      { detached: true, stdio: "ignore", windowsHide: false }).unref();
+    if (process.platform === "win32") {
+      const ps = path.join(__dirname, "..", "installer", "update.ps1");
+      // Launch in a REAL, visible console window via `cmd start` so the user can
+      // watch git pull + the rebuild — a silent detached process looked hung. It
+      // also outlives this daemon (the updater kills + relaunches the whole suite).
+      spawn("cmd.exe", ["/c", "start", "BagIdea Update", "powershell",
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
+        { detached: true, stdio: "ignore", windowsHide: false }).unref();
+    } else if (process.platform === "darwin") {
+      // macOS: git pull + rebuild in a visible Terminal window
+      const root = path.join(__dirname, "..");
+      const script = `tell application "Terminal" to do script "cd '${root}' && git pull && ./build-mac.sh"`;
+      spawn("osascript", ["-e", script], { detached: true, stdio: "ignore" }).unref();
+    } else {
+      // Linux: same idea, x-terminal-emulator
+      const root = path.join(__dirname, "..");
+      spawn("x-terminal-emulator", ["-e", `cd '${root}' && git pull && bash build-mac.sh`],
+        { detached: true, stdio: "ignore" }).unref();
+    }
     res.writeHead(200); res.end("ok");
 
   } else if (req.url === "/health") {
