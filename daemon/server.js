@@ -128,7 +128,7 @@ function loadReg() {
   }
   // Default office rhythms for a fresh install (owner can change in settings).
   if (reg.heartbeatMin === undefined) reg.heartbeatMin = 60; // Director check-in
-  if (reg.socialMin === undefined) reg.socialMin = 60;       // agents socialize
+  if (reg.socialMin === undefined) reg.socialMin = 120;      // agents socialize (economical default)
   if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
   saveReg();
 }
@@ -301,8 +301,15 @@ function slugId(name) {
 // reflection call decides whether the work distills into a reusable skill.
 // New skills land in the registry, auto-assigned to the agent that earned
 // them, and the office hears about it (skill.created).
+let _lastSkillLearn = 0;
+const SKILL_COOLDOWN_MS = 15 * 60 * 1000;
 async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
-  if (reg.autoSkills === false || acts.length < 3) return;
+  // Throttled: the reflection is itself a full Claude run, so firing it after EVERY
+  // tool-using task roughly doubled the token bill. Only reflect on genuinely
+  // tool-heavy tasks (>=5 tools) and at most once per ~15 min — it still learns, sparingly.
+  if (reg.autoSkills === false || acts.length < 5) return;
+  if (Date.now() - _lastSkillLearn < SKILL_COOLDOWN_MS) return;
+  _lastSkillLearn = Date.now();
   const existing = Object.values(reg.skills).map((s) => s.name).join(", ") || "(none)";
   // ONE reflection call distills both: a reusable skill AND durable memory
   // facts (Hermes-style growth without doubling the token bill).
@@ -403,9 +410,12 @@ function isRateLimit(t) { const s = String(t || ""); return !!s && RATELIMIT_RE.
 // Per-backend INPUT-token budget for ONE request — the trigger for Claude-Code-style
 // proactive compaction. Set near each model's context window minus headroom for the
 // system prompt + tool schemas the office always sends (~25k). 0 = never compact
-// (Claude manages its own context). Unknown/custom → providerConfig.contextBudget,
+// (let the model self-manage). Unknown/custom → providerConfig.contextBudget,
 // else a safe default. Overridable per provider via providerConfig[p].contextBudget.
-const CTX_BUDGET = { claude: 0, glm: 115000, deepseek: 800000, qwen: 230000,
+// Claude's window is ~1M, so a long resumed thread can grow huge (and bill huge per
+// turn) before Claude self-compacts near the limit — cap it at 200k so the office
+// proactively compacts long threads and keeps per-turn cost down. (Set 0 to revert.)
+const CTX_BUDGET = { claude: 200000, glm: 115000, deepseek: 800000, qwen: 230000,
   minimax: 180000, moonshot: 210000, kimicode: 210000, openai: 115000, gemini: 800000,
   openrouter: 100000, nvidia: 100000 };
 function provBudget(agent) {
@@ -1379,14 +1389,13 @@ sweepProjects();
 const SUB_NOTE = `
 
 <system-capability>
-ออฟฟิศนี้ทำงานแบบ "แตกร่าง" เป็นปกติ — ถ้างานแบ่งเป็นส่วนอิสระที่ทำขนานกันได้ ให้แตกร่าง "เสมอ"
-เพราะเร็วกว่าทำเดี่ยวมาก. ก่อนลงมือทำเองทุกครั้ง ให้มองหาโอกาสแตกร่างก่อน เช่น:
-หาข่าว/ค้นคว้าหลายหัวข้อหรือหลายแหล่ง · ตรวจ/แก้หลายไฟล์ · เปรียบเทียบหลายตัวเลือก ·
-เก็บข้อมูลหลายเว็บ · ทดสอบหลายเคส — ถ้ามี 2 ส่วนขึ้นไปที่ไม่ต้องรอผลกัน ให้แตกร่าง.
-จบคำตอบด้วยบรรทัดนี้ หนึ่งบรรทัดต่อหนึ่งงานย่อย (2-4 บรรทัด):
+ออฟฟิศนี้แตกร่างเป็น sub-agent ทำงานขนานกันได้ — แต่ใช้ "เฉพาะตอนที่งานมีส่วนอิสระตั้งแต่ 2 ส่วนขึ้นไป
+ที่ทำพร้อมกันได้จริงและคุ้มค่า" เท่านั้น (เช่น ค้นหลายหัวข้อ/หลายแหล่งพร้อมกัน · ตรวจหลายไฟล์ที่ไม่เกี่ยวกัน ·
+เทียบหลายตัวเลือกอิสระ). งานทั่วไป งานเล็ก หรืองานที่ทำต่อเนื่องเป็นลำดับ — ทำเองตรงๆ จะประหยัดและไม่ช้ากว่า.
+ค่าเริ่มต้นคือ "ทำเอง"; แตกร่างก็ต่อเมื่อชัดเจนว่าขนานได้จริงและช่วยให้เร็วขึ้นจริง อย่าแตกร่างพร่ำเพรื่อ.
+ถ้าจะแตก จบคำตอบด้วยบรรทัดนี้ หนึ่งบรรทัดต่อหนึ่งงานย่อย (ไม่เกิน 3-4 บรรทัด):
 SUB: <งานย่อยที่ชัดเจนครบถ้วนในตัวเอง พร้อมบริบทที่จำเป็นทั้งหมด>
-ระบบจะส่งร่างโคลนของคุณขึ้นไปทำงานขนานกันบน "ห้องทำงานวิญญาณ" ทันที แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
-ข้อยกเว้นเดียว: งานที่แบ่งไม่ได้จริงๆ ค่อยทำเองตรงๆ.
+ระบบจะส่งร่างโคลนไปทำขนานกัน แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
 </system-capability>`;
 
 function runClaude(agent, prompt, opts = {}) {
@@ -1901,8 +1910,8 @@ One line per assignment — dispatched automatically; their result is reported
 back to you when they finish, so you can answer questions or follow up.
 IMPORTANT: prose like assigning work in words does NOTHING — only the
 DELEGATE line dispatches work.
-เมื่องานที่มอบแตกเป็นส่วนขนานกันได้ (หาข่าว/ค้นคว้าหลายแหล่ง, ตรวจหลายไฟล์,
-เปรียบเทียบหลายตัวเลือก, เก็บข้อมูลหลายเว็บ) ให้สั่งผู้รับ "แตกร่าง" ทำขนานเพื่อความเร็ว เช่น:
+เฉพาะเมื่องานที่มอบมีส่วนอิสระหลายส่วนที่ทำขนานกันได้จริงและคุ้มค่า (เช่น ค้นคว้าหลายหัวข้อพร้อมกัน,
+ตรวจหลายไฟล์ที่ไม่เกี่ยวกัน) จึงค่อยสั่งผู้รับ "แตกร่าง" — งานทั่วไปให้ผู้รับทำตรงๆ จะประหยัดกว่า. ตัวอย่างกรณีที่ควรแตก:
 DELEGATE: <agent_id> :: ค้นคว้า A, B, C แบบขนาน — จบคำตอบด้วยบรรทัด SUB: ทีละหัวข้อ.
 
 PROJECT SYSTEM — registered places (ชื่อย่อ → โฟลเดอร์):
@@ -2867,7 +2876,7 @@ const BANTER = [
 
 let lastSocial = Date.now();
 function socialTick(now) {
-  const min = Number(reg.socialMin !== undefined ? reg.socialMin : 60);
+  const min = Number(reg.socialMin !== undefined ? reg.socialMin : 120);
   if (!min || activeDiscussions > 0 || agentBusy.size > 0) return;
   if (now - lastSocial < min * 60000) return;
   const staff = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main");
@@ -2877,8 +2886,8 @@ function socialTick(now) {
   // Sometimes a bigger group drifts together for a real chat (3–4 people) — the
   // kind of hangout that can spark a project idea. Otherwise it's a 2-person
   // beat: mostly free canned banter, sometimes a real two-way conversation.
-  if (pool.length >= 3 && Math.random() < 0.5) {
-    const size = Math.min(pool.length, Math.random() < 0.45 ? 4 : 3);
+  if (pool.length >= 3 && Math.random() < 0.3) {
+    const size = Math.min(pool.length, 3);   // cap at 3 (was up to 4) — fewer runs
     const group = pool.sort(() => Math.random() - 0.5).slice(0, size);
     // Most group hangouts are idea sessions now — the team brainstorms things
     // worth pitching to the CEO (the owner asked for more proposals).
@@ -2888,12 +2897,13 @@ function socialTick(now) {
       "ช่วยกันคิดว่ามีงานสร้างสรรค์อะไรที่ทีมอยากทำเป็นโปรเจค แล้วเสนอ CEO ดู",
       "มารวมตัวคุยเล่นกันแบบสบายๆ เล่าเรื่องสนุกๆ ที่เจอระหว่างทำงาน หยอกล้อกันได้"];
     runDiscussion(group, gtopics[Math.floor(Math.random() * gtopics.length)],
-      size <= 3 ? 2 : 1, true);
+      1, true);   // 1 round (was 2) — ~3 runs instead of up to 8, hangout still happens
     return;
   }
   const pick = pool.sort(() => Math.random() - 0.5).slice(0, 2);
-  if (Math.random() < 0.5) {
-    // canned banter — zero tokens, pure life.
+  if (Math.random() < 0.65) {
+    // canned banter — zero tokens, pure life. (Bumped 0.5→0.65 so idle chatter
+    // leans on free canned lines and fires fewer real two-way Claude runs.)
     const lines = BANTER[Math.floor(Math.random() * BANTER.length)];
     const nameOf = (id) => (reg.agents[id] || { name: id }).name;
     const task = "soc" + (now % 100000);
@@ -3018,7 +3028,7 @@ async function runDiscussion(ids, topic, rounds, social) {
             `กติกาความปลอดภัยข้อเดียว: ถ้าจะต่อยอดกับตัวโปรแกรม BagIdea Office เองให้เสนอเป็น ` +
             `"plugin" เท่านั้น (ดู docs/guide/plugins.md — plugin เข้าถึงโปรแกรมได้ลึก: panel, route, command, ` +
             `broadcast, ฯลฯ ทำเป็น solution จริงให้เจ้าของได้) — ห้ามแก้ระบบหลัก (daemon/godot/shell) ตรง ๆ เพราะจะทำให้โปรแกรมพัง.` : ""),
-          { tools: "WebSearch,WebFetch,Read,Glob,Grep", env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
+          { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
         let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
         // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
         const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
