@@ -195,7 +195,7 @@ func _process(delta: float) -> void:
 		_occ_check_timer -= delta
 		if _occ_check_timer <= 0.0:
 			_occ_check_timer = 0.5
-			var now_occ := FileAccess.file_exists("/tmp/bagidea_occ")
+			var now_occ := FileAccess.open("/private/tmp/bagidea_occ", FileAccess.READ) != null
 			if now_occ != _occluded:
 				_occluded = now_occ
 				Engine.max_fps = 2 if _occluded else 30
@@ -204,7 +204,7 @@ func _process(delta: float) -> void:
 		_fps_log_timer += delta
 		if _fps_log_timer >= 1.0:
 			_fps_log_timer -= 1.0
-			var f := FileAccess.open("/tmp/bagidea_fps", FileAccess.WRITE)
+			var f := FileAccess.open("/private/tmp/bagidea_fps", FileAccess.WRITE)
 			if f:
 				f.store_line(str(Engine.get_frames_per_second()))
 

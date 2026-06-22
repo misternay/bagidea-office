@@ -15,10 +15,11 @@
 
 set -euo pipefail
 
-OCC_FLAG=/tmp/bagidea_occ
-FPS_LOG=/tmp/bagidea_fps
+OCC_FLAG=/private/tmp/bagidea_occ
+FPS_LOG=/private/tmp/bagidea_fps
 BASELINE_SECS=5   # seconds to sample with desktop clear
-COVER_WAIT=3      # seconds to wait for throttle to kick in after cover appears
+CLEAR_WAIT=7      # seconds to wait for FPS to recover to 30 after hiding windows
+COVER_WAIT=7      # seconds to wait: 2s debounce + ~5s for Engine.get_frames_per_second() to converge
 COVER_SECS=6      # seconds to sample while covered
 
 RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; CYAN=$'\033[0;36m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
@@ -65,8 +66,8 @@ tell application "System Events"
     end try
   end repeat
 end tell' 2>/dev/null || true
-echo "  Waiting 2s for occlusion monitor to confirm visible state…"
-sleep 2
+echo "  Waiting ${CLEAR_WAIT}s for occlusion flag to clear and FPS to stabilise at 30…"
+sleep "$CLEAR_WAIT"
 sample_phase "Sampling (target 30 fps)…" "$BASELINE_SECS"
 cpu_before=$PHASE_CPU_AVG
 fps_before=$PHASE_FPS_AVG
