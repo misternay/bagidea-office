@@ -4,6 +4,28 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.17] — Reachable menus, a way back from mini, macOS occlusion throttle
+
+**Fixed** (reported on Discord 🙏)
+- **The language menu no longer clips.** With 14 languages the dropdown ran off the
+  bottom of short / mini / Windows-10 windows, so ไทย / Tiếng Việt / Indonesia were
+  unreachable. All header dropdowns now cap to the window height and scroll.
+- **Mini window has an obvious way back.** The ◱ button toggles a compact window in the
+  shell, but it never changed once shrunk — people couldn't find how to restore. It now
+  shows **⛶ "Restore window size"** while the window is small.
+
+**Added**
+- **macOS: the wallpaper throttles to 2 fps when fully occluded** (or the display is
+  asleep) and recovers automatically — no more burning ~20% CPU rendering frames no one
+  sees ([#11](https://github.com/bagidea/bagidea-office/pull/11), thanks @spondanai;
+  fixes [#10](https://github.com/bagidea/bagidea-office/issues/10)). macOS-only, cfg-gated.
+
+**Web & docs** (already live at bagidea.github.io)
+- Language choice is now **remembered** across pages/refresh, and all **14 site languages
+  are 100% complete** (no English fallback). A **Showcase** page, a fuller **Tools** hub
+  (incl. agent-browser), the **Hello Office** template + **Web View** plugin in the Hub,
+  and the `/docs/guide` guides translated to English.
+
 ## [0.9.16] — Tidier settings tabs + much fuller docs
 
 **Changed**
