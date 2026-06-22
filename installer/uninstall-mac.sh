@@ -30,7 +30,6 @@ echo "  [1/4] Stopping the app..."
 pkill -f "node.*server\.js" 2>/dev/null || true
 pkill -f "bagidea-office-shell" 2>/dev/null || true
 pkill -f "BagIdeaOffice" 2>/dev/null || true
-pkill -f "BagIdeaOffice" 2>/dev/null || true
 sleep 1
 
 # 2) Remove LaunchAgent (autostart at login).

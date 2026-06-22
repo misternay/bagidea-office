@@ -124,18 +124,10 @@ function help() {
   console.log("");
 }
 
+const { findShellExe: _findShell } = require("./find-shell");
+
 function findShellExe() {
-  const isWin = process.platform === "win32";
-  const name = isWin ? "bagidea-office-shell.exe" : "bagidea-office-shell";
-  // Try release first, then debug if release isn't there
-  const paths = [
-    path.join(ROOT, "shell", "target", "release", name),
-    path.join(ROOT, "shell", "target", "debug", name)
-  ];
-  for (const p of paths) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
+  return _findShell(ROOT);
 }
 
 const NOT_RUNNING = () => bad(`The office isn't running — run ${c.accent}bagidea start${c.reset} first`);
@@ -260,7 +252,16 @@ async function main() {
       spawn("bash", [sh], { cwd: ROOT, detached: true, stdio: "inherit" });
       return;
     }
-    if (process.platform !== "win32") return info(`Run ${c.accent}git pull${c.reset} and then ${c.accent}./build-mac.sh${c.reset} to update.`);
+    if (process.platform !== "win32") {
+      // Linux: a helper script does git pull + rebuild-if-changed + restart.
+      const sh = path.join(ROOT, "installer", "update-linux.sh");
+      if (fs.existsSync(sh)) {
+        info("Updating… (the app will restart itself)");
+        spawn("bash", [sh], { cwd: ROOT, detached: true, stdio: "inherit" });
+        return;
+      }
+      return info(`Run ${c.accent}git pull${c.reset}, then ${c.accent}cargo build --release${c.reset} in ${c.accent}shell/${c.reset} if it changed, then ${c.accent}bagidea restart${c.reset}.`);
+    }
     const ps = path.join(ROOT, "installer", "update.ps1");
     if (!fs.existsSync(ps)) return bad("installer/update.ps1 not found");
     info("Updating… (the app will restart itself)");
@@ -291,7 +292,13 @@ async function main() {
       rl.once("line", (a) => { rl.close(); if (/^y/i.test(a.trim())) go(); else info("Cancelled."); });
       return;
     }
-    if (process.platform !== "win32") return info("Run the uninstall script manually.");
+    if (process.platform !== "win32") {
+      // Linux: remove the autostart entry, then guide the rest (safe — no auto-delete).
+      const desk = path.join(require("os").homedir(), ".config", "autostart", "bagidea-office.desktop");
+      try { if (fs.existsSync(desk)) fs.unlinkSync(desk); } catch {}
+      info(`Removed autostart. To finish: ${c.accent}bagidea stop${c.reset}, delete this folder (${ROOT}), and remove the PATH/symlink to ${c.accent}cli/bagidea${c.reset} from your shell profile (~/.bashrc or ~/.profile).`);
+      return;
+    }
     const ps = path.join(ROOT, "installer", "uninstall.ps1");
     if (!fs.existsSync(ps)) return bad("installer/uninstall.ps1 not found");
     const keepData = rest.includes("--keep-data");
@@ -491,9 +498,19 @@ async function main() {
       spawn("powershell", ["-NoProfile", "-Command",
         `(New-Object Media.SoundPlayer '${wav}').PlaySync()`], { stdio: "ignore" })
         .on("close", () => ok("Done speaking"));
-    } else {
+    } else if (process.platform === "darwin") {
       spawn("afplay", [wav], { stdio: "ignore" })
         .on("close", () => ok("Done speaking"));
+    } else {
+      // Linux: try common players in order until one plays the WAV.
+      const players = [["paplay", [wav]], ["aplay", ["-q", wav]],
+        ["ffplay", ["-nodisp", "-autoexit", "-loglevel", "quiet", wav]], ["play", [wav]]];
+      (function tryPlay(i) {
+        if (i >= players.length) return info("Saved the voice but found no audio player (install pulseaudio-utils or alsa-utils): " + wav);
+        const p = spawn(players[i][0], players[i][1], { stdio: "ignore" });
+        p.on("error", () => tryPlay(i + 1));
+        p.on("close", (code) => code === 0 ? ok("Done speaking") : tryPlay(i + 1));
+      })(0);
     }
     return;
   }

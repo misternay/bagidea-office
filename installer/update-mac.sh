@@ -23,7 +23,6 @@ pkill -f "node.*server\.js" 2>/dev/null || true
 # Kill the Godot shell / wallpaper
 pkill -f "bagidea-office-shell" 2>/dev/null || true
 pkill -f "BagIdeaOffice" 2>/dev/null || true
-pkill -f "BagIdeaOffice" 2>/dev/null || true
 sleep 2
 
 # No git checkout: hand off to the installer (it clones + preserves data).
@@ -35,6 +34,9 @@ fi
 
 # 2) Pull the latest code.
 echo "  [2/4] Pulling latest code..."
+# Clean the hook-path files so --ff-only doesn't fail on a dirty tree
+# (wire-hooks.sh rewrites these with machine-specific absolute paths)
+git checkout -- .claude/settings.json workspace/.claude/settings.json 2>/dev/null || true
 BEFORE=$(git rev-parse HEAD 2>/dev/null || echo "none")
 git pull --ff-only || {
   echo "  ⚠ git pull failed — you may have local changes."
@@ -46,6 +48,11 @@ if [ "$BEFORE" = "$AFTER" ]; then
   echo "  - Already up to date"
 else
   echo "  - Updated: ${BEFORE:0:7} → ${AFTER:0:7}"
+  # Re-wire Claude Code hooks with the new install path
+  if [ -f "$ROOT/installer/wire-hooks.sh" ]; then
+    bash "$ROOT/installer/wire-hooks.sh" "$ROOT"
+    echo "  ✓ Hooks re-wired"
+  fi
 fi
 
 # 3) Rebuild the shell only when its source changed (and cargo exists).
