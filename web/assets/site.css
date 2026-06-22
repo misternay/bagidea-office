@@ -195,6 +195,16 @@ a.sp-chip:hover .sp-chip-av { border-color:var(--accent); }
 .sp-how ol li b { color:var(--text); }
 .sp-how .muted { margin-top:14px; font-size:13px; }
 
+/* contributors */
+.contrib-grid { display:flex; flex-wrap:wrap; justify-content:center; gap:22px 30px; margin-top:42px; }
+.contrib { display:flex; flex-direction:column; align-items:center; gap:10px; width:92px;
+  color:var(--dim); text-decoration:none; font-size:13px; transition:transform .15s, color .15s; }
+.contrib img { width:72px; height:72px; border-radius:50%; object-fit:cover;
+  border:2px solid var(--line2); background:var(--card); transition:border-color .15s, box-shadow .15s; }
+.contrib span { font-weight:600; }
+.contrib:hover { transform:translateY(-3px); color:var(--text); }
+.contrib:hover img { border-color:var(--accent); box-shadow:0 0 24px rgba(94,200,255,.25); }
+
 /* founder / footer */
 .founder { display:flex; gap:18px; align-items:center; justify-content:center; flex-wrap:wrap;
   background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; max-width:680px; margin:34px auto 0; }

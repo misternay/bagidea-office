@@ -694,7 +694,28 @@ this makes them employable"*).
 
 ## Contributors
 
-Built in the open, with help from the community — special thanks to **[@spondanai](https://github.com/spondanai)** (early macOS support) and **[@misternay](https://github.com/misternay)** (macOS/Linux shell-finder fix). See **[CONTRIBUTORS.md](CONTRIBUTORS.md)**. PRs welcome — every merged contribution is credited there and on the Contributors graph.
+Built in the open, with help from the community. A huge thank you to everyone who's
+shaped BagIdea Office — by sending a pull request, reporting a bug, or testing on a
+platform we couldn't reach.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/bagidea"><img src="https://github.com/bagidea.png?size=100" width="72" alt="@bagidea"><br><sub><b>@bagidea</b></sub></a><br><sub>Creator &amp; maintainer</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/spondanai"><img src="https://github.com/spondanai.png?size=100" width="72" alt="@spondanai"><br><sub><b>@spondanai</b></sub></a><br><sub>macOS support</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/misternay"><img src="https://github.com/misternay.png?size=100" width="72" alt="@misternay"><br><sub><b>@misternay</b></sub></a><br><sub>macOS / Linux fixes</sub>
+    </td>
+  </tr>
+</table>
+
+Much of the implementation was pair-built with **[Claude Code](https://claude.com/claude-code)** 💜
+
+See **[CONTRIBUTORS.md](CONTRIBUTORS.md)** for what each person built. PRs welcome — every
+merged contribution is credited there and on the Contributors graph.
 
 ## License
 
