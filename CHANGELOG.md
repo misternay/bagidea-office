@@ -4,6 +4,24 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.18] — Mini/restore button shows the right icon; full macOS support; Calculator in the Hub
+
+**Fixed** (reported on Discord 🙏)
+- **The mini/restore button no longer gets stuck on ⛶.** v0.9.17 picked the ◱/⛶ icon from
+  `window.innerHeight`, which can read `0` before first paint on a window that's born
+  full-size and never fires a resize — so the full window wrongly showed ⛶ (Restore). It
+  now uses the same media query the mini-mode CSS uses and updates exactly on the mini⇄full
+  toggle.
+
+**Added**
+- **Full macOS support** — installer/update robustness on a wired install, CLI uninstall,
+  and a custom-provider save fix, with Linux support kept intact
+  ([#12](https://github.com/bagidea/bagidea-office/pull/12), thanks @misternay).
+
+**Web & docs** (already live at bagidea.github.io)
+- The **🧮 Calculator** is a real plugin (safe math evaluator — no `eval`) and is now in the
+  **Plugins Hub**, listed as a worked example alongside Music Player and the Hello template.
+
 ## [0.9.17] — Reachable menus, a way back from mini, macOS occlusion throttle
 
 **Fixed** (reported on Discord 🙏)
