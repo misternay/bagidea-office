@@ -13,8 +13,10 @@ Thank you for the pull requests that made the office better — especially the
 early macOS support, when the project was Windows-only:
 
 - **[@spondanai](https://github.com/spondanai)** — macOS support & installer resilience
-  ([#4](https://github.com/bagidea/bagidea-office/pull/4)), plus an early refactor +
-  automated tests pass ([#1](https://github.com/bagidea/bagidea-office/pull/1)).
+  ([#4](https://github.com/bagidea/bagidea-office/pull/4)), an early refactor +
+  automated tests pass ([#1](https://github.com/bagidea/bagidea-office/pull/1)), and the
+  macOS occlusion FPS throttle — 30→2 fps when the wallpaper is hidden
+  ([#11](https://github.com/bagidea/bagidea-office/pull/11)).
 - **[@misternay](https://github.com/misternay)** (Ritthikiat Jindajak) — fixed the
   CLI shell-binary finder on macOS/Linux, with cross-platform tests
   ([#9](https://github.com/bagidea/bagidea-office/pull/9)).
