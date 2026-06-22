@@ -1828,12 +1828,14 @@
   function speakQueue(agent, text) {
     if (!text) return;
     _sayQ.push({ agent, text });
-    if (!_saying) speakNext();
+    // Set the flag HERE, before the async drain starts — otherwise two
+    // synchronous speakQueue() calls both see _saying===false and kick off
+    // two concurrent speakNext() loops, playing two voices at once.
+    if (!_saying) { _saying = true; speakNext(); }
   }
   async function speakNext() {
     const item = _sayQ.shift();
     if (!item) { _saying = false; return; }
-    _saying = true;
     try {
       const r = await fetch("/tts", { method: "POST",
         headers: { "content-type": "application/json" },
@@ -1841,9 +1843,15 @@
       if (!r.ok) throw new Error(await r.text());
       const audio = applySink(new Audio(URL.createObjectURL(await r.blob())));
       audio.onended = speakNext;
-      audio.onerror = speakNext;
-      audio.play().catch(speakNext);
-    } catch { speakNext(); }
+      audio.onerror = () => speakNext();
+      audio.play().catch(() => speakNext());
+    } catch (e) {
+      // Surface the failure instead of swallowing it — a missing/revoked
+      // GEMINI_API_KEY or a Gemini outage otherwise makes the office go
+      // silent with no clue why. Keep draining the queue afterwards.
+      addChip("🗣✗ " + String((e && e.message) || e).slice(0, 80));
+      speakNext();
+    }
   }
 
   // Mic buttons: click = record (red), click again = transcribe → the text

@@ -2417,7 +2417,7 @@ function ttsSpeak(presetId, text) {
         `Perform this line as a charming, expressive anime character — ${p.style}. ` +
         `Use natural human intonation and real emotion, with a little life and warmth, ` +
         `never flat or robotic. Don't read these directions aloud. Say only:\n` +
-        `"${String(text).slice(0, 900)}"` }] }],
+        JSON.stringify(String(text).slice(0, 900)) }] }],
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: p.voice } } },
