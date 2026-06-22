@@ -1,0 +1,49 @@
+name: Publish to npm
+
+# Auto-publish the `bagidea-office` npm bootstrapper on each release, via npm
+# Trusted Publishing (OIDC) — NO long-lived token stored anywhere. Only publishes
+# when npm/package.json carries a version that isn't on the registry yet, so a
+# release that didn't bump the bootstrapper is a clean no-op.
+#
+# PREREQUISITE (one-time, on npmjs.com): configure a Trusted Publisher for the
+# `bagidea-office` package → GitHub Actions → repo bagidea/bagidea-office →
+# workflow file `npm-publish.yml`. Until that's set up, only bump
+# npm/package.json AFTER configuring it (otherwise this job fails on auth).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Upgrade npm (trusted publishing needs npm >= 11.5)
+        run: npm install -g npm@latest
+      - name: Skip if this version is already on npm
+        id: check
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if npm view "bagidea-office@$V" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "bagidea-office@$V is already published — nothing to do."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+            echo "Will publish bagidea-office@$V."
+          fi
+      - name: Publish (OIDC trusted publishing — no token)
+        if: steps.check.outputs.already == 'false'
+        run: npm publish
