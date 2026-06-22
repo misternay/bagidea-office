@@ -34,6 +34,10 @@
     display: flex; align-items: center; justify-content: center; font-size: 12px;
     color: var(--text); background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.12);
+    /* The header sets letter-spacing:1.2px + font-weight:600, which leak in and
+       add trailing space after a single glyph (◱/⛶/⋯/—) — flex-centering then
+       nudges it off-centre. Reset so the glyph sits dead-centre in the circle. */
+    line-height: 1; letter-spacing: normal; font-weight: 400; text-align: center;
   }
   .winbtn:hover { background: rgba(94,200,255,0.25); border-color: var(--accent); }
   .winbtn.hide:hover { background: rgba(255,84,72,0.3); border-color: #ff5448; }
