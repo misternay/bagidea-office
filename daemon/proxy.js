@@ -311,16 +311,18 @@ async function fetchWithTimeout(url, opts, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   // If the caller aborts (client drop), propagate to our fetch immediately.
+  // Stored as a named ref so removeEventListener can actually detach it.
+  const onAbort = () => ctrl.abort();
   if (external) {
-    if (external.aborted) ctrl.abort();
-    else external.addEventListener("abort", () => ctrl.abort(), { once: true });
+    if (external.aborted) onAbort();
+    else external.addEventListener("abort", onAbort, { once: true });
   }
   try {
     const { signal: _drop, ...rest } = opts || {};
     return await fetch(url, { ...rest, signal: ctrl.signal });
   } finally {
     clearTimeout(timer);
-    if (external) external.removeEventListener("abort", () => ctrl.abort());
+    if (external) external.removeEventListener("abort", onAbort);
   }
 }
 
