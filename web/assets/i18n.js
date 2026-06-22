@@ -127,7 +127,7 @@ const I18N = {
     dn_intro:"Introduction", dn_what:"What it is", dn_concepts:"Core concepts",
     dn_install:"Installation", dn_install_win:"Windows (one-shot)", dn_install_manual:"Manual build", dn_install_first:"First run", dn_install_fix:"If it fails",
     dn_using:"Using it", dn_chat:"Chat & the CEO", dn_projects:"Projects", dn_security:"Permissions", dn_editor:"3D Editor", dn_voice:"Voice & channels", dn_updates:"Updates & start-up",
-    dn_features:"Features", dn_brains:"Swappable brains", dn_plugins:"Plugins & skills", dn_workflow:"Workflow Builder", dn_lang:"Languages", dn_sponsors:"Sponsoring",
+    dn_features:"Features", dn_brains:"Swappable brains", dg_cost:"💸 Cost & vision", dn_plugins:"Plugins & skills", dn_workflow:"Workflow Builder", dn_lang:"Languages", dn_sponsors:"Sponsoring",
     dn_cli:"CLI reference", dn_faq:"FAQ", dn_changelog:"Changelog ↗",
 
     d_intro_h:"Introduction", d_intro_p1:"BagIdea Office is a living AI-agent office that runs as your desktop wallpaper. Every AI agent on your machine becomes a pixel-art employee in an HD-2D office: they walk to their desks when real work starts, gather at Security to ask permission, hold meetings, learn skills, and the lights follow your real local time.",
@@ -338,7 +338,7 @@ const I18N = {
     sphow_note:"Künftig treten alle über GitHub Sponsors bei (automatisch und wiederkehrend). Die einzige Ausnahme ist ein vorgestellter Partner wie WARRIX; Reuannamphung wird aus Höflichkeit angezeigt, bis sie zu GitHub Sponsors wechseln.",
     dn_install_fix:"Wenn es fehlschlägt",
     dn_updates:"Updates & Start",
-    dn_brains:"Austauschbare Gehirne",
+    dn_brains:"Austauschbare Gehirne", dg_cost:"💸 Kosten & Sicht",
     dn_workflow:"Workflow Builder",
     dn_sponsors:"Sponsoring",
     d_install_fix_h:"Wenn die Installation fehlschlägt",
@@ -546,7 +546,7 @@ const I18N = {
     dn_intro:"แนะนำ", dn_what:"มันคืออะไร", dn_concepts:"แนวคิดหลัก",
     dn_install:"การติดตั้ง", dn_install_win:"Windows (คำสั่งเดียว)", dn_install_manual:"ติดตั้งเอง", dn_install_first:"เปิดครั้งแรก", dn_install_fix:"ถ้าติดตั้งไม่ผ่าน",
     dn_using:"การใช้งาน", dn_chat:"แชท & CEO", dn_projects:"โปรเจค", dn_security:"สิทธิ์การใช้เครื่องมือ", dn_editor:"3D Editor", dn_voice:"เสียง & ช่องทาง", dn_updates:"อัปเดต & เปิดพร้อม Windows",
-    dn_features:"ฟีเจอร์", dn_brains:"สมองสลับได้", dn_plugins:"Plugin & สกิล", dn_workflow:"Workflow Builder", dn_lang:"ภาษา", dn_sponsors:"การสนับสนุน",
+    dn_features:"ฟีเจอร์", dn_brains:"สมองสลับได้", dg_cost:"💸 ต้นทุน & การมองเห็น", dn_plugins:"Plugin & สกิล", dn_workflow:"Workflow Builder", dn_lang:"ภาษา", dn_sponsors:"การสนับสนุน",
     dn_cli:"คำสั่ง CLI", dn_faq:"คำถามที่พบบ่อย", dn_changelog:"บันทึกการเปลี่ยนแปลง ↗",
 
     d_intro_h:"แนะนำ", d_intro_p1:"BagIdea Office คือออฟฟิศเอเจนต์ AI ที่มีชีวิตชีวาซึ่งทำงานเป็นวอลเปเปอร์เดสก์ท็อปของคุณ เอเจนต์ AI ทุกตัวบนเครื่องของคุณจะกลายเป็นพนักงานพิกเซลอาร์ตในออฟฟิศ HD-2D พวกเขาจะเดินไปที่โต๊ะทำงานเมื่อเริ่มงานจริง รวมตัวกันที่ฝ่ายรักษาความปลอดภัยเพื่อขออนุญาต จัดประชุม เรียนรู้ทักษะต่างๆ และแสงไฟจะเปลี่ยนไปตามเวลาท้องถิ่นจริงของคุณ",
