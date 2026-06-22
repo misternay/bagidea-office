@@ -79,6 +79,23 @@ window that pops up.
 - Remove **🔌 web** from the agent's TOOLS (revoke access for just that agent), or
 - Delete the **web** server under **⚙ → 🔌 MCP SERVERS** (revoke it office-wide — once deleted it won't come back on its own)
 
+## Power option: agent-browser (faster, with a live view)
+
+The built-in `web` tool is zero-install and great for most cases. For heavier use there's a
+faster alternative — **[agent-browser](https://github.com/vercel-labs/agent-browser)** (Vercel
+Labs), a native **Rust** browser driver that's also an MCP server. It's faster, uses stable
+element refs (less context), has an encrypted auth vault, and can **stream a live viewport**.
+
+1. Install it once: `npm i -g agent-browser && agent-browser install` (downloads Chrome for Testing).
+2. In **⚙ → 🔌 MCP SERVERS** add a server — name `web-fast`, command `agent-browser mcp` — then
+   tick **🔌 web-fast** on an agent (instead of, or alongside, `web`).
+3. **Watch it live in the office:** install the **👁 Web View** plugin (🧩 Plugins). It connects
+   to agent-browser's stream and shows the agent's browser inside an office panel in real time.
+   Enable the stream first: `agent-browser stream enable --port 9223`.
+
+> 🧪 agent-browser is an external, opt-in power tool — it needs installing and isn't bundled.
+> The built-in `web` tool stays the default.
+
 ---
 
 > **Tidbit:** this idea was inspired by [PixelRAG](https://github.com/StarTrail-org/PixelRAG),
