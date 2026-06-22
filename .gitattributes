@@ -5,3 +5,4 @@ cli/bagidea text eol=lf
 # The npm bootstrapper's bin is a shebang script — must stay LF or `npx
 # bagidea-office` breaks on macOS/Linux (#!/usr/bin/env node\r is not found).
 npm/cli.js text eol=lf
+npm-bagidea/cli.js text eol=lf

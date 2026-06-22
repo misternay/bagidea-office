@@ -1,0 +1,42 @@
+{
+  "name": "bagidea",
+  "version": "0.9.19",
+  "description": "Short alias for bagidea-office — `npx bagidea` installs BagIdea Office: a living HD-2D office where every AI agent is a real Claude Code session, on your desktop wallpaper.",
+  "bin": {
+    "bagidea-office": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-agents",
+    "ai-agent",
+    "agents",
+    "wallpaper",
+    "desktop",
+    "ai",
+    "llm",
+    "automation",
+    "autonomous-agents",
+    "mcp",
+    "godot",
+    "anthropic"
+  ],
+  "homepage": "https://bagidea.github.io/bagidea-office/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bagidea/bagidea-office.git",
+    "directory": "npm-bagidea"
+  },
+  "bugs": {
+    "url": "https://github.com/bagidea/bagidea-office/issues"
+  },
+  "author": "BagIdea Innovation Co., Ltd.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
