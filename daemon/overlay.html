@@ -68,7 +68,15 @@
     background: rgba(13, 19, 32, 0.97);
     border: 1px solid var(--line); border-radius: 12px; padding: 6px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+    /* Never run off a short window — 14-language menu was clipping ไทย/Việt/etc.
+       on small / mini / Windows-10 windows. Cap to the window and scroll. */
+    max-height: calc(100vh - 56px); overflow-y: auto;
   }
+  #dayMenu::-webkit-scrollbar, #sessMenu::-webkit-scrollbar, #moreMenu::-webkit-scrollbar,
+  #langMenu::-webkit-scrollbar, #dispMenu::-webkit-scrollbar { width: 8px; }
+  #dayMenu::-webkit-scrollbar-thumb, #sessMenu::-webkit-scrollbar-thumb, #moreMenu::-webkit-scrollbar-thumb,
+  #langMenu::-webkit-scrollbar-thumb, #dispMenu::-webkit-scrollbar-thumb {
+    background: rgba(94,200,255,0.45); border-radius: 999px; }
   #dayMenu { top: 46px; right: 12px; }
   #moreMenu { top: 46px; right: 12px; min-width: 180px; }
   #langMenu { top: 46px; right: 12px; min-width: 150px; }
@@ -5430,8 +5438,19 @@
       if (e.button === 0 && !e.target.closest("button") && !e.target.closest(".winbtn"))
         shellPost("drag-overlay");
     });
-    document.getElementById("miniBtn").onclick = () => shellPost("mini");
+    const miniBtn = document.getElementById("miniBtn");
+    miniBtn.onclick = () => shellPost("mini");
     document.getElementById("hideBtn").onclick = () => shellPost("hide");
+    // ◱ toggles mini ↔ full in the shell, but users got stuck because the button
+    // never changed — they couldn't find how to restore. Reflect the state: show a
+    // clear ⛶ "Restore" while shrunk (the mini window is ~430px tall).
+    const syncMiniBtn = () => {
+      const small = window.innerHeight <= 470;
+      miniBtn.textContent = small ? "⛶" : "◱";
+      miniBtn.title = small ? "Restore window size" : "Mini window";
+    };
+    syncMiniBtn();
+    window.addEventListener("resize", syncMiniBtn);
   } else {
     // plain browser: the OS window has its own chrome
     document.getElementById("miniBtn").style.display = "none";
