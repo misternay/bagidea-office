@@ -3397,7 +3397,9 @@ const server = http.createServer((req, res) => {
           skills: Array.isArray(p.skills) ? p.skills : cur.skills || [],
           tools: Array.isArray(p.tools) ? p.tools : cur.tools || [],
           // 🧠 swappable brain: which backend/model this agent runs on (default Claude).
-          provider: providers.PROVIDERS[p.provider] ? p.provider : (cur.provider || "claude"),
+          // Accept both built-in PROVIDERS and custom ones from providerConfig.
+          provider: (providers.PROVIDERS[p.provider] || (reg.providerConfig && reg.providerConfig[p.provider]))
+            ? p.provider : (cur.provider || "claude"),
           model: String(p.model !== undefined ? p.model : (cur.model || "")).slice(0, 60),
         };
         saveReg();
