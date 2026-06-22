@@ -70,6 +70,31 @@ So the single biggest cost lever is: **what brain are your busy/worker agents on
 > tools, and long Claude threads are compacted proactively. You don't have to do anything to
 > get those — the knobs above are for going further.
 
+### "The model has a 1M context window — why does the office compact at ~200k?"
+
+1M is the model's **maximum** — not the size it works *best* at, or *cheapest* at. The office
+keeps each agent's working memory around ~200k tokens and summarizes older history beyond
+that, for two reasons:
+
+- **You pay for the whole context on every turn.** Each reply is billed the *entire*
+  conversation so far as input. If a thread is allowed to grow to ~900k before the model
+  compacts on its own, every turn near there bills ~900k input tokens — for the same work.
+  Capping at ~200k keeps each turn affordable.
+- **A tighter context is sharper.** Models lose accuracy when the window is stuffed with
+  stale history ("lost in the middle"). A focused ~200k working set usually gives *better*
+  answers, not worse.
+
+This is **not** a limit on what an agent can do. Compaction *summarizes* the old history and
+continues — and the real source of truth, your **files on disk**, is always there for the
+agent to re-read. Think of it like a desk: it could hold a thousand pages, but you work
+fastest with the ~200 you actually need in front of you; the rest are filed and one reach
+away.
+
+Most tasks never reach the cap, so there's no overhead for normal work — it only bounds
+genuinely long, marathon threads. And it's **tunable**: raise a specific agent's budget for
+big builds (`providerConfig.claude.contextBudget`), or set `CTX_BUDGET.claude = 0` to let the
+model self-manage all the way to its window.
+
 ---
 
 ## 3. Running with **no Claude at all** (e.g. GLM + DeepSeek only)
