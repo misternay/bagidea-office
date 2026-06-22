@@ -19,7 +19,7 @@
 **Install in one line** — `npx bagidea` (or [from source](#install)). Windows · macOS/Linux (beta).
 
 <p align="center">
-  <a href="https://bagidea.github.io/bagidea-office/" title="Watch it live"><img src="https://bagidea.github.io/bagidea-office/img/hero-still.png?v=2" width="820" alt="BagIdea Office — a living HD-2D AI-agent office running as your desktop wallpaper, agents at their desks behind your icons"></a>
+  <a href="https://bagidea.github.io/bagidea-office/" title="Watch it live"><img src="https://bagidea.github.io/bagidea-office/img/hero-still.png?v=3" width="820" alt="BagIdea Office — a living HD-2D AI-agent office running as your desktop wallpaper, agents at their desks behind your icons"></a>
   <br><sub><b><a href="https://bagidea.github.io/bagidea-office/">▶ Watch it live — smooth autoplay demo on the site</a></b></sub>
 </p>
 
