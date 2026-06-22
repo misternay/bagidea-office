@@ -3537,13 +3537,29 @@ const server = http.createServer((req, res) => {
           const proj = projects.find((x) => x.id === p.removeDisk);
           if (!proj) { res.writeHead(404); return res.end("unknown project"); }
           if (!proj.created) { res.writeHead(403); return res.end("not created by this app"); }
-          // Folders die hard on Windows: a dev server an agent left running
+          // Folders die hard: a dev server an agent left running
           // (next dev, vite, …) or the project's own terminal keeps files
           // locked and rmSync silently half-deletes. Order of battle:
           // close our project window → kill processes anchored in the dir →
           // delete with retries → readable error if something still holds on.
           const pid = p.removeDisk;
-          winproj("stop", pid, () => winproj("killdir", proj.dir, () => {
+          const killProjectProcesses = (dir, cb) => {
+            if (process.platform === "win32") {
+              winproj("killdir", dir, cb);
+            } else {
+              // macOS/Linux: kill processes whose cwd or args reference this dir
+              const { execSync } = require("child_process");
+              try {
+                // lsof +cwd finds processes with working dir inside the project
+                const out = execSync(`lsof +D "${dir}" 2>/dev/null | awk 'NR>1{print $2}' | sort -u`, { timeout: 5000 }).toString().trim();
+                if (out) out.split("\n").forEach(p => {
+                  try { process.kill(parseInt(p), "SIGTERM"); } catch {}
+                });
+              } catch {}
+              setTimeout(cb, 500);
+            }
+          };
+          winproj("stop", pid, () => killProjectProcesses(proj.dir, () => {
             setTimeout(() => {
               try {
                 fs.rmSync(proj.dir, { recursive: true, force: true,
