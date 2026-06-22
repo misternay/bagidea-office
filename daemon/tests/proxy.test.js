@@ -129,3 +129,5 @@ test("upstreamFor: providerConfig.token overrides the main-key env", () => {
   const u = upstreamFor("openai", { apiKeys: { OPENAI_API_KEY: "sk" }, providerConfig: { openai: { token: "pc" } } });
   assert.strictEqual(u.key, "pc");
 });
+
+// Bug 2 (issue #15) proxy upstream timeout tests live in proxy-timeout.test.js.

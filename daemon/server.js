@@ -31,6 +31,16 @@ const retrieval = require("./retrieval");
 const skillsSync = require("./skills");
 const providers = require("./providers");
 const proxy = require("./proxy");
+const { RunWatchdog } = require("./watchdog");
+const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
+
+// Issue #15 (Bug 1) — main runs need both a hard wall-clock cap and an idle
+// detector, or a stuck CLI retry loop pins a task in "started" until the CLI
+// gives up on its own (observed: 14 min). Sub-agents already have a 6-min
+// watchdog; these apply to the main runClaude() path.
+const RUN_TOTAL_MS = Number(process.env.OFFICE_RUN_TOTAL_MS) || 30 * 60000;  // 30 min hard cap
+const RUN_IDLE_MS = Number(process.env.OFFICE_RUN_IDLE_MS) || 5 * 60000;     // 5 min no-progress
+
 
 const WORKSPACE = path.join(__dirname, "..", "workspace");
 // Server-local paths (the refactor moved REPLAY_COUNT to constants.js but these
@@ -1547,6 +1557,21 @@ function runClaude(agent, prompt, opts = {}) {
   }
   // Track every run by task id so a single task can be cancelled mid-flight.
   runChildren.set(task, { child, agent });
+  // Issue #15 (Bug 1): reap stuck runs. The watchdog fires onKill if either
+  // the total wall-clock cap or the idle window (no progress event) elapses.
+  // It calls back into the same cleanup path the CLI's own exit would.
+  const watchdog = new RunWatchdog({
+    totalMs: RUN_TOTAL_MS, idleMs: RUN_IDLE_MS,
+    onKill: (reason) => {
+      console.error(`[claude] watchdog: ${agent}/${task} killed — ${reason}`);
+      try { child.kill("SIGKILL"); } catch {}
+      // Already-cleared (doneFired) runs are skipped by fireDone's guard.
+      broadcast({ type: "task.failed", agent, task, session: entry.key,
+        reason: `watchdog: ${reason}` });
+      fireDone(`(watchdog: ${reason})`, false);
+    },
+  });
+  watchdog.start();
   // The split capability + project map ride on the wire only — never in
   // the chat log.
   const canSplit = !opts.noSub && !agent.includes("#");
@@ -1606,6 +1631,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   const fireDone = (text, ok) => {
     if (doneFired) return;
     doneFired = true;
+    watchdog.clear();     // issue #15: run resolved normally — disarm the watchdog
     runChildren.delete(task);
     releaseProj();
     // Resume bookkeeping (delegated work + direct user tasks only): done OK → clear; hit
@@ -1656,6 +1682,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
             saveSess();
             broadcast({ type: "task.progress", agent, task, tool: b.name,
               session: entry.key });
+            watchdog.touch();   // issue #15: a tool call is forward progress
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             let raw = b.text;
@@ -5415,6 +5442,24 @@ server.on("upgrade", (req, sock) => {
 process.on("uncaughtException", (e) => console.error("[fatal] uncaught:", e && e.stack || e));
 process.on("unhandledRejection", (e) => console.error("[fatal] rejection:", e && e.stack || e));
 
+// Issue #15 (Bug 3): on restart/quit, SIGKILL every spawned claude child so
+// none get reparented to PID 1 and keep making proxy requests after the daemon
+// that owns them is gone. The new daemon boots with an empty runChildren map,
+// so anything we leave alive is untraceable.
+let _shuttingDown = false;
+function gracefulShutdown(sig) {
+  if (_shuttingDown) return;     // second Ctrl-C → fall through to default die
+  _shuttingDown = true;
+  let n = 0;
+  for (const { child } of runChildren.values()) {
+    try { child.kill("SIGKILL"); n++; } catch {}
+  }
+  console.error(`[daemon] ${sig} — killed ${n} child process(es)`);
+  process.exit(0);
+}
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
 server.on("error", (e) => {
   // Most likely EADDRINUSE — another daemon already holds :8787. Exit cleanly
   // (code 1) so the launcher/watchdog knows not to expect us, instead of a
@@ -5424,6 +5469,12 @@ server.on("error", (e) => {
 });
 
 const OEP_PORT = process.env.OEP_PORT || 8787;  // override only for isolated tests
+// Issue #15 (Bug 4): rewrite {workspace}/.claude/settings.json so the
+// PreToolUse hook resolves to THIS install's perm.js — works on macOS, Linux,
+// and Windows without a committed absolute path, and runs even when the user
+// skips the installer's wire-hooks script (clone-and-run dev workflow).
+try { wireWorkspaceSettings(WORKSPACE, __dirname); }
+catch (e) { console.error("[startup] wireWorkspaceSettings failed:", e && e.message); }
 server.listen(OEP_PORT, "127.0.0.1", () => {
   console.log(`[oep] http+ws listening :${OEP_PORT}`);
   // Fresh boot ⇒ nothing is running (runChildren starts empty). A task.started left

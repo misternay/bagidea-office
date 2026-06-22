@@ -223,10 +223,13 @@ async function handle(req, res, provider, reg, raw) {
   const ac = new AbortController();
   res.on("close", () => { if (!res.writableEnded) { try { ac.abort(); } catch {} } });
 
-  const doFetch = () => fetch(chat, { method: "POST", signal: ac.signal,
+  // Hard upstream cap (issue #15, Bug 2): without it a hung upstream is held open
+  // forever and the CLI's ~60s retry loop turns one bad turn into a storm.
+  const PROXY_TIMEOUT_MS = 120000;
+  const doFetch = () => fetchWithTimeout(chat, { method: "POST", signal: ac.signal,
     headers: { "content-type": "application/json", authorization: "Bearer " + key,
       "HTTP-Referer": "https://github.com/bagidea/bagidea-office", "X-Title": "BagIdea Office" },
-    body: JSON.stringify(body) });
+    body: JSON.stringify(body) }, PROXY_TIMEOUT_MS);
 
   let r;
   try { r = await doFetch(); }
@@ -297,4 +300,28 @@ async function handle(req, res, provider, reg, raw) {
   else { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(msg)); }
 }
 
-module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickModel, cleanModels, upstreamFor, UPSTREAM };
+// fetch() wrapper with a hard upstream timeout. Without this, a hung upstream
+// holds the connection open forever — and since claude CLI retries every ~60s,
+// one hung turn becomes an unbounded retry storm (issue #15, Bug 2).
+//
+// Either the timeout OR an external abort (caller's opts.signal, e.g. the
+// Claude child dropping the request) wins; both resolve the same way.
+async function fetchWithTimeout(url, opts, timeoutMs) {
+  const external = opts && opts.signal;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  // If the caller aborts (client drop), propagate to our fetch immediately.
+  if (external) {
+    if (external.aborted) ctrl.abort();
+    else external.addEventListener("abort", () => ctrl.abort(), { once: true });
+  }
+  try {
+    const { signal: _drop, ...rest } = opts || {};
+    return await fetch(url, { ...rest, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+    if (external) external.removeEventListener("abort", () => ctrl.abort());
+  }
+}
+
+module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickModel, cleanModels, upstreamFor, UPSTREAM, fetchWithTimeout };
