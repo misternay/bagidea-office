@@ -1136,6 +1136,7 @@ mod platform {
                             // are created once per poll, not once per window.
                             let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
                             let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
+                            let ok: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerName\0".as_ptr()];
                             let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
                             let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
                             let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
@@ -1164,6 +1165,19 @@ mod platform {
                                 if !an.is_null() {
                                     let alpha: f64 = msg_send![an, doubleValue];
                                     if alpha < 0.1 { continue; }
+                                }
+
+                                // Owner check: skip known system chrome that covers the screen
+                                // but doesn't hide content — the Dock creates a full-screen
+                                // opaque event-capture window (layer 20, alpha 1.0, cov 100%)
+                                // during auto-hide reveal; this is not a real occlusion.
+                                let on: *mut AnyObject = msg_send![dict, objectForKey: ok];
+                                if !on.is_null() {
+                                    let owner_ptr: *const i8 = msg_send![on, UTF8String];
+                                    if !owner_ptr.is_null() {
+                                        let owner = std::ffi::CStr::from_ptr(owner_ptr).to_string_lossy();
+                                        if owner == "Dock" { continue; }
+                                    }
                                 }
 
                                 // Bounds check — does this window cover the primary screen?
