@@ -5061,8 +5061,12 @@
     if (ev.type === "voice.say") {
       // 🗣 an agent chose to speak — fetch its voice and play (queued).
       // Never on journal replay: restarted clients must stay silent.
+      // Voice is simply OFF (no audio, no error) unless a Gemini key is connected
+      // — FEATURES.tts gates it. The feed line still shows; only the spoken audio
+      // needs the key. (How to enable: ⚙ → CONNECT a Gemini key; the AI-features
+      // panel and the ▶ preview button both say so.)
       if (!ev.replay && TTSON) {
-        speakQueue(ev.agent, ev.text);
+        if (FEATURES.tts) speakQueue(ev.agent, ev.text);
         addFeed(ev.agent, "🗣 " + String(ev.text).slice(0, 120), ev.session || "");
       }
       return;
