@@ -4,6 +4,17 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.24] — Windows 10 mini/restore button + tidier mini header
+
+**Fixed** (reported on Discord 🙏)
+- **Windows 10: the "restore window size" button is visible again.** The mini/restore icon
+  used the `⛶` / `◱` glyphs, which have no font coverage on Windows 10 — so the button
+  rendered **empty** and users couldn't get back from the mini window. It's now an inline
+  **SVG** icon (shrink ⇄ expand) that renders identically on every Windows.
+- **Mini-window header buttons pin to the right.** In the small window the menu / security /
+  mini / hide buttons weren't right-aligned (the control carrying the auto-margin is hidden
+  in mini, and an inline margin was overriding the fix) — they now sit flush right.
+
 ## [0.9.23] — Clearer context: why the office compacts at ~200k
 
 **Added**
