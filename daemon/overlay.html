@@ -198,8 +198,13 @@
     align-self: flex-start; font-size: 10px; color: rgba(150,165,195,0.65);
     padding: 0 0 0 30px; animation: chipIn 0.25s ease both;
   }
-  /* "agent is typing" — three bouncing dots in an agent-style bubble */
-  .typing { display: inline-flex; gap: 5px; align-items: center; padding: 11px 14px !important; }
+  /* "agent is typing" — a status bubble: optional icon + live label, then three
+     bouncing dots. Carries what the agent is doing right now (thinking / reading
+     a file / running a command / waiting for approval) instead of mute dots. */
+  .typing { display: inline-flex; gap: 8px; align-items: center; padding: 11px 14px !important; }
+  .typing .ti { font-size: 14px; line-height: 1; flex: 0 0 auto; }
+  .typing .tlabel { font-size: 12px; color: var(--text); white-space: nowrap; }
+  .typing .tdots { display: inline-flex; gap: 5px; align-items: center; flex: 0 0 auto; }
   .typing .tdot {
     width: 6px; height: 6px; border-radius: 50%; background: rgba(170,185,215,0.75);
     animation: tbounce 1.1s infinite ease-in-out both;
@@ -384,6 +389,15 @@
   .pbtn.ok { color: #4ade80; border-color: #4ade8066; background: rgba(74,222,128,0.1); }
   .pbtn.no { color: #ff8a7a; border-color: #ff584866; }
   .pbtn:hover { filter: brightness(1.2); }
+  /* 🛡 inline permission card in the chat — approve/deny right where you read,
+     so a request never hides only in the sidebar. Same orange tone as the .perm
+     sidebar card so it reads as "security approval" at a glance. */
+  .msg.permcard { align-self: stretch; max-width: 100%; border: 1px solid #ffb054aa;
+    background: rgba(255,176,84,0.08); padding: 9px 11px; }
+  .permcard .phd { font-size: 12px; margin-bottom: 5px; }
+  .permcard .ptool { color: #ffd28a; font-weight: 700; }
+  .permcard pre { font-size: 10.5px; color: var(--dim); white-space: pre-wrap;
+    word-break: break-all; margin: 4px 0 6px; max-height: 84px; overflow-y: auto; }
 
   /* 🔄 update banner */
   #updBar {
@@ -1401,14 +1415,35 @@
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
-  // "agent is typing" dots — a single bubble pinned to the bottom of the pane while
-  // the agent is starting up / thinking / between tool calls, removed when it speaks.
-  function showTyping() {
+  // "agent is typing" status bubble — optional icon + a live label saying what the
+  // agent is doing right now (thinking / reading a file / waiting for approval…),
+  // followed by the bouncing dots. Removed when the agent speaks or finishes.
+  // Call with no args = the classic mute dots (back-compat for any stray caller).
+  // The label carries ev.tool (a tool name from the stream), so it's attached via
+  // textContent — never innerHTML — to stay an injection-free boundary like addMsg.
+  function showTyping(icon, label) {
     hideTyping();
     const d = document.createElement("div");
     d.className = "msg agent typing";
     d.id = "typingRow";
-    d.innerHTML = '<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>';
+    if (icon) {
+      const i = document.createElement("span");
+      i.className = "ti"; i.textContent = icon;
+      d.appendChild(i);
+    }
+    if (label) {
+      const l = document.createElement("span");
+      l.className = "tlabel"; l.textContent = label;
+      d.appendChild(l);
+    }
+    const dots = document.createElement("span");
+    dots.className = "tdots";
+    for (let k = 0; k < 3; k++) {
+      const t = document.createElement("span");
+      t.className = "tdot";
+      dots.appendChild(t);
+    }
+    d.appendChild(dots);
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
@@ -1420,6 +1455,19 @@
     if (groupView) return ev.session === groupView;
     return (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
       (!ev.session || !CUR[target] || ev.session === CUR[target]);
+  }
+  // Tool name → short, human "what am I doing" phrase. Reuses the Thai tool
+  // descriptions shipped from constants.js (BUILTIN_DESC, e.g. Read → "อ่านไฟล์ /
+  // รูปภาพ / PDF") and tr()'s BOTH the verb and the description into the active
+  // UI language — same pattern as the rest of the UI (Thai source → tr() →
+  // Gemini auto-translate for non-en/zh/ja). Falls back to the raw name for
+  // unknown / MCP tools so the user always sees *something*.
+  function toolLabel(tool) {
+    if (!tool) return tr("ทำงานอยู่…");
+    const desc = BUILTIN_DESC[tool];
+    if (desc) return tr("กำลัง") + " " + tr(desc.split(" / ")[0]).toLowerCase();
+    if (tool.startsWith("mcp__")) return tr("กำลังใช้ปลั๊กอิน") + " " + tool.split("__").pop();
+    return tr("กำลังใช้") + " " + tool;
   }
   // Tiny inline tool-call marker inside a conversation.
   function addToolRow(name) {
@@ -2203,25 +2251,70 @@
   }
 
   function addPermCard(ev) {
-    const d = document.createElement("div");
-    d.className = "perm";
-    d.id = "perm-" + ev.perm;
-    let input = "";
-    try { input = JSON.stringify(JSON.parse(ev.input), null, 1); } catch { input = ev.input || ""; }
-    d.innerHTML =
-      `<b>${ev.agent}</b> requests <span class="tool">${ev.tool}</span>` +
-      `<pre>${input.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</pre>` +
-      `<div class="row"><button class="allow">✓ Allow</button>` +
-      `<button class="allow" style="border-color:#4ade80;color:#4ade80" ` +
-      `title="อนุญาต ${ev.tool} ให้ agent นี้ตลอดไป — ไม่ถามซ้ำอีก">✓✓ ตลอดไป</button>` +
-      `<button class="deny">✗ Deny</button></div>`;
-    const btns = d.querySelectorAll("button");
-    btns[0].onclick = () => respondPerm(ev.perm, "allow");
-    btns[1].onclick = () => respondPerm(ev.perm, "allow", true);
-    btns[2].onclick = () => respondPerm(ev.perm, "deny");
-    permsEl.appendChild(d);
+    const side = buildPermCard(ev, false);   // sidebar variant (rich, full input)
+    side.id = "perm-" + ev.perm;
+    permsEl.appendChild(side);
+    // Mirror in the chat pane — the approval request lives where you're reading,
+    // not only in the (auto-opening) sidebar. Same buttons, same response path.
+    // Gated to the live conversation like the chat bubbles (a replayed request
+    // doesn't pop a card into history; a request from another thread is none of
+    // this pane's business).
+    if (!ev.replay && viewingLive(ev)) {
+      const inline = buildPermCard(ev, true);  // inline variant (compact, in chat)
+      inline.id = "ipermline-" + ev.perm;
+      inline.classList.add("msg", "agent", "permcard");
+      hideTyping();  // the card replaces the "waiting for approval" status bubble
+      log.appendChild(inline);
+      log.scrollTop = log.scrollHeight;
+    }
     setSide(true);  // a pending approval summons the Security Center
     renderBadge();
+  }
+  // Builds ONE permission card (DOM, with bound buttons). `inline` switches the
+  // layout: sidebar uses .perm/.allow/.deny classes; the chat mirror uses
+  // .pbtn/.ok/.no so it matches the inline-proposal look. Both call respondPerm.
+  // (esc() is the file-wide HTML-escape helper declared further down.)
+  function buildPermCard(ev, inline) {
+    const d = document.createElement("div");
+    d.className = inline ? "" : "perm";
+    let input = "";
+    try { input = JSON.stringify(JSON.parse(ev.input), null, 1); } catch { input = ev.input || ""; }
+    const safe = esc(input);
+    if (inline) {
+      const hd = document.createElement("div");
+      hd.className = "phd";
+      hd.innerHTML = tr("🛡 ") + "<b>" + esc(nameOf(ev.agent)) + "</b> " +
+        tr("ขอใช้") + ' <span class="ptool">' + esc(ev.tool || "") + "</span>";
+      d.appendChild(hd);
+      if (input) { const pre = document.createElement("pre"); pre.textContent = input; d.appendChild(pre); }
+      const row = document.createElement("div");
+      row.className = "propbtns";
+      row.innerHTML =
+        `<button class="pbtn ok">✓ ${tr("อนุญาต")}</button>` +
+        `<button class="pbtn ok" title="${tr("อนุญาตเครื่องมือนี้ให้ agent นี้ตลอดไป — ไม่ถามซ้ำอีก")}">✓✓ ${tr("ตลอดไป")}</button>` +
+        `<button class="pbtn no">✕ ${tr("ปฏิเสธ")}</button>`;
+      d.appendChild(row);
+      const b = row.querySelectorAll("button");
+      b[0].onclick = () => respondPerm(ev.perm, "allow");
+      b[1].onclick = () => respondPerm(ev.perm, "allow", true);
+      b[2].onclick = () => respondPerm(ev.perm, "deny");
+    } else {
+      // Sidebar card — ev.agent / ev.tool arrive from the stream, so escape them
+      // before interpolating into innerHTML (the <pre> body was already escaped
+      // as `safe` above; bring the header to the same standard).
+      d.innerHTML =
+        `<b>${esc(ev.agent)}</b> requests <span class="tool">${esc(ev.tool)}</span>` +
+        `<pre>${safe}</pre>` +
+        `<div class="row"><button class="allow">✓ Allow</button>` +
+        `<button class="allow" style="border-color:#4ade80;color:#4ade80" ` +
+        `title="อนุญาต ${esc(ev.tool)} ให้ agent นี้ตลอดไป — ไม่ถามซ้ำอีก">✓✓ ตลอดไป</button>` +
+        `<button class="deny">✗ Deny</button></div>`;
+      const btns = d.querySelectorAll("button");
+      btns[0].onclick = () => respondPerm(ev.perm, "allow");
+      btns[1].onclick = () => respondPerm(ev.perm, "allow", true);
+      btns[2].onclick = () => respondPerm(ev.perm, "deny");
+    }
+    return d;
   }
   async function respondPerm(id, decision, always = false) {
     const r = await fetch("/perm/respond", {
@@ -2236,8 +2329,10 @@
     }
   }
   function removePermCard(id) {
-    const el = document.getElementById("perm-" + id);
-    if (el) el.remove();
+    // Same request renders in two places (sidebar + the inline chat mirror) —
+    // clear both, by their distinct id prefixes, when it's answered/withdrawn.
+    for (const el of [document.getElementById("perm-" + id), document.getElementById("ipermline-" + id)])
+      if (el) el.remove();
     renderBadge();
   }
 
@@ -4976,7 +5071,7 @@
       addLog(`👻 <b>${gname}</b> ${ev.ok ? "งานเสร็จ ✓ กลับเข้าร่าง" : "ล้มเหลว ✗ กลับเข้าร่าง"}`);
     else if (ev.type === "subagent.progress") {
       addLog(`⚙ <b>${ev.tool || "…"}</b> — 👻 ${gname}`);
-      if (groupView && ev.session === groupView) addToolRow(ev.tool || "…");
+      if (groupView && ev.session === groupView) { addToolRow(ev.tool || "…"); showTyping("⚙", toolLabel(ev.tool)); }
     }
     else if (ev.type === "chat.message") {
       if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text, ev.ts);
@@ -5158,7 +5253,7 @@
             (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
             ev.session && ev.session === CUR[target]) {
           addToolRow(ev.tool || "…");
-          showTyping();  // still working after the tool — keep the dots at the bottom
+          showTyping("⚙", toolLabel(ev.tool));  // name the tool the agent is running now
         }
       }
       if (missions[key]) { missions[key].tool = ev.tool; renderMissions(); }
@@ -5167,7 +5262,7 @@
     else if (ev.type === "task.started") {
       missions[key] = { agent: ev.agent, state: "running" }; renderMissions();
       ensureAgent(ev.agent, "working");
-      if (viewingLive(ev)) showTyping();
+      if (viewingLive(ev)) showTyping("🧠", tr("กำลังคิดและวางแผน…"));
     }
     else if (ev.type === "task.completed") {
       if (missions[key]) { missions[key].state = "done"; renderMissions(); }
@@ -5203,6 +5298,8 @@
       if (missions[key]) { missions[key].state = "blocked"; renderMissions(); }
       ensureAgent(ev.agent, "blocked");
       if (!ev.replay) { addPermCard(ev); uiSnd("alert"); }
+      // (the inline approve card that addPermCard drops into the chat supersedes
+      // any "waiting" typing bubble — no separate status line is needed here.)
     }
     else if (ev.type === "perm.approved" || ev.type === "perm.denied") {
       removePermCard(ev.perm);
@@ -5426,7 +5523,7 @@
     uiSnd("send");
     const d = addMsg("you", null, prompt || "(ส่งไฟล์แนบ)");
     for (const f of files) d.appendChild(mediaNode(f.url, f.kind, f.name, f.path || f.url));
-    showTyping();  // instant feedback while the agent spins up (no more dead silence)
+    showTyping("⏳", tr("กำลังรับคำสั่ง…"));  // instant feedback while the agent spins up (no more dead silence)
     if (files.length) {
       prompt += "\n\n[ไฟล์แนบจากผู้ใช้ — เปิดดูได้ด้วย Read]:\n" +
         files.map((f) => "- " + f.path).join("\n");
