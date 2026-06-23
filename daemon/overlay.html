@@ -137,6 +137,23 @@
     position: absolute; top: 3px; right: 5px; width: 8px; height: 8px;
     border-radius: 50%; background: #4ade80; outline: 2px solid #0a0f1a;
   }
+  .seat.busy {
+    border-color: rgba(251, 191, 36, 0.6) !important;
+    background: rgba(251, 191, 36, 0.15) !important;
+    animation: busyPulse 2s ease-in-out infinite;
+  }
+  .seat.busy .face {
+    outline: 2px solid rgba(251, 191, 36, 0.8) !important;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.5) !important;
+  }
+  .seat.busy .nm {
+    color: #fbbf24 !important;
+    font-weight: 600;
+  }
+  @keyframes busyPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }
+    50% { box-shadow: 0 0 16px rgba(251, 191, 36, 0.6); }
+  }
   /* the CEO seat is YOU — first in line, golden, crowned */
   .seat.ceoSeat { border-color: rgba(255, 200, 80, 0.55); background: rgba(255, 200, 80, 0.08); }
   .seat.ceoSeat .face { outline: 2px solid #ffc850; box-shadow: 0 0 10px rgba(255, 200, 80, 0.35); }
@@ -1297,6 +1314,13 @@
   }
 
   const DOTS = { idle: "#4ade80", working: "#5ec8ff", blocked: "#ffb054", offline: "#6b7280", meeting: "#c084fc" };
+  function isAgentBusy(id) {
+    for (const task of RUNNING.values()) {
+      if (task.agent === id) return true;
+    }
+    return false;
+  }
+
   function renderRail() {
     railEl.innerHTML = "";
     // The CEO (you) always leads, then the Director, then the team in the order
@@ -1308,8 +1332,9 @@
     });
     for (const id of ids) {
       const seat = document.createElement("div");
+      const busy = isAgentBusy(id) ? " busy" : "";
       seat.className = "seat" + (id === target ? " active" : "")
-        + (id === "ceo" ? " ceoSeat" : "") + (id === "main" ? " leadSeat" : "");
+        + (id === "ceo" ? " ceoSeat" : "") + (id === "main" ? " leadSeat" : "") + busy;
       const f = document.createElement("div");
       f.className = "face";
       f.textContent = id[0].toUpperCase();
@@ -2163,6 +2188,7 @@
     strip.classList.toggle("on", items.length > 0);
     ftask.classList.toggle("on", items.length > 0);
     document.body.classList.toggle("hastasks", items.length > 0);
+    renderRail();  // update busy state on seats
     for (const box of [strip, ftask]) {
       box.innerHTML = "";
       if (!items.length) continue;
