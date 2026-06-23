@@ -3400,46 +3400,70 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ sessions: index, total: index.length }));
 
   } else if (req.method === "GET" && req.url.startsWith("/brainlog/detail?")) {
-    const params = new URL("http://x" + req.url).searchParams;
+    let params;
+    try {
+      params = new URL("http://x" + req.url).searchParams;
+    } catch {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: "invalid query string" }));
+      return;
+    }
     const sid = params.get("sid");
     const proj = params.get("proj") || null;
     if (!sid) { res.writeHead(400); res.end("missing sid"); return; }
-
-    const cwd = proj && reg.projects && reg.projects[proj] ? reg.projects[proj] : WORKSPACE;
-    const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
-    const fp = path.join(require("os").homedir(), ".claude", "projects", enc, sid + ".jsonl");
-    
-    if (!require("fs").existsSync(fp)) {
-      res.writeHead(404);
-      res.end(JSON.stringify({ error: "session file not found" }));
+    if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(sid)) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: "invalid sid format" }));
+      return;
+    }
+    if (proj && !/^[a-zA-Z0-9_-]+$/.test(proj)) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: "invalid proj format" }));
       return;
     }
 
-    try {
-      const raw = require("fs").readFileSync(fp, "utf-8");
-      const lines = raw.trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-      const turns = parseJsonlTurns(lines);
-      
-      const totalInputTokens = turns.reduce((s, t) => s + (t.usage?.input_tokens || 0), 0);
-      const totalOutputTokens = turns.reduce((s, t) => s + (t.usage?.output_tokens || 0), 0);
-      const toolCallCount = turns.filter((t) => t.tools && t.tools.length > 0).reduce((s, t) => s + t.tools.length, 0);
-      
-      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({
-        sid,
-        turns,
-        stats: {
-          totalInputTokens,
-          totalOutputTokens,
-          toolCallCount,
-          turnCount: turns.length,
-          duration: turns.length > 1 ? turns[turns.length - 1].ts - turns[0].ts : 0,
-        },
-      }));
-    } catch (e) {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: String(e.message) }));
+    const cwd = proj && reg.projects && reg.projects[proj] ? reg.projects[proj] : WORKSPACE;
+    const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
+    const baseDir = path.join(require("os").homedir(), ".claude", "projects");
+    const fp = path.resolve(baseDir, enc, sid + ".jsonl");
+    if (!fp.startsWith(baseDir + path.sep)) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: "invalid path" }));
+      return;
     }
+
+    (async () => {
+      try {
+        const raw = await fs.promises.readFile(fp, "utf-8");
+        const lines = raw.trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+        const turns = parseJsonlTurns(lines);
+        
+        const totalInputTokens = turns.reduce((s, t) => s + (t.usage?.input_tokens || 0), 0);
+        const totalOutputTokens = turns.reduce((s, t) => s + (t.usage?.output_tokens || 0), 0);
+        const toolCallCount = turns.filter((t) => t.tools && t.tools.length > 0).reduce((s, t) => s + t.tools.length, 0);
+        
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({
+          sid,
+          turns,
+          stats: {
+            totalInputTokens,
+            totalOutputTokens,
+            toolCallCount,
+            turnCount: turns.length,
+            duration: turns.length > 1 ? turns[turns.length - 1].ts - turns[0].ts : 0,
+          },
+        }));
+      } catch (e) {
+        if (e.code === "ENOENT") {
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: "session file not found" }));
+        } else {
+          res.writeHead(500);
+          res.end(JSON.stringify({ error: String(e.message) }));
+        }
+      }
+    })();
 
   } else if (req.method === "POST" && req.url === "/sessions/delete") {
     readBody(req, (body) => {
