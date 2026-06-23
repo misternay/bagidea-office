@@ -3128,6 +3128,85 @@ function serveMedia(res, full, req) {
   });
 }
 
+// ---------------------------------------------------------------- brainlog helper
+function resolveJsonlPath(entry) {
+  if (!entry || !entry.sid) return null;
+  const cwd = entry.proj ? (reg.projects[entry.proj] || WORKSPACE) : WORKSPACE;
+  const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
+  const dir = path.join(require("os").homedir(), ".claude", "projects", enc);
+  const fp = path.join(dir, entry.sid + ".jsonl");
+  try {
+    if (require("fs").existsSync(fp)) return fp;
+  } catch {}
+  return null;
+}
+
+function parseJsonlTurns(lines) {
+  const turns = [];
+  const toolResults = {};
+  
+  // First pass: collect tool results from user-type messages
+  for (const line of lines) {
+    if (line.type === "user" && line.message && Array.isArray(line.message.content)) {
+      for (const block of line.message.content) {
+        if (block.type === "tool_result") {
+          const text = typeof block.content === "string" ? block.content
+            : Array.isArray(block.content) ? block.content.map((b) => b.text || "").join("\n")
+            : JSON.stringify(block.content);
+          toolResults[block.tool_use_id] = {
+            text: text.slice(0, 2000),
+            isError: block.is_error || false,
+          };
+        }
+      }
+    }
+  }
+  
+  // Second pass: build turns from assistant + user (prompt) messages
+  for (const line of lines) {
+    if (line.type === "user" && line.message && Array.isArray(line.message.content)) {
+      const textBlocks = line.message.content.filter((b) => b.type === "text" && b.text);
+      if (textBlocks.length > 0) {
+        const text = textBlocks.map((b) => b.text).join("\n");
+        if (text.length < 5000) {
+          turns.push({
+            role: "user",
+            text: text.slice(0, 3000),
+            ts: new Date(line.timestamp).getTime(),
+            tools: [],
+            usage: null,
+          });
+        }
+      }
+    }
+    
+    if (line.type === "assistant" && line.message && Array.isArray(line.message.content)) {
+      const textBlocks = line.message.content.filter((b) => b.type === "text" && b.text);
+      const toolBlocks = line.message.content.filter((b) => b.type === "tool_use");
+      
+      const tools = toolBlocks.map((b) => ({
+        name: b.name,
+        id: b.id,
+        input: typeof b.input === "string" ? b.input.slice(0, 500) : JSON.stringify(b.input).slice(0, 500),
+        result: toolResults[b.id] || null,
+      }));
+      
+      if (textBlocks.length > 0 || tools.length > 0) {
+        turns.push({
+          role: "assistant",
+          text: textBlocks.map((b) => b.text).join("\n").slice(0, 3000),
+          ts: new Date(line.timestamp).getTime(),
+          tools,
+          usage: line.message.usage || null,
+          model: line.message.model || null,
+        });
+      }
+    }
+  }
+  
+  return turns;
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && (req.url.split("?")[0] === "/" || req.url.split("?")[0] === "/index.html")) {
     res.writeHead(200, {
@@ -3298,6 +3377,69 @@ const server = http.createServer((req, res) => {
   } else if (req.method === "GET" && req.url === "/sessions/all") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ all: sess }));
+
+  } else if (req.method === "GET" && req.url === "/brainlog") {
+    const index = [];
+    for (const [agent, threads] of Object.entries(sess)) {
+      for (const t of (threads || [])) {
+        index.push({
+          agent,
+          key: t.key,
+          sid: t.sid || null,
+          title: t.title || "(no title)",
+          ts: t.ts,
+          proj: t.proj || null,
+          hasRaw: !!(t.sid && resolveJsonlPath(t)),
+          logCount: (t.log || []).length,
+          lastUsage: t.lastUsage || null,
+        });
+      }
+    }
+    index.sort((a, b) => b.ts - a.ts);
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ sessions: index, total: index.length }));
+
+  } else if (req.method === "GET" && req.url.startsWith("/brainlog/detail?")) {
+    const params = new URL("http://x" + req.url).searchParams;
+    const sid = params.get("sid");
+    const proj = params.get("proj") || null;
+    if (!sid) { res.writeHead(400); res.end("missing sid"); return; }
+
+    const cwd = proj && reg.projects && reg.projects[proj] ? reg.projects[proj] : WORKSPACE;
+    const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
+    const fp = path.join(require("os").homedir(), ".claude", "projects", enc, sid + ".jsonl");
+    
+    if (!require("fs").existsSync(fp)) {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: "session file not found" }));
+      return;
+    }
+
+    try {
+      const raw = require("fs").readFileSync(fp, "utf-8");
+      const lines = raw.trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const turns = parseJsonlTurns(lines);
+      
+      const totalInputTokens = turns.reduce((s, t) => s + (t.usage?.input_tokens || 0), 0);
+      const totalOutputTokens = turns.reduce((s, t) => s + (t.usage?.output_tokens || 0), 0);
+      const toolCallCount = turns.filter((t) => t.tools && t.tools.length > 0).reduce((s, t) => s + t.tools.length, 0);
+      
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({
+        sid,
+        turns,
+        stats: {
+          totalInputTokens,
+          totalOutputTokens,
+          toolCallCount,
+          turnCount: turns.length,
+          duration: turns.length > 1 ? turns[turns.length - 1].ts - turns[0].ts : 0,
+        },
+      }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
 
   } else if (req.method === "POST" && req.url === "/sessions/delete") {
     readBody(req, (body) => {
