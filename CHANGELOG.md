@@ -4,6 +4,25 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.25] — Live chat status + in-chat permissions, meeting brain-routing fix
+
+**Added** (community PRs 🙌 — thanks [@misternay](https://github.com/misternay))
+- **Live status in the chat** while an agent works — a typing/▶ bubble shows what it's
+  doing right now instead of a silent wait ([#18](https://github.com/bagidea/bagidea-office/pull/18)).
+- **Approve permissions right in the chat.** When an agent needs to run a tool, the request
+  now appears as an inline card you approve or reject without leaving the conversation
+  ([#18](https://github.com/bagidea/bagidea-office/pull/18)).
+
+**Fixed**
+- **Meetings & reflection now use each agent's own brain.** When an agent was set to a
+  non-Claude provider, group meetings and idle reflection still hit Claude's endpoint and
+  failed with a **401** for users running only a proxy / GLM / DeepSeek key. Each agent's
+  configured provider is now routed everywhere ([#22](https://github.com/bagidea/bagidea-office/pull/22)).
+- **Windows 10: the mini-window restore button no longer clips.** In the narrow mini window
+  the logo + "BAGIDEA OFFICE" wordmark + buttons overflowed and the restore button was only
+  half visible. The wordmark is now hidden in mini (the logo icon is enough), so the control
+  cluster always fits flush-right and fully shows (reported on Discord 🙏).
+
 ## [0.9.24] — Windows 10 mini/restore button + tidier mini header
 
 **Fixed** (reported on Discord 🙏)
