@@ -1426,16 +1426,36 @@
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
-  // "agent is typing" dots — a single bubble pinned to the bottom of the pane while
-  // the agent is starting up / thinking / between tool calls, removed when it speaks.
-  function showTyping() {
+  // "agent is typing" — a status bubble: optional icon + live label, then three
+  // bouncing dots. Carries what the agent is doing right now (thinking / reading
+  // a file / running a command / waiting for approval) instead of mute dots.
+  function showTyping(label, icon) {
     hideTyping();
     const d = document.createElement("div");
     d.className = "msg agent typing";
     d.id = "typingRow";
-    d.innerHTML = '<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>';
+    const iconHtml = icon ? `<span class="ti">${icon}</span>` : "";
+    const labelHtml = label ? `<span class="tlabel">${esc(label)}</span>` : "";
+    d.innerHTML = iconHtml + labelHtml + '<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>';
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
+  }
+  // Update the live label without removing the bubble (avoids flicker between tool calls).
+  function updateTypingLabel(label, icon) {
+    const row = document.getElementById("typingRow");
+    if (!row) { showTyping(label, icon); return; }
+    const lbl = row.querySelector(".tlabel");
+    if (lbl) lbl.textContent = label || "";
+    else if (label) {
+      const s = document.createElement("span"); s.className = "tlabel"; s.textContent = label;
+      row.insertBefore(s, row.firstChild.nextSibling || row.firstChild);
+    }
+    const ic = row.querySelector(".ti");
+    if (ic) ic.textContent = icon || "";
+    else if (icon) {
+      const s = document.createElement("span"); s.className = "ti"; s.textContent = icon;
+      row.insertBefore(s, row.firstChild);
+    }
   }
   function hideTyping() { const e = document.getElementById("typingRow"); if (e) e.remove(); }
   // True when ev belongs to the conversation the user is watching live (mirrors the
@@ -5351,7 +5371,20 @@
             (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
             ev.session && ev.session === CUR[target]) {
           addToolRow(ev.tool || "…");
-          showTyping();  // still working after the tool — keep the dots at the bottom
+          const toolName = ev.tool || "";
+          let label = "กำลังทำงาน…";
+          let icon = "⚙";
+          if (toolName === "Read" || toolName === "Glob") { label = "กำลังอ่านไฟล์…"; icon = "📖"; }
+          else if (toolName === "Write" || toolName === "Edit") { label = "กำลังเขียนโค้ด…"; icon = "✍"; }
+          else if (toolName === "Bash") { label = "กำลังรันคำสั่ง…"; icon = "⌨"; }
+          else if (toolName === "WebSearch" || toolName === "WebFetch") { label = "กำลังค้นหาข้อมูล…"; icon = "🔍"; }
+          else if (toolName === "Grep") { label = "กำลังค้นหาในโค้ด…"; icon = "🔍"; }
+          else if (toolName === "Skill") { label = "กำลังโหลดความรู้…"; icon = "📚"; }
+          else if (toolName === "AskUserQuestion") { label = "กำลังถามคำถาม…"; icon = "❓"; }
+          else if (toolName === "ExitPlanMode") { label = "กำลังออกจากแผน…"; icon = "📋"; }
+          else if (toolName === "TaskCreate" || toolName === "TaskUpdate") { label = "กำลังจัดการงาน…"; icon = "📋"; }
+          else if (toolName === "Agent") { label = "กำลังส่งงานต่อ…"; icon = "🤝"; }
+          showTyping(label, icon);
         }
       }
       if (missions[key]) { missions[key].tool = ev.tool; renderMissions(); }
@@ -5360,7 +5393,7 @@
     else if (ev.type === "task.started") {
       missions[key] = { agent: ev.agent, state: "running" }; renderMissions();
       ensureAgent(ev.agent, "working");
-      if (viewingLive(ev)) showTyping();
+      if (viewingLive(ev)) showTyping("กำลังเริ่มต้นงาน…", "🚀");
     }
     else if (ev.type === "task.completed") {
       if (missions[key]) { missions[key].state = "done"; renderMissions(); }
@@ -5619,7 +5652,7 @@
     uiSnd("send");
     const d = addMsg("you", null, prompt || "(ส่งไฟล์แนบ)");
     for (const f of files) d.appendChild(mediaNode(f.url, f.kind, f.name, f.path || f.url));
-    showTyping();  // instant feedback while the agent spins up (no more dead silence)
+    showTyping("กำลังเปิด Claude…", "🧠");  // instant feedback while the agent spins up (no more dead silence)
     if (files.length) {
       prompt += "\n\n[ไฟล์แนบจากผู้ใช้ — เปิดดูได้ด้วย Read]:\n" +
         files.map((f) => "- " + f.path).join("\n");
