@@ -38,6 +38,7 @@ workspace/*
 !workspace/.claude/
 workspace/.claude/*
 !workspace/.claude/settings.json
+!workspace/docs/
 
 # Free art packs (free-license / CC0 — see README "Art assets") now ship IN the
 # repo, so a fresh install and `bagidea update` carry the full visuals + sounds.
