@@ -844,9 +844,10 @@
     header { padding: 6px 10px; font-size: 11px; }
     header .sub { display: none; }
     #opsBtn, #setBtn { display: none; }  /* still reachable via ⋯ + window */
-    /* ops/set carry the margin-left:auto in full mode; they're hidden here, so move the
-       push to the first remaining control → the whole button cluster pins right. */
-    #moreBtn { margin-left: auto; }
+    /* #opsBtn carries the margin-left:auto that pins the cluster right in full mode, but
+       it's hidden here → move the push to the first remaining control (#moreBtn). It has
+       an inline margin-left:6px, so !important is required to win over the inline style. */
+    #moreBtn { margin-left: auto !important; }
     #threadBar { display: none; }
     #log { padding: 10px; }
     footer { padding: 8px 10px; }
