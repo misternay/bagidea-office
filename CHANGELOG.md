@@ -4,6 +4,18 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.26] — Multi-monitor: the wallpaper can't vanish off a second screen
+
+**Fixed** (reported on Facebook 🙏)
+- **Two+ monitors: the wallpaper no longer flashes and disappears.** On some
+  multi-monitor setups the desktop's wallpaper layer (WorkerW) only really covers the
+  **primary** screen, so moving the office onto a secondary monitor put it off-canvas and
+  Windows clipped it away — it appeared for a moment, then vanished. The shell now measures
+  that layer and, if the chosen monitor isn't reachable through it, keeps the wallpaper on
+  the primary screen (where it's always visible) instead of moving it somewhere it can't be
+  seen. The single-monitor path is unchanged. If you hit a multi-monitor placement issue,
+  send us `daemon/monitor-debug.log` — the office now records exactly what it detected.
+
 ## [0.9.25] — Live chat status + in-chat permissions, meeting brain-routing fix
 
 **Added** (community PRs 🙌 — thanks [@misternay](https://github.com/misternay))
