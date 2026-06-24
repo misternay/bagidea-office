@@ -4,6 +4,22 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.29] — Uninstall/update any plugin; agents deploy & verify their plugin work
+
+**Fixed**
+- **Uninstall and update now work for every plugin.** A plugin whose folder name differed
+  from its manifest id (so it lived somewhere other than `plugins/<its-id>`) couldn't be
+  removed or updated — the buttons failed with "plugin not found". The office now resolves
+  a plugin by its id wherever its folder lives.
+
+**Changed**
+- **Agents finish plugin work properly by default.** When the team builds or improves a
+  plugin, they now deploy it into the running office and **verify it actually took effect**
+  (the office only runs plugins from `plugins/<id>`, so a plugin built in a project or a dev
+  copy doesn't count until it's deployed, reloaded, and confirmed at the new version) before
+  reporting it done — so a finished-looking plugin can't quietly leave the office running an
+  old version. Publishing to a git repo or the Hub stays a separate, owner-approved step.
+
 ## [0.9.28] — One-click plugin updates + a default plugin icon
 
 **Added**
