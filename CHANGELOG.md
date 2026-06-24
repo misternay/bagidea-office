@@ -4,6 +4,23 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.27] — A full team always shows up; tidier mini header; smarter persona drafts
+
+**Fixed**
+- **All your agents show up when the team is full.** Once the office had a full roster,
+  the wallpaper could show **only the CEO** — everyone else was missing (though they still
+  chatted and worked). The team roster the daemon sends had outgrown the wallpaper's 64 KB
+  WebSocket buffer, so the whole message was dropped and the world never learned who was on
+  the team. The buffer is now 1 MB — a full 18-agent office fits with room to spare.
+- **Mini window keeps its "BAGIDEA OFFICE" wordmark.** The previous build hid it to protect
+  the window buttons on a narrow window; it now stays and simply shrinks (with an `…`) when
+  space is tight, so the buttons are still safe but the header no longer looks empty.
+
+**Changed**
+- **The ✨ persona copilot drafts with the Director's brain.** When you ask it to draft a new
+  agent from a one-line brief, it now uses your Director (main agent)'s configured model —
+  predictable, and it works for an office running entirely on a non-Claude provider.
+
 ## [0.9.26] — Multi-monitor: the wallpaper can't vanish off a second screen
 
 **Fixed** (reported on Facebook 🙏)

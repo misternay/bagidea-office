@@ -4817,8 +4817,9 @@ const server = http.createServer((req, res) => {
           .map(([id, d]) => `  ${id}: ${d}`).join("\n");
         const skillIds = Object.keys(reg.skills);
         const toolIds = Object.keys(BUILTIN_TOOLS);
-        // Use the first available agent's provider for persona generation
-        const firstAgent = Object.values(reg.agents || {}).find((a) => a.provider && a.provider !== "claude");
+        // Draft with the Director's (main agent's) brain — predictable, and it
+        // works for an office with no Claude key (whatever provider the Director runs).
+        const director = (reg.agents || {}).main;
         const draft = await claudeText(
           `Design a complete persona for an AI agent in a software office, and ` +
           `pick the skills + tools that fit its job.\n` +
@@ -4837,7 +4838,7 @@ const server = http.createServer((req, res) => {
           `Every field must genuinely reflect the brief. skills/tools MUST be chosen ` +
           `ONLY from the lists above (exact ids/names). Match the brief's language ` +
           `(Thai brief → Thai text fields; skill ids and tool names stay verbatim).`,
-          { provider: firstAgent && firstAgent.provider, model: firstAgent && firstAgent.model });
+          { provider: director && director.provider, model: director && director.model });
         let out = { prompt: draft };
         const m = draft.match(/\{[\s\S]*\}/);
         if (m) try { out = JSON.parse(m[0]); } catch {}

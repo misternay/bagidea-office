@@ -5,6 +5,10 @@ extends Node
 ## connection state shows on the lobby status totem (truth, not theater).
 
 const URL := "ws://127.0.0.1:8787/ws"
+# roster.sync carries every agent's full persona prompt, so a full team easily
+# tops Godot's 64 KB default inbound buffer — the whole message is then dropped
+# and the office shows only the CEO (the rest never get a body). Give it room.
+const IN_BUF := 1 << 20  # 1 MB
 
 var _ws := WebSocketPeer.new()
 var _retry := 0.0
@@ -13,6 +17,7 @@ var _was_connected := false
 @onready var manager: Node = get_node("../AgentManager")
 
 func _ready() -> void:
+	_ws.inbound_buffer_size = IN_BUF
 	_ws.connect_to_url(URL)
 
 func _process(delta: float) -> void:
@@ -33,6 +38,7 @@ func _process(delta: float) -> void:
 			if _retry <= 0.0:
 				_retry = 3.0
 				_ws = WebSocketPeer.new()
+				_ws.inbound_buffer_size = IN_BUF
 				_ws.connect_to_url(URL)
 
 func _handle(line: String) -> void:
