@@ -4453,6 +4453,76 @@ const server = http.createServer((req, res) => {
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
 
+  } else if (req.method === "POST" && req.url === "/plugins/check-updates") {
+    // 🔄 For every git-installed plugin, compare local HEAD to the remote's HEAD
+    // — read-only (`git ls-remote`, no fetch) — and report which ones are behind.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    (async () => {
+      const pexec = require("util").promisify(require("child_process").execFile);
+      const pluginsRoot = path.join(__dirname, "..", "plugins");
+      const out = {};
+      await Promise.all(plugins.list().map(async (p) => {
+        if (p.core) return;
+        const dir = path.join(pluginsRoot, p.id);
+        if (!fs.existsSync(path.join(dir, ".git"))) return;
+        try {
+          const opt = { cwd: dir, timeout: 12000 };
+          // Only shallow clones are Hub-installed (depth 1, never developed in).
+          // A FULL clone is a dev's own working repo (e.g. waxwing) — never flag it,
+          // so a one-click "update" can't discard their unpushed commits.
+          const shallow = (await pexec("git", ["rev-parse", "--is-shallow-repository"], opt)).stdout.trim();
+          if (shallow !== "true") return;
+          const local = (await pexec("git", ["rev-parse", "HEAD"], opt)).stdout.trim();
+          const ls = (await pexec("git", ["ls-remote", "origin", "HEAD"], opt)).stdout.trim();
+          const remote = ls.split(/\s+/)[0] || "";
+          if (remote && remote !== local) out[p.id] = true;
+        } catch { /* offline / no remote → just don't flag it */ }
+      }));
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ updates: out }));
+    })();
+
+  } else if (req.method === "POST" && req.url === "/plugins/update") {
+    // ⬆ Update one plugin: git fetch + reset --hard to the remote HEAD, then reload.
+    // Guarded — refuses if the working tree is dirty, so it can never clobber a
+    // dev's own plugin checkout with uncommitted work (e.g. the canonical waxwing).
+    readBody(req, (body) => {
+      if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+      const { execFile } = require("child_process");
+      try {
+        const id = String(JSON.parse(body).id || "").replace(/[^\w-]/g, "");
+        const dir = path.join(__dirname, "..", "plugins", id);
+        const manFile = path.join(dir, "plugin.json");
+        if (!fs.existsSync(manFile)) throw new Error("ไม่พบ plugin");
+        let man = {}; try { man = JSON.parse(fs.readFileSync(manFile, "utf8")); } catch {}
+        if (man.core) throw new Error("plugin หลักอัปเดตผ่านตัวแอป ไม่ใช่ที่นี่");
+        if (!fs.existsSync(path.join(dir, ".git"))) throw new Error("plugin นี้ไม่ได้ติดตั้งจาก git — อัปเดตอัตโนมัติไม่ได้");
+        const fail = (m) => { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(m); };
+        const opt = { cwd: dir, timeout: 60000 };
+        execFile("git", ["rev-parse", "--is-shallow-repository"], opt, (e0, sh) => {
+          if (e0) return fail("git error: " + e0.message);
+          // Full clone = a dev's own working repo → auto-update is disabled so a
+          // fetch+reset can never throw away unpushed commits. (Hub installs are shallow.)
+          if (String(sh).trim() !== "true") return fail("plugin นี้เป็น repo ที่พัฒนาเอง (full clone) — ปิดอัปเดตอัตโนมัติไว้กันงานหาย");
+          execFile("git", ["status", "--porcelain"], opt, (e1, so) => {
+            if (e1) return fail("git error: " + e1.message);
+            if (String(so).trim()) return fail("มีไฟล์ที่ยังไม่ commit ใน plugin นี้ — ไม่อัปเดตทับ (กันงานหาย)");
+            execFile("git", ["fetch", "--depth", "1", "origin", "HEAD"], opt, (e2) => {
+              if (e2) return fail("fetch ไม่สำเร็จ: " + e2.message);
+              execFile("git", ["reset", "--hard", "FETCH_HEAD"], opt, (e3) => {
+                if (e3) return fail("update ไม่สำเร็จ: " + e3.message);
+                plugins.load();
+                broadcast({ type: "plugins.changed" }, false);
+                let v = "?"; try { v = JSON.parse(fs.readFileSync(manFile, "utf8")).version || "?"; } catch {}
+                res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+                res.end(JSON.stringify({ ok: true, version: v }));
+              });
+            });
+          });
+        });
+      } catch (e) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(String(e.message)); }
+    });
+
   } else if (req.url.startsWith("/plugin/") &&
       plugins.handleHttp(req, res, readBody, readBodyRaw)) {
     /* handled by a plugin */

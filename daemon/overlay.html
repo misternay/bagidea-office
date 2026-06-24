@@ -3739,6 +3739,7 @@
     for (const p of ordered) {
       const row = document.createElement("div");
       row.className = "arow";
+      row.dataset.pid = p.id;
       // A plugin's icon is the emoji at the start of its manifest name. If the
       // author didn't include one, fall back to 🧩 so the row never looks empty.
       const pName = /^\p{Extended_Pictographic}/u.test(p.name || "") ? p.name : "🧩 " + (p.name || p.id);
@@ -3771,6 +3772,40 @@
     }
     wirePins(box, openPlugins);
     wireFilter(modalCard.querySelector("#plgFilter"), box);
+    // Async: ask the daemon which git-installed plugins are behind their repo,
+    // then drop an "⬆ update" control onto those rows (read-only check; no fetch).
+    fetch("/plugins/check-updates", { method: "POST", headers: { "x-bagidea-ui": "1" } })
+      .then((x) => x.json()).then((d) => {
+        const ups = (d && d.updates) || {};
+        for (const id of Object.keys(ups)) {
+          const row = box.querySelector(`[data-pid="${CSS.escape(id)}"]`);
+          if (!row || row.querySelector('[title="อัปเดต plugin"]')) continue;
+          const nameEl = row.querySelector(".meta b");
+          if (nameEl && !nameEl.querySelector(".updbadge")) {
+            const badge = document.createElement("span");
+            badge.className = "updbadge";
+            badge.textContent = " ⬆ " + tr("อัปเดตได้");
+            badge.style.cssText = "color:#4ade80;font-size:10px;font-weight:600";
+            nameEl.appendChild(badge);
+          }
+          const ub = document.createElement("div");
+          ub.className = "winbtn"; ub.title = "อัปเดต plugin"; ub.textContent = "⬆";
+          ub.style.color = "#4ade80";
+          ub.onclick = async (e) => {
+            e.stopPropagation();
+            ub.textContent = "…";
+            const rr = await fetch("/plugins/update", { method: "POST",
+              headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+              body: JSON.stringify({ id }) });
+            if (rr.ok) {
+              const j = await rr.json().catch(() => ({}));
+              addChip("⬆ " + tr("อัปเดต plugin แล้ว") + ": " + id + (j.version ? " · v" + j.version : ""));
+              openPlugins();
+            } else { addChip("✗ " + (await rr.text()).slice(0, 120)); ub.textContent = "⬆"; }
+          };
+          row.insertBefore(ub, row.lastElementChild);  // before 🗑
+        }
+      }).catch(() => {});
     modalCard.querySelector("#plgReload").onclick = () =>
       api("/plugins/reload", {}).then(() => openPlugins());
     const doInstall = async (url, mode) => {

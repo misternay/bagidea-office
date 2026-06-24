@@ -75,7 +75,7 @@ A plugin needs **only** `plugin.json`. Add `index.js` for server power, and/or
 | field | meaning |
 |---|---|
 | `id` | unique slug (defaults to the folder name) |
-| `name` | shown in the UI / `bagidea plugins` |
+| `name` | shown in the UI / `bagidea plugins`. **Start it with an emoji** — that leading emoji becomes your plugin's icon in the office's 🧩 Plugins panel (e.g. `"🧪 Agent Workbench"`). Omit it and the office falls back to a default 🧩. |
 | `panel` | the HTML file to open as a panel (omit for headless plugins) |
 | `window` | *(optional)* default size when the panel is **popped out into its own window** (see §4): `{ "w": <px>, "h": <px>, "resizable": true|false }`. Defaults to `900×680`, resizable. Pick a size that fits your UI; set `resizable: false` for a fixed-size tool. |
 | `commands` | what **agents** can call — each `{name, args, desc}` |
