@@ -3739,7 +3739,10 @@
     for (const p of ordered) {
       const row = document.createElement("div");
       row.className = "arow";
-      row.innerHTML = `<div class="meta"><b>${p.name}</b>
+      // A plugin's icon is the emoji at the start of its manifest name. If the
+      // author didn't include one, fall back to 🧩 so the row never looks empty.
+      const pName = /^\p{Extended_Pictographic}/u.test(p.name || "") ? p.name : "🧩 " + (p.name || p.id);
+      row.innerHTML = `<div class="meta"><b>${pName}</b>
           <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
         pinBtn("plugins", p.id) +
