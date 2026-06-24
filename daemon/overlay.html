@@ -860,6 +860,10 @@
     .seat .face { width: 30px; height: 30px; }
     header { padding: 6px 10px; font-size: 11px; }
     header .sub { display: none; }
+    /* Hide the "BAGIDEA OFFICE" wordmark in the narrow mini window — the logo icon is
+       enough — so the control cluster always fits and never clips the restore button
+       (reported on a Win10 mini window where it was half cut off). */
+    header .titletxt { display: none; }
     #opsBtn, #setBtn { display: none; }  /* still reachable via ⋯ + window */
     /* #opsBtn carries the margin-left:auto that pins the cluster right in full mode, but
        it's hidden here → move the push to the first remaining control (#moreBtn). It has
@@ -873,7 +877,7 @@
 
 <header id="titlebar" style="cursor:grab">
   <img src="/brand/logo_ico_cute.png" width="20" height="20" draggable="false" style="flex:none">
-  <span class="logo">BAGIDEA</span> OFFICE
+  <span class="titletxt"><span class="logo">BAGIDEA</span> OFFICE</span>
   <span id="conn"></span>
   <button id="opsBtn" title="Office Ops — งาน / ปฏิทิน / โน้ต / ผังองค์กร" style="margin-left:auto">🗂</button>
   <button id="setBtn" title="Office settings — agents, roles" style="margin-left:6px">⚙</button>

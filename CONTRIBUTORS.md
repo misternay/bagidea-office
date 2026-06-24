@@ -17,15 +17,16 @@ early macOS support, when the project was Windows-only:
   automated tests pass ([#1](https://github.com/bagidea/bagidea-office/pull/1)), and the
   macOS occlusion FPS throttle — 30→2 fps when the wallpaper is hidden
   ([#11](https://github.com/bagidea/bagidea-office/pull/11)).
-- **[@misternay](https://github.com/misternay)** (Ritthikiat Jindajak) — fixed the
-  CLI shell-binary finder on macOS/Linux with cross-platform tests
-  ([#9](https://github.com/bagidea/bagidea-office/pull/9)), then rounded out **full
-  macOS support** — installer/update robustness on a wired install, CLI uninstall,
-  and a custom-provider save fix ([#12](https://github.com/bagidea/bagidea-office/pull/12)),
-  and hardened TTS — surfaced failures, fixed a double-play race, escaped the speak
-  JSON ([#14](https://github.com/bagidea/bagidea-office/pull/14)), and added run-lifecycle
-  safety — run timeouts, graceful shutdown, and a cross-platform process-tree kill
-  ([#16](https://github.com/bagidea/bagidea-office/pull/16), fixing [#15](https://github.com/bagidea/bagidea-office/issues/15)).
+- **[@misternay](https://github.com/misternay)** (Ritthikiat Jindajak) — a prolific
+  contributor across the stack: the macOS/Linux CLI shell-finder
+  ([#9](https://github.com/bagidea/bagidea-office/pull/9)), **full macOS support**
+  ([#12](https://github.com/bagidea/bagidea-office/pull/12)), TTS hardening
+  ([#14](https://github.com/bagidea/bagidea-office/pull/14)), run-lifecycle safety —
+  timeouts, graceful shutdown, cross-platform process-tree kill
+  ([#16](https://github.com/bagidea/bagidea-office/pull/16)), live chat status +
+  inline permission approval ([#18](https://github.com/bagidea/bagidea-office/pull/18)),
+  and routing each agent's brain in meetings/reflection — the 401 fix
+  ([#22](https://github.com/bagidea/bagidea-office/pull/22)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here

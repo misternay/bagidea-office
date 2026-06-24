@@ -636,11 +636,12 @@ mod platform {
         }
     }
 
-    fn position_wallpaper(godot: HWND, root: &std::path::Path) {
+    fn position_wallpaper(godot: HWND, workerw: HWND, root: &std::path::Path) {
         unsafe {
+            use windows_sys::Win32::Foundation::RECT;
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                GetSystemMetrics, MoveWindow, SM_CXSCREEN, SM_CYSCREEN, SM_XVIRTUALSCREEN,
-                SM_YVIRTUALSCREEN,
+                GetClientRect, GetSystemMetrics, MoveWindow, SM_CXSCREEN, SM_CXVIRTUALSCREEN,
+                SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
             };
             let mons = enum_monitors();
             // Chosen monitor: daemon/monitor.txt (set from the in-app picker) wins,
@@ -652,13 +653,71 @@ mod platform {
                 .unwrap_or(0);
             let vsx = GetSystemMetrics(SM_XVIRTUALSCREEN);
             let vsy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-            let (left, top, w, h) = mons
+            let vcx = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            let vcy = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            // The monitor the user picked, and the primary (index 0) we fall back to.
+            let chosen = mons
                 .get(idx)
                 .or_else(|| mons.first())
-                .map(|&(l, t, w, h, _)| (l, t, w, h))
-                .unwrap_or((0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)));
-            // WorkerW client origin = virtual-screen origin → subtract it.
-            MoveWindow(godot, left - vsx, top - vsy, w, h, 1);
+                .copied()
+                .unwrap_or((0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), true));
+            let primary = mons.first().copied().unwrap_or(chosen);
+
+            // WorkerW client (0,0) is the virtual-screen origin and it SHOULD span the
+            // whole virtual desktop. On many real setups, though, it only covers the
+            // PRIMARY monitor — so a wallpaper moved onto a secondary monitor lands
+            // outside it and is clipped to nothing (the reported multi-monitor "it
+            // flashes, then vanishes"). Measure WorkerW so we can refuse a placement
+            // that would make the wallpaper invisible, and fall back to the primary,
+            // which is always reachable. Never moves it somewhere it can't be seen.
+            let mut wc = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            let have_wc = GetClientRect(workerw, &mut wc) != 0;
+            let wcw = (wc.right - wc.left).max(0);
+            let wch = (wc.bottom - wc.top).max(0);
+
+            // Target rect in WorkerW client coords (subtract the virtual origin).
+            let (tx, ty, tw, th) = (chosen.0 - vsx, chosen.1 - vsy, chosen.2, chosen.3);
+            let (mut fx, mut fy, mut fw, mut fh) = (tx, ty, tw, th);
+            let mut fallback = false;
+            if have_wc && wcw > 0 && wch > 0 {
+                // How much of the target actually falls on the WorkerW canvas?
+                let vis = ((tx + tw).min(wcw) - tx.max(0)).max(0) as i64
+                    * ((ty + th).min(wch) - ty.max(0)).max(0) as i64;
+                let area = (tw.max(1) as i64) * (th.max(1) as i64);
+                if vis * 2 < area {
+                    // Less than half visible → not reachable here. Use the primary.
+                    fx = primary.0 - vsx;
+                    fy = primary.1 - vsy;
+                    fw = primary.2;
+                    fh = primary.3;
+                    fallback = true;
+                }
+            }
+            // A degenerate size would also vanish — guard that too.
+            if fw <= 0 || fh <= 0 {
+                fx = 0;
+                fy = 0;
+                fw = GetSystemMetrics(SM_CXSCREEN);
+                fh = GetSystemMetrics(SM_CYSCREEN);
+                fallback = true;
+            }
+
+            // Diagnostic log — on a multi-monitor problem, ask the reporter to send
+            // daemon/monitor-debug.log. Captures exactly what we saw and applied.
+            let mut log = String::from("=== BagIdea Office — wallpaper placement (multi-monitor) ===\n");
+            log.push_str(&format!("monitors: {} (index 0 = primary)\n", mons.len()));
+            for (i, m) in mons.iter().enumerate() {
+                log.push_str(&format!(
+                    "  [{}] left={} top={} w={} h={} primary={}\n", i, m.0, m.1, m.2, m.3, m.4));
+            }
+            log.push_str(&format!("chosen index (monitor.txt): {}\n", idx));
+            log.push_str(&format!("virtual screen: origin=({},{}) size={}x{}\n", vsx, vsy, vcx, vcy));
+            log.push_str(&format!("WorkerW client: have={} size={}x{}\n", have_wc, wcw, wch));
+            log.push_str(&format!("target  (WorkerW coords): x={} y={} w={} h={}\n", tx, ty, tw, th));
+            log.push_str(&format!("applied (WorkerW coords): x={} y={} w={} h={} fallback_to_primary={}\n", fx, fy, fw, fh, fallback));
+            let _ = std::fs::write(root.join("daemon").join("monitor-debug.log"), log);
+
+            MoveWindow(godot, fx, fy, fw, fh, 1);
         }
     }
 
@@ -723,7 +782,7 @@ mod platform {
             // Multi-monitor → place it on the chosen screen (default = primary), a
             // ONE-TIME position so a fresh multi-monitor setup just works on boot.
             if count > 1 {
-                position_wallpaper(godot, &root);
+                position_wallpaper(godot, workerw, &root);
             }
             let _ = proxy.send_event(UserEvent::WorldReady);
         });
