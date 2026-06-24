@@ -57,6 +57,7 @@
       "author": "bagidea",
       "repo": "https://github.com/bagidea/waxwing",
       "tags": ["tools", "wallet", "crypto"],
+      "official": true,
       "preview": "https://raw.githubusercontent.com/bagidea/waxwing/main/brand/preview-hero.png",
       "th": { "desc": "กระเป๋า self-custody สำหรับเชน Antelope (WAX · EOS · Telos · XPR, testnet & mainnet, ดีฟอลต์ WAX testnet) — สร้าง/นำเข้าคีย์เข้ารหัส AES-256-GCM + scrypt, รหัสผ่านเดียวปลดล็อกทุกเน็ตเวิร์ก, auto-lock, ส่ง/ stake/ unstake/ ซื้อ-ขาย RAM ผ่าน WharfKit, ส่งออก/นำเข้า wallet แบบเข้ารหัส · คีย์ไม่เคยออกจากเครื่อง" },
       "en": { "desc": "A self-custody wallet for Antelope chains (WAX · EOS · Telos · XPR, testnet & mainnet, default WAX testnet) — generate/import keys encrypted at rest (AES-256-GCM + scrypt), one wallet-level password unlocks all networks, auto-lock, send / stake / unstake / buy-sell RAM via WharfKit, encrypted export/import. Your keys never leave the machine." }
