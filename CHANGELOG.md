@@ -4,6 +4,25 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.28] — One-click plugin updates + a default plugin icon
+
+**Added**
+- **Update a plugin in one click.** Open the 🧩 Plugins panel and any plugin you installed
+  from the Hub that has a newer version now shows an **⬆ update** button — click it and the
+  office pulls the latest and reloads it live. The check is read-only (it just compares your
+  copy to the plugin's repo), and it only ever touches plugins you installed from the Hub:
+  a plugin repo you're developing yourself is never auto-updated, and one with uncommitted
+  changes is left alone — so an update can't throw away your own work.
+
+**Fixed**
+- **Plugins without an emoji get a default 🧩 icon.** A plugin whose name didn't start with
+  an emoji used to render with a blank icon slot in the Plugins panel; it now falls back to
+  🧩 so no row looks empty. (Plugin authors: the leading emoji in your manifest `name` is your
+  icon — see the plugins guide.)
+
+> The Plugins, Tools, and Showcase pages on the website also gained a **search box** this
+> cycle (already live).
+
 ## [0.9.27] — A full team always shows up; tidier mini header; smarter persona drafts
 
 **Fixed**
