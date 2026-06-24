@@ -3129,12 +3129,19 @@ function serveMedia(res, full, req) {
 }
 
 // ---------------------------------------------------------------- brainlog helper
+// Resolve the JSONL file path for a (sid, proj) pair. proj maps to a registered
+// project dir (falls back to WORKSPACE), then the dir is alnum-encoded the way
+// the Claude CLI encodes project folders. No validation here — callers validate
+// request input and check containment/existence as needed.
+function jsonlPathFor(sid, proj) {
+  const cwd = proj ? (reg.projects[proj] || WORKSPACE) : WORKSPACE;
+  const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
+  return path.join(require("os").homedir(), ".claude", "projects", enc, sid + ".jsonl");
+}
+
 function resolveJsonlPath(entry) {
   if (!entry || !entry.sid) return null;
-  const cwd = entry.proj ? (reg.projects[entry.proj] || WORKSPACE) : WORKSPACE;
-  const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
-  const dir = path.join(require("os").homedir(), ".claude", "projects", enc);
-  const fp = path.join(dir, entry.sid + ".jsonl");
+  const fp = jsonlPathFor(entry.sid, entry.proj);
   try {
     if (require("fs").existsSync(fp)) return fp;
   } catch {}
@@ -3422,10 +3429,8 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    const cwd = proj && reg.projects && reg.projects[proj] ? reg.projects[proj] : WORKSPACE;
-    const enc = cwd.replace(/[^a-zA-Z0-9]/g, "-");
     const baseDir = path.join(require("os").homedir(), ".claude", "projects");
-    const fp = path.resolve(baseDir, enc, sid + ".jsonl");
+    const fp = path.resolve(jsonlPathFor(sid, proj));
     if (!fp.startsWith(baseDir + path.sep)) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: "invalid path" }));
