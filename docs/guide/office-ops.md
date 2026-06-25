@@ -53,7 +53,7 @@ Central settings that control how "alive" the office feels — all under ⚙ →
 | 💓 DIRECTOR HEARTBEAT | How often the Director reviews the big picture and only flags what you should know | Every 60 min |
 | ☕ SOCIAL | Idle agents gather to chat / brainstorm | Every 60 min |
 | 💡 PROPOSALS | Minimum gap between "project proposals" sent to you (prevents proposal spam) | At least every 120 min |
-| 🎤 PUSH-TO-TALK HOTKEY | The key to give orders by voice | F6 |
+| 🎤 PUSH-TO-TALK HOTKEY | The key to give orders by voice | Right Ctrl |
 
 ## 💓 Director Heartbeat
 

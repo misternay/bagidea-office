@@ -9,12 +9,12 @@ There are two completely separate paths:
 - Your speech is typed into the text field next to the button, so you can review/edit before sending yourself
 - Available next to the chat box, on the command form, and on the notes board
 
-**2. The F6 hotkey (direct line to the Director — works in every mode)**
-- **Press F6 = mic on** → a red pulsing pill shows every word it hears live
-- **Press F6 again = mic off + message sent to the Director immediately**
+**2. The push-to-talk hotkey — default Right Ctrl (direct line to the Director — works in every mode)**
+- **Press Right Ctrl = mic on** → a red pulsing pill shows every word it hears live
+- **Press Right Ctrl again = mic off + message sent to the Director immediately**
 - Doesn't touch any input field — works the same in normal / minimized / 📡 feed mode
 - In normal mode you'll see a chip "🎤 Command to Director: …" confirming what was sent
-- Rebind the key at ⚙ → AGENTS (F6/F7/F8/F9/Ctrl+Space)
+- Rebind the key at ⚙ → AGENTS — **Right Ctrl** (default), Right Alt, Right Shift, or F6–F9
 
 > **Voice engine**: the program records audio itself (with a VU meter in the pill so you can see it's listening),
 > then transcribes with **OpenAI Whisper** or **Gemini** using the API key from ⚙ CONNECT —
@@ -79,7 +79,7 @@ ghosts splitting off, delegations, messages from channels, and so on.
 | Read clearly | hover the mouse → the background turns opaque automatically |
 | Clear the list | the 🧹 button at the top of the bar (keeps up to 60 items) |
 | Permission requests | pop up as cards with ✓ Allow / ✓✓ Always / ✗ No buttons — answer right in the bar |
-| Voice command | hold F6 and speak — sent to the Director automatically |
+| Voice command | hold Right Ctrl and speak — sent to the Director automatically |
 
 Switch back: right-click the chat head again — any windows/tabs you'd left open come back as they were,
 and if all permission requests were answered from the feed, the Security Center folds itself away.

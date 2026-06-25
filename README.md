@@ -222,7 +222,7 @@ Sponsorship is a **recurring monthly subscription handled entirely by GitHub Spo
 - **🌍 Official website** in [`web/`](web/) — landing page + browsable docs, deployable to any static host
 
 ### 🎤 Voice, channels, memory & media (2026-06)
-- **Voice in / out**: hold-to-record in the webview → **OpenAI Whisper / Gemini** transcription (no Windows dictation panel); **F6** speaks a command straight to the CEO; agents can be given **Gemini TTS voices** — **16 presets split clearly ♀ / ♂** (8 each), each its own emotion/style, per-agent, gimmick `SPEAK:` announcements; **📞 realtime voice chat** (the **main agent only**) bridges your mic to **Gemini Live** in the main agent's assigned voice (or a sensible default), with the office's own knowledge in context
+- **Voice in / out**: hold-to-record in the webview → **OpenAI Whisper / Gemini** transcription (no Windows dictation panel); **Right Ctrl** speaks a command straight to the CEO; agents can be given **Gemini TTS voices** — **16 presets split clearly ♀ / ♂** (8 each), each its own emotion/style, per-agent, gimmick `SPEAK:` announcements; **📞 realtime voice chat** (the **main agent only**) bridges your mic to **Gemini Live** in the main agent's assigned voice (or a sensible default), with the office's own knowledge in context
 - **Channels**: connect **Telegram · Discord · LINE · Slack · WhatsApp · Messenger** — messages enter the CEO flow, the Director answers back on the same channel
 - **Hermes-style memory** (token-lean, relevance-retrieved): shared `workspace/OFFICE.md` (owner) + per-agent `workspace/memory/<id>.md` + per-project `workspace/projects/<id>/MEMORY.md`, distilled automatically after real work. A pure on-device keyword index (BM25, zero deps, works in Thai too) injects only the memories **relevant to the task at hand** — not a blind dump — with full recall on demand via `GET /recall` + the `archive-search` skill
 - **Main API keys + feature gates**: `OPENAI_API_KEY` / `GEMINI_API_KEY` are first-class — voice/TTS/image/realtime grey out with guidance until set; an extra-key vault feeds agents' own env
@@ -283,7 +283,7 @@ Served by the daemon at `http://127.0.0.1:8787/` — best experienced through th
 - **🔵 NOW WORKING strip**: one calm line under the header — "กำลังทำ N งาน · latest…" — expandable into the full live task list; visible in feed mode too
 - **🔗 CONNECT tab**: API key vault (masked) + Telegram / Discord / LINE / Slack / WhatsApp / Messenger channel setup with live status dots
 - **📡 Feed mode**: right-click the chat head — the panel becomes a translucent right-edge activity stream (scrollback, hover-to-focus, 🧹 clear, actionable permission cards); the wallpaper stays clean for streaming/recording
-- **🎤 Push-to-talk**: hold **F6** anywhere in Windows, speak (Windows Voice Typing — Thai works), release; a pulsing live pill shows what was heard; feed mode auto-sends to the Director (the F6 global hotkey is Windows-only for now — on macOS/Linux use the in-overlay mic button)
+- **🎤 Push-to-talk**: hold **Right Ctrl** anywhere in Windows, speak (Windows Voice Typing — Thai works), release; a pulsing live pill shows what was heard; feed mode auto-sends to the Director (the Right Ctrl global hotkey is Windows-only for now — on macOS/Linux use the in-overlay mic button)
 - **🌗 Atmosphere picker**, slide-over **🛡 Security/Mission/Office-Log sidebar** (edge handle pulses when an approval is waiting; pops open on arrival)
 - **🔄 Update banner** when a new version lands on GitHub — one click updates and relaunches
 - Circular **chat head** (Messenger-style, never steals focus) + system tray (Start with Windows, **Hide office**, Exit)
@@ -535,9 +535,9 @@ office answers you anywhere. Discord and LINE work too —
 [setup guide](docs/guide/channels.md).
 
 ### Speak instead of typing
-Hold **F6**, talk, release. In normal mode the words land in the input box for
+Hold **Right Ctrl**, talk, release. In normal mode the words land in the input box for
 you to review; in 📡 feed mode they're sent to the Director automatically.
-(F6 is Windows-only for now — on macOS/Linux use the in-overlay mic button.)
+(Right Ctrl is Windows-only for now — on macOS/Linux use the in-overlay mic button.)
 
 ### Simulate events (no Claude needed)
 ```powershell
@@ -669,7 +669,7 @@ remain (FSR scale, grass density, cinema pass) if you want it leaner.
 | [AI features](docs/guide/ai-features.md) | main keys · เสียง/TTS/realtime · รูปภาพ · ความจำ · social |
 | [Models & Providers](docs/guide/models.md) | สมองถอดเปลี่ยนได้ · เลือกโมเดลต่อ agent · GLM/DeepSeek/Qwen/MiniMax · ประหยัด |
 | [Cost & vision](docs/guide/cost-and-vision.md) | ใช้ให้ประหยัด token · route brain ถูก/ฟรี · รันด้วย GLM/DeepSeek ล้วน · ทำให้น้องมองรูปได้ |
-| [เสียง & Feed mode](docs/guide/voice-feed.md) | F6 push-to-talk · feed mode · NOW WORKING |
+| [เสียง & Feed mode](docs/guide/voice-feed.md) | Right Ctrl push-to-talk · feed mode · NOW WORKING |
 | [Office Editor](docs/guide/editor.md) | จัดเฟอร์นิเจอร์/กำแพง · import โมเดล/รูป |
 | [Plugins](docs/guide/plugins.md) | ระบบส่วนขยาย · music player · เขียน plugin เอง |
 | [Office Ops](docs/guide/office-ops.md) | งานตั้งเวลา · ปฏิทิน · กระดานโน้ต · ผังองค์กร |
@@ -702,7 +702,7 @@ this makes them employable"*).
 - [x] **Projects** — agents work inside real folders with resumable sessions;
       one window per project, one occupant at a time (stop-agent-to-take-over lock)
 - [x] Permission policies — granted tools run silently, ✓✓ forever grants
-- [x] Voice — F6 push-to-talk over Windows Voice Typing (Thai works)
+- [x] Voice — Right Ctrl push-to-talk over Windows Voice Typing (Thai works)
 - [x] 📡 Feed mode, NOW-WORKING strip, Office Ops (jobs/calendar/notes/org)
 - [x] **Channels** — Telegram / Discord / LINE → the Director
 - [x] API key vault, `bagidea` CLI, one-shot installer + self-updater
