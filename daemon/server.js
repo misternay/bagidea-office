@@ -1045,17 +1045,45 @@ function pausePause(agent, prompt, project, key) {
   if (changed) savePaused();
 })();
 const WINPROJ = path.join(__dirname, "winproj.ps1");
+const MACPROJ = path.join(__dirname, "macproj.sh");
 const LIVEVIEW = path.join(__dirname, "liveview.ps1");
 
+// Cheap cached probe for `zenity` on PATH. Only meaningful on Linux; used by
+// the /platform endpoint's nativePick hint. Synchronous so the endpoint can
+// stay a plain JSON write — the result is memoized after the first call.
+let _zenityCache = null;
+function canZenity() {
+  if (process.platform !== "linux") return false;
+  if (_zenityCache !== null) return _zenityCache;
+  try {
+    // `command -v` is POSIX and always available in sh; throws when zenity
+    // is not on PATH — that's the "not installed" case.
+    require("child_process").execFileSync("sh", ["-c", "command -v zenity"],
+      { stdio: "ignore" });
+    _zenityCache = true;
+  } catch {
+    _zenityCache = false;
+  }
+  return _zenityCache;
+}
+
 function winproj(action, id, cb) {
-  // Windows-only: project-window show/hide/stop is driven by a PowerShell helper that
-  // walks the win32 window tree. On macOS/Linux there's no equivalent window tracking
-  // (projects just open in a terminal), so this is a graceful no-op.
-  if (process.platform !== "win32") { if (cb) cb(null, ""); return; }
-  const { execFile } = require("child_process");
-  execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass",
-    "-File", WINPROJ, action, String(id || "")],
-    { timeout: 20000, windowsHide: true }, (e, out) => cb && cb(e, out));
+  // Cross-platform project-window show/hide/stop/sweep.
+  // Windows: PowerShell helper (winproj.ps1) walks the win32 window tree.
+  // macOS:   AppleScript helper (macproj.sh) walks Terminal.app tabs.
+  // Linux:   no window tracking (projects open in user's terminal of choice).
+  if (process.platform === "win32") {
+    const { execFile } = require("child_process");
+    execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass",
+      "-File", WINPROJ, action, String(id || "")],
+      { timeout: 20000, windowsHide: true }, (e, out) => cb && cb(e, out));
+  } else if (process.platform === "darwin") {
+    const { execFile } = require("child_process");
+    execFile("/bin/bash", [MACPROJ, action, String(id || "")],
+      { timeout: 20000 }, (e, out) => cb && cb(e, out));
+  } else {
+    if (cb) cb(null, "");
+  }
 }
 
 function projectDir(id) {
@@ -3697,12 +3725,27 @@ const server = http.createServer((req, res) => {
             spawn("cmd.exe", [line],
               { windowsVerbatimArguments: true, windowsHide: true, detached: true });
           } else if (process.platform === "darwin") {
-            // macOS: Open a new terminal window, cd to project dir, run claude
+            // macOS: Open a new Terminal.app window, cd to project dir, run
+            // claude, then set the window's custom title to BAGIDEA_PROJ_<id>
+            // so macproj.sh sweep can identify it — mirrors the Windows
+            // --suppressApplicationTitle approach.
             const cmd = psCmd || "";
             // psCmd on Windows is `-Command "..."` — extract the inner command for macOS
             const innerCmd = cmd.match(/-Command\s+"(.+)"/)?.[1] || "";
             const shellCmd = innerCmd || "exec bash";
-            const script = `tell application "Terminal" to do script "cd '${dir.replace(/'/g, "'\\''")}' && ${shellCmd}"`;
+            // Extract marker (#BAGIDEA_PROJ_<id>) from the command, or fall
+            // back to the title parameter the caller already passes.
+            const marker = (innerCmd.match(/#(BAGIDEA_PROJ_[\w-]+)/) || [])[1] || title;
+            const esc = (s) => s.replace(/'/g, "'\\''");
+            // Escape for AppleScript double-quoted string: backslash first, then dquote.
+            const asEsc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+            // Capture the tab reference from `do script` so `set custom title`
+            // targets exactly the window we just opened — `front window` is a
+            // race when Terminal is busy creating the tab.
+            const script = `tell application "Terminal"
+  set t to do script "cd '${esc(dir)}' && ${esc(shellCmd)}"
+  set custom title of (window 1 where tabs contains t) to "${asEsc(marker)}"
+end tell`;
             spawn("osascript", ["-e", script], { detached: true });
           } else {
             // Linux: open a terminal at `dir` running the command. The Windows psCmd is
@@ -3861,6 +3904,49 @@ const server = http.createServer((req, res) => {
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
+
+  } else if (req.method === "POST" && req.url === "/fs/native-pick") {
+    // Native OS folder picker — cross-platform:
+    //   macOS:   osascript `choose folder` (NSOpenPanel)
+    //   Windows: PowerShell FolderBrowserDialog
+    //   Linux:   zenity --file-selection --directory (if installed)
+    // Linux without zenity returns 404 so the client falls back to the
+    // in-house picker. A cancelled dialog returns { path: null }.
+    // Human-UI only, same boundary as the other /fs + /task + /projects
+    // endpoints that surface a modal dialog to the user.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    const { execFile } = require("child_process");
+    const picked = (p) => {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ path: p || null }));
+    };
+    if (process.platform === "darwin") {
+      execFile("osascript", ["-e", "try\nPOSIX path of (choose folder)\non error\n\"\"\nend try"],
+        { timeout: 300000 }, (e, out) => {
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    } else if (process.platform === "win32") {
+      // FolderBrowserDialog.ShowDialog() needs STA. powershell.exe (5.1, the
+      // common case) is STA by default so this just works. pwsh (7+) is MTA
+      // and would throw — we hardcode "powershell" (5.1) to stay on STA.
+      const ps = "Add-Type -AssemblyName System.Windows.Forms; " +
+        "$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
+        "if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }";
+      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+        { timeout: 300000, windowsHide: true }, (e, out) => {
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    } else {
+      // Linux: zenity if installed. ENOENT → 404 (client falls back to in-house).
+      execFile("zenity", ["--file-selection", "--directory"],
+        { timeout: 300000 }, (e, out) => {
+          if (e && e.code === "ENOENT") { res.writeHead(404); res.end("zenity not installed"); return; }
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    }
 
   } else if (req.method === "POST" && req.url === "/places") {
     readBody(req, (body) => {
@@ -5380,6 +5466,23 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ clients: wsClients.size, pendingPerms: pendingPerms.size,
       wt: HAS_WT }));
+
+  } else if (req.url === "/platform") {
+    // Single source of truth for the client: which OS is the daemon on,
+    // and which path separator to use. Avoids deprecated navigator.platform.
+    // nativePick is a hint: macOS/Windows always have a native picker; Linux
+    // does only when zenity is on PATH. The client still treats a 404 from
+    // /fs/native-pick as the authoritative "fall back to in-house" signal,
+    // so this field is informational, not a guarantee.
+    const nativePick = process.platform === "win32" || process.platform === "darwin"
+      ? true
+      : canZenity();
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      platform: process.platform,
+      sep: path.sep,
+      nativePick,
+    }));
 
   } else {
     res.writeHead(404);
