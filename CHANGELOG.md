@@ -4,6 +4,23 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.32] — Agents stay on the brain you gave them
+
+**Fixed**
+- **An agent can no longer change which model it (or anyone) runs on.** The endpoints that set
+  an agent's brain (provider/model), create or remove agents, and store provider credentials
+  weren't restricted to the in-app editor — so a teammate with shell access, when asked to "pick
+  the right model," could reassign models itself instead of delegating. They're now owner-only
+  (the 🧠 editor), like every other roster and credential setting. Each teammate runs strictly on
+  the brain you assigned it, and the Director keeps its own.
+
+**Changed**
+- **The Director routes by brain instead of switching models.** Its operating brief now says it
+  plainly — every teammate has a fixed brain you chose, so putting "the right model" on a task
+  means handing it to the teammate who already has that brain, never changing models — and the
+  team roster it works from now shows each member's brain (🧠) so it can match a task to the right
+  one at a glance.
+
 ## [0.9.31] — Cross-platform project folders + Linux lifecycle fixes
 
 **Added**
