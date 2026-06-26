@@ -4,6 +4,35 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.30] — Media from anywhere, baseline skills for everyone, no more scroll jumps
+
+**Fixed**
+- **Tasks / Calendar / Notes stop jumping to the top.** Pinning a row, approving or rejecting
+  a proposal, or editing a job/event/note in OFFICE OPS re-rendered the whole panel and snapped
+  the scrollbar back to the top every time. Each of those tabs now keeps its scroll position
+  across those actions (and across the live job refresh), the same way the project list already did.
+
+**Changed**
+- **Chat shows media from anywhere on your disk.** Images, video and audio rendered inline only
+  when the file lived under the workspace or a registered project — anything on the Desktop, in
+  Downloads, or on another drive fell back to a bare path link, so the team copied files in just
+  to show them. Now an absolute media path previews inline wherever it lives, and the row's open/
+  reveal actions follow. Only media files are ever served this way (never source, `.env`, keys or
+  other files) and the office still listens only on your own machine.
+- **Every agent starts with three baseline skills.** New and existing teammates now carry
+  **archive-search** (recall what the office already knows before guessing), the **file & media
+  toolkit** (reach for the bundled tools instead of "I can't"), and **doc-writer** (clean,
+  skimmable deliverables) without having to be assigned them — the shared competence a teammate
+  should just have. Specialist skills, and tool-granting ones like web automation, stay opt-in.
+- **Agents put their tools to visible use when it helps.** Quiet background work stays the default,
+  but when seeing something live makes it clearer — or you ask — an agent will open the real
+  browser to walk you through a web build, or produce an artifact and show it in chat, instead of
+  only describing what it could do.
+
+**Security**
+- Hardened `.gitignore` so key material, `.env` files, keystores and `*.bak` runtime logs can't be
+  committed by accident.
+
 ## [0.9.29] — Uninstall/update any plugin; agents deploy & verify their plugin work
 
 **Fixed**
