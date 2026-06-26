@@ -13,6 +13,15 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { DEFAULT_SKILLS } = require("./constants");
+
+// An agent's effective skills = the baseline every agent carries + whatever's been
+// assigned to it (deduped, assignment order preserved after the defaults). Unknown
+// ids are tolerated downstream. This is the ONE place the baseline gets merged, so
+// every sync path (boot, per-run, ghosts) stays consistent.
+function effectiveIds(assignedIds) {
+  return [...new Set([...(DEFAULT_SKILLS || []), ...(assignedIds || [])])];
+}
 
 // The dir handed to --add-dir; Claude Code reads its .claude/skills/ child.
 function agentDir(agentsRoot, agentId) {
@@ -39,7 +48,7 @@ function syncAgent(agentsRoot, agentId, assignedIds, skills) {
   try { synced = JSON.parse(fs.readFileSync(syncedFile, "utf8")); } catch {}
   const want = {};
   let wrote = 0, pruned = 0;
-  for (const id of assignedIds || []) {
+  for (const id of effectiveIds(assignedIds)) {
     const sk = skills[id];
     if (!sk) continue;
     const safe = String(id).replace(/[^\w-]/g, "-");
@@ -71,10 +80,11 @@ function syncAgent(agentsRoot, agentId, assignedIds, skills) {
 function syncAll(agentsRoot, agents, skills) {
   let wrote = 0, pruned = 0;
   for (const [id, a] of Object.entries(agents || {})) {
+    if (a.isUser) continue;   // the human CEO never runs as an agent — no skill files
     const r = syncAgent(agentsRoot, id, a.skills || [], skills || {});
     wrote += r.wrote; pruned += r.pruned;
   }
   return { wrote, pruned };
 }
 
-module.exports = { agentDir, skillsRoot, frontmatter, syncAgent, syncAll };
+module.exports = { agentDir, skillsRoot, frontmatter, syncAgent, syncAll, effectiveIds };

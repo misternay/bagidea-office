@@ -312,11 +312,24 @@ const DEFAULT_CEO_AGENT = {
   aura: "ice", tier: 3, prompt: "", skills: [], tools: [],
 };
 
+// Baseline skills EVERY working agent carries without being assigned them — the
+// cross-cutting competence a teammate should just have. Delivered as native skill
+// files (progressive disclosure), so they cost almost nothing per turn but are
+// there the moment they're needed. Kept deliberately tight to three universals:
+//   • archive-search     — recall what the office already knows before guessing.
+//   • file-media-toolkit — reach for the bundled tools instead of "I can't".
+//   • doc-writer         — turn work into clean, skimmable deliverables.
+// NOT here on purpose: web-automation (assigning it GRANTS the browser tool, so it
+// must stay opt-in), and the orchestration/specialist skills (office-ops, plugin-
+// builder, code-review, …) that belong to specific roles or are auto-learned.
+const DEFAULT_SKILLS = ["archive-search", "file-media-toolkit", "doc-writer"];
+
 module.exports = {
   REPLAY_COUNT,
   MAX_STAFF,
   BUILTIN_TOOLS,
   SKILL_LIBRARY,
+  DEFAULT_SKILLS,
   DEFAULT_MAIN_AGENT,
   DEFAULT_CEO_AGENT
 };

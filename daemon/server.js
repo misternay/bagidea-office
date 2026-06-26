@@ -1518,7 +1518,9 @@ function runClaude(agent, prompt, opts = {}) {
   let preamble = "";
   if (isFresh && a && (a.prompt || a.persona || (a.skills || []).length)) {
     preamble = `<persona>\nYou are "${a.name}" (${a.role}).\n${personaText(a)}\n`;
-    if (!nativeSkills) for (const sid of a.skills || []) {
+    // Inline-skills fallback (reg.nativeSkills === false): same baseline+assigned set
+    // the native path delivers as files, but written straight into the preamble.
+    if (!nativeSkills) for (const sid of skillsSync.effectiveIds(a.isUser ? [] : a.skills)) {
       const sk = reg.skills[sid];
       if (sk) preamble += `\n<skill name="${sk.name}">\n${sk.content}\n</skill>\n`;
     }
