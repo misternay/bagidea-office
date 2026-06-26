@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BagIdea Office — Linux (Ubuntu/Debian) one-shot installer & build.
 #   • installs dependencies via apt (Node 20, Rust, WebKitGTK, X11 tools, audio)
-#   • downloads Godot 4.6.3 (linux x86_64) if missing
+#   • downloads Godot 4.6.3 (linux x86_64 OR arm64/aarch64, auto-detected) if missing
 #   • builds the native shell (tao/wry)
 #   • wires Claude Code hooks and sets up the 'bagidea' CLI + autostart
 set -e
@@ -43,12 +43,23 @@ if [ "$need_node" -eq 1 ]; then
   sudo apt-get install -y nodejs
 fi
 
+# ---- detect CPU arch — the office runs on x86_64 AND arm64/aarch64 on Linux ---
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64|amd64)   GODOT_ARCH="x86_64" ;;
+  aarch64|arm64)  GODOT_ARCH="arm64" ;;
+  *) echo "    ! unrecognized CPU arch '$ARCH' — assuming x86_64 (override with BAGIDEA_GODOT_ARCH)"; GODOT_ARCH="x86_64" ;;
+esac
+GODOT_ARCH="${BAGIDEA_GODOT_ARCH:-$GODOT_ARCH}"   # manual override, e.g. BAGIDEA_GODOT_ARCH=arm64
+
 # ---- try a prebuilt shell (skips installing Rust + the cargo build) ----------
-# Only trust it when WebKitGTK 4.1 is present (the prebuilt is built on Ubuntu
-# 24.04 / webkit 4.1); older distros that only have 4.0 fall back to a source
-# build. Force a source build with BAGIDEA_NO_PREBUILT=1.
+# Only on x86_64 + WebKitGTK 4.1 (the prebuilt shell is built on Ubuntu 24.04 /
+# webkit 4.1, x86_64 only). arm64 and older distros fall back to a source build —
+# which works. Force a source build with BAGIDEA_NO_PREBUILT=1.
 PREBUILT=0
-if [ -z "$BAGIDEA_NO_PREBUILT" ] && pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+if [ "$GODOT_ARCH" != "x86_64" ]; then
+  echo "    - no prebuilt shell for linux $GODOT_ARCH yet — building from source"
+elif [ -z "$BAGIDEA_NO_PREBUILT" ] && pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
   SLUG=$(git -C "$ROOT" remote get-url origin 2>/dev/null | sed -nE 's#.*github\.com[:/]+([^/]+)/([^/.]+).*#\1/\2#p')
   VER=$(head -n1 "$ROOT/VERSION" 2>/dev/null | tr -d ' \r\n')
   if [ -n "$SLUG" ] && [ -n "$VER" ]; then
@@ -77,13 +88,13 @@ GODOT_DIR="$ROOT/godot/bin-linux"
 GODOT_BIN="$GODOT_DIR/godot"
 echo "[2/6] checking Godot engine..."
 if [ ! -x "$GODOT_BIN" ]; then
-  echo "    + downloading Godot 4.6.3 (linux x86_64) — ~80 MB, a progress bar follows..."
+  echo "    + downloading Godot 4.6.3 (linux $GODOT_ARCH) — ~80 MB, a progress bar follows..."
   mkdir -p "$GODOT_DIR"
   ZIP="$ROOT/godot/godot_linux.zip"
-  curl -L --progress-bar "https://github.com/godotengine/godot/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip" -o "$ZIP"
+  curl -L --progress-bar "https://github.com/godotengine/godot/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.$GODOT_ARCH.zip" -o "$ZIP"
   unzip -q -o "$ZIP" -d "$GODOT_DIR"
-  # The zip contains Godot_v4.6.3-stable_linux.x86_64 — normalize the name to 'godot'.
-  mv "$GODOT_DIR"/Godot_v*_linux.x86_64 "$GODOT_BIN"
+  # The zip contains Godot_v4.6.3-stable_linux.<arch> — normalize the name to 'godot'.
+  mv "$GODOT_DIR"/Godot_v*_linux."$GODOT_ARCH" "$GODOT_BIN"
   chmod +x "$GODOT_BIN"
   rm -f "$ZIP"
   echo "    → installed Godot to $GODOT_BIN"
