@@ -2031,8 +2031,11 @@ fn main() {
                 .unwrap_or(true);
             if hidden {
                 let (px, py) = if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
-                overlay.set_outer_position(LogicalPosition::new(px, py));
+                // Map BEFORE positioning: X11 ignores set_outer_position on an unmapped
+                // window, so set_visible must come first or the overlay re-maps at the
+                // old parked x=-9000 and "Open" appears to do nothing (#28).
                 overlay_vis(&overlay, true);
+                overlay.set_outer_position(LogicalPosition::new(px, py));
                 overlay.set_focus();
                 raise_orb(&orb);
             } else {
@@ -2116,6 +2119,8 @@ fn main() {
                         "window.setFeedMode && setFeedMode({})", feed));
                     let _ = overlay.set_ignore_cursor_events(false);
                     platform::set_feed_alpha(&overlay, feed);
+                    // Map before repositioning (see do_toggle) so X11 honors the new position.
+                    overlay_vis(&overlay, true);
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
@@ -2126,7 +2131,6 @@ fn main() {
                         overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
                         platform::region_round(&overlay, w, h, 18.0);
                     }
-                    overlay_vis(&overlay, true);
                     raise_orb(&orb);
                 }
                 UserEvent::DragOrb => { let _ = orb.drag_window(); }
@@ -2145,8 +2149,8 @@ fn main() {
                             } else {
                                 (overlay_x, overlay_y)
                             };
-                            overlay.set_outer_position(LogicalPosition::new(px, py));
                             overlay_vis(&overlay, true);
+                            overlay.set_outer_position(LogicalPosition::new(px, py));
                             raise_orb(&orb);
                         }
                         let _ = overlay_view.evaluate_script("window.pttSet && pttSet(true)");
