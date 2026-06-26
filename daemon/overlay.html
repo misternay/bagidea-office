@@ -1244,6 +1244,7 @@
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
   let _plistScroll = 0, _plistQ = "";  // preserve project-list scroll + search across live refreshes
+  const _opsScroll = {};  // OFFICE OPS per-tab scroll memory — survives action re-renders (pin/approve/reject/edit/delete) so the list doesn't jump to top
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -4445,6 +4446,11 @@
           box.appendChild(card);
         }
         wirePins(box, () => openOps("jobs"));
+        // prBox sits below the job list and only fills in here (async), AFTER the
+        // tail scroll-restore ran. Re-apply the saved offset now that its full height
+        // exists, so approving/rejecting a proposal deep in this list keeps the view
+        // in place instead of snapping up to where the list ended.
+        modalCard.scrollTop = _opsScroll.jobs || 0;
         clearSelBtn.onclick = async () => {
           if (!selected.size) return;
           if (!await confirmDanger(t("ลบ"),
@@ -4708,6 +4714,16 @@
         face(f, s.dataset.id, parseInt(f.style.width) || 36);
         s.onclick = () => openCard(s.dataset.id);
       });
+    }
+
+    // Keep the scroll position across action re-renders (pin/approve/reject/edit/
+    // delete all call openOps(tab) again). The main list of each of these tabs is
+    // rendered by an awaited fetch above, so by here its height is settled — we can
+    // restore the saved offset without it snapping back to the top. proj manages its
+    // own scroll via _plistScroll; dash/org have no in-list actions to preserve for.
+    if (tab === "jobs" || tab === "cal" || tab === "notes") {
+      modalCard.scrollTop = _opsScroll[tab] || 0;
+      modalCard.onscroll = () => { _opsScroll[tab] = modalCard.scrollTop; };
     }
   }
 
