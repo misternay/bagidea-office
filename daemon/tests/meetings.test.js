@@ -28,18 +28,23 @@ const DAEMON_DIR = path.join(__dirname, "..");   // the real daemon/ we're testi
 // free: no model, no network.
 const CLAUDE_STUB = `#!/usr/bin/env node
 let s = ""; process.stdin.on("data", c => s += c); process.stdin.on("end", () => {
-  if (/secretary/i.test(s)) {
-    process.stdout.write(
-      "## Summary\\nThe team aligned on the plan.\\n" +
-      "## Decisions\\nShip the meeting enhancement.\\n" +
-      "## Open Questions\\nNone.\\n\\n" +
-      "\`\`\`json\\n" +
-      "[{\\"owner\\":\\"nida\\",\\"text\\":\\"write the action-item tests\\",\\"due\\":\\"\\"}," +
-      " {\\"owner\\":\\"bogus\\",\\"text\\":\\"should be dropped (unknown owner)\\",\\"due\\":\\"\\"}]" +
-      "\\n\`\`\`\\n");
-  } else {
-    process.stdout.write("Opening: my take on the topic, grounded in context.");
-  }
+  const reply = () => {
+    if (/secretary/i.test(s)) {
+      process.stdout.write(
+        "## Summary\\nThe team aligned on the plan.\\n" +
+        "## Decisions\\nShip the meeting enhancement.\\n" +
+        "## Open Questions\\nNone.\\n\\n" +
+        "\`\`\`json\\n" +
+        "[{\\"owner\\":\\"nida\\",\\"text\\":\\"write the action-item tests\\",\\"due\\":\\"\\"}," +
+        " {\\"owner\\":\\"bogus\\",\\"text\\":\\"should be dropped (unknown owner)\\",\\"due\\":\\"\\"}]" +
+        "\\n\`\`\`\\n");
+    } else {
+      process.stdout.write("Opening: my take on the topic, grounded in context.");
+    }
+  };
+  // Optional artificial delay so tests can exercise End-during-a-turn.
+  const delay = Number(process.env.OFFICE_TEST_SLOW_MS || 0);
+  if (delay) setTimeout(reply, delay); else reply();
 });
 `;
 
@@ -59,7 +64,8 @@ function stubRegistry() {
 }
 
 // Boot an isolated daemon. Returns { url, stop, tmp }.
-async function bootIsolated() {
+// opts.slowMs: artificial claude-call delay (for the End-during-a-turn race).
+async function bootIsolated(opts = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "meeting-test-"));
   // Copy the daemon source so __dirname (and thus WORKSPACE) lives under tmp.
   await fs.promises.cp(DAEMON_DIR, path.join(tmp, "daemon"), { recursive: true });
@@ -79,7 +85,9 @@ async function bootIsolated() {
 
   const port = 19000 + Math.floor(Math.random() * 999);
   const child = spawn(process.execPath, [path.join(tmp, "daemon", "server.js")], {
-    env: { ...process.env, OEP_PORT: String(port), PATH: `${bin}:${process.env.PATH}` },
+    env: { ...process.env, OEP_PORT: String(port),
+      PATH: `${bin}:${process.env.PATH}`,
+      ...(opts.slowMs ? { OFFICE_TEST_SLOW_MS: String(opts.slowMs) } : {}) },
     stdio: ["ignore", "pipe", "pipe"]
   });
   const logs = [];
@@ -245,5 +253,30 @@ test("POST /discuss/message on a finished meeting returns 404", async () => {
     await waitForEnd(d.url, session);
     const r = await req(d.url, "POST", "/discuss/message", { session, text: "late" });
     assert.strictEqual(r.status, 404, "message to a non-live meeting must 404");
+  } finally { d.stop(); }
+});
+
+test("End pressed mid-turn drops the lagging reply (no ghost message after close)", async () => {
+  // Slow claude so we can fire End while a turn is in flight, then assert the
+  // minutes transcript stays small — the lagging reply must NOT be appended
+  // after the meeting has closed. We wait on the FILE, not the live flag,
+  // because the daemon flips live=false before writing minutes (the summary
+  // call runs in between); keep the daemon alive until the file lands.
+  const d = await bootIsolated({ slowMs: 700 });
+  const meetDir = path.join(d.tmp, "workspace", "meetings");
+  try {
+    const session = await startMeeting(d.url);
+    const mdPath = path.join(meetDir, `${session}.md`);
+    await new Promise((r) => setTimeout(r, 150));
+    await req(d.url, "POST", "/discuss/control", { session, action: "end" });
+    for (let i = 0; i < 60 && !fs.existsSync(mdPath); i++)
+      await new Promise((r) => setTimeout(r, 250));
+    assert.ok(fs.existsSync(mdPath), "minutes must be written even after a quick End");
+    const md = fs.readFileSync(mdPath, "utf8");
+    const after = md.split(/## Transcript\n\n/)[1] || md;
+    const transcriptLineCount = (after.match(/^\*\*\[/gm) || []).length;
+    assert.ok(transcriptLineCount <= 2,
+      `transcript should have ≤2 lines after a quick End, got ${transcriptLineCount} ` +
+      "(lagging reply leaked past the End guard)");
   } finally { d.stop(); }
 });

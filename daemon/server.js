@@ -3256,6 +3256,11 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
             (social ? SOCIAL_PROPOSAL_INSTRUCTION : ""),
             { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
           let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
+          // If the owner pressed End while this claude call was in flight, drop the
+          // lagging reply entirely — otherwise it would surface as a ghost message
+          // AFTER meeting.ended has already fired and the summary has been written
+          // (transcript would then disagree with the minutes).
+          if (ctrl.ended) break outerPhase;
           // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
           const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
           if (pm) {
@@ -3277,16 +3282,23 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
     activeDiscussions = Math.max(0, activeDiscussions - 1);
     // One summary secretary → one canonical action-item list (per ADR-0001 these
     // live in their own .actions.json, NOT jobs.json, and NOT on Mission Control).
-    const { summary, actions } = social ? { summary: "", actions: [] } : await generateMeetingSummary(entry, ids);
-    if (actions.length) {
-      const stamped = actions.map((a, i) => ({
-        id: `${entry.key}-${i + 1}`, meeting: entry.key, owner: a.owner,
-        text: a.text, due: a.due || "", status: "open", created: Date.now()
-      }));
-      saveActions(entry.key, stamped);
-      for (const a of stamped)
-        broadcast({ type: "meeting.action", action: a, session: entry.key });
-    }
+    // The summary call is best-effort: it must NEVER block or throw away the
+    // minutes (a hung/slow/failed claude can't lose the transcript). Minutes are
+    // written FIRST with whatever we have, then enriched if the summary lands.
+    let summary = "", actions = [];
+    try {
+      ({ summary, actions } = social ? { summary: "", actions: [] }
+        : await generateMeetingSummary(entry, ids));
+      if (actions.length) {
+        const stamped = actions.map((a, i) => ({
+          id: `${entry.key}-${i + 1}`, meeting: entry.key, owner: a.owner,
+          text: a.text, due: a.due || "", status: "open", created: Date.now()
+        }));
+        saveActions(entry.key, stamped);
+        for (const a of stamped)
+          broadcast({ type: "meeting.action", action: a, session: entry.key });
+      }
+    } catch (e) { console.error("[meeting] summary failed:", e && e.message); }
     // Markdown minutes inside the agents' workspace — searchable by them.
     try {
       const dir = path.join(WORKSPACE, "meetings");

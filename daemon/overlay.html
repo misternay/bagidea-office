@@ -5082,8 +5082,8 @@
       closeModal();
       addChip(`🗣 meeting started: <b>${topic.slice(0, 50)}</b>`);
       // Open the live meeting so messages stream in and the speak bar appears.
-      // /discuss returns the session key; if absent, best-effort: fetch the
-      // latest @group session.
+      // /discuss returns the session key synchronously; liveMeetings.add is a
+      // belt-and-suspenders in case the meeting.live broadcast hasn't landed.
       const key = r && r.session;
       if (key) { liveMeetings.add(key); openGroupLog(key, topic); }
     };
