@@ -243,7 +243,8 @@ function rosterEvt() {
     proposalMin: Number(reg.proposalMin !== undefined ? reg.proposalMin : 120),
     maxStaff: MAX_STAFF, staffCount: staffCount(),
     lang: reg.lang || "en", daylight: reg.daylight ?? "auto",
-    monitor: reg.monitor || 0, monitors: monitorCount() };
+    monitor: reg.monitor || 0, monitors: monitorCount(),
+    autoApproveAll: reg.autoApproveAll || false };
 }
 
 // Relaunch the whole stack (shell → daemon → godot) detached, so it survives
@@ -3542,6 +3543,25 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/setting") {
+    // Toggle a top-level registry setting (autoApproveAll, tts, sound, etc.).
+    // Body: { key: "autoApproveAll", value: true | false | ["main","arthit"] }
+    readBody(req, (body) => {
+      try {
+        const { key, value } = JSON.parse(body);
+        if (typeof key !== "string" || !key) throw new Error("missing key");
+        reg[key] = value;
+        saveReg();
+        pushRoster();
+        broadcast({ type: "setting.changed", key, value });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, key, value }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(String(e.message));
+      }
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/skill") {
     // Create, update or remove a skill in the library. Removal also strips
     // the skill from every agent that had it assigned.
@@ -5112,9 +5132,23 @@ end tell`;
       try { p = JSON.parse(body); } catch { res.writeHead(400); return res.end(); }
       let { id, agent = "claude", task = "", tool = "?", input = "" } = p;
       if (agent === "claude") agent = "main";  // host session = the Director
+      const base = String(agent).split("#")[0];
+      // ── Auto-approve-all bypass ──────────────────────────────────
+      // When reg.autoApproveAll is true, every tool call from every agent
+      // is allowed without asking.  Optional per-agent override:
+      //   reg.autoApproveAll = ["main","arthit"]  → only those agents bypass.
+      // ----------------------------------------------------------------
+      const apa = reg.autoApproveAll;
+      const apaOn = apa === true ||
+        (Array.isArray(apa) && apa.includes(base));
+      if (apaOn) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ decision: "allow" }));
+        broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "auto-approve-all" });
+        return;
+      }
       // Tools the owner GRANTED in the agent's registry profile never ask —
       // that's what granting means. "Allow ตลอดไป" rules ride along too.
-      const base = String(agent).split("#")[0];
       const granted = [
         ...(((reg.agents[base] || {}).tools) || []),
         ...(((reg.autoAllow || {})[base]) || []),

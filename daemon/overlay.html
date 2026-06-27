@@ -920,6 +920,13 @@
   </div>
   <aside id="side" class="closed">
     <h2>🛡 SECURITY CENTER</h2>
+    <div id="autoApproveBar" style="display:flex;align-items:center;gap:6px;padding:4px 8px;margin-bottom:6px;background:rgba(255,180,0,.08);border:1px solid rgba(255,180,0,.25);border-radius:6px;font-size:11px">
+      <label style="cursor:pointer;display:flex;align-items:center;gap:6px;flex:1">
+        <input type="checkbox" id="autoApproveToggle" style="margin:0">
+        <span>🔓 Auto-approve <b>all</b> tools — bypass Security Center</span>
+      </label>
+      <span id="autoApproveHint" style="color:var(--dim);font-size:10px"></span>
+    </div>
     <div id="perms"></div>
     <h2>🛰 MISSION CONTROL</h2>
     <div id="missions"></div>
@@ -1588,6 +1595,26 @@
   document.getElementById("sideBtn").onclick = () =>
     setSide(sideEl.classList.contains("closed"));
   sideTab.onclick = () => setSide(sideEl.classList.contains("closed"));
+  // ── Auto-approve-all toggle: bypass Security Center for all agents ──
+  function syncAutoApproveUI(apa) {
+    const el = document.getElementById("autoApproveToggle");
+    if (!el) return;
+    el.checked = apa === true || (Array.isArray(apa) && apa.length > 0);
+    const hint = document.getElementById("autoApproveHint");
+    if (hint) {
+      if (apa === true) hint.textContent = "⚠ ALL agents bypass";
+      else if (Array.isArray(apa) && apa.length) hint.textContent = "bypass: " + apa.join(", ");
+      else hint.textContent = "";
+    }
+    const bar = document.getElementById("autoApproveBar");
+    if (bar) bar.style.background = el.checked ? "rgba(255,80,40,.12)" : "rgba(255,180,0,.08)";
+  }
+  document.getElementById("autoApproveToggle").onchange = function () {
+    const on = this.checked;
+    api("/registry/setting", { key: "autoApproveAll", value: on })
+      .then(() => { syncAutoApproveUI(on); })
+      .catch(() => { this.checked = !on; });  // revert on error
+  };
   function renderBadge() {
     const n = permsEl.children.length;
     const b = document.getElementById("permBadge");
@@ -5203,6 +5230,8 @@
       HEARTBEAT = Number(ev.heartbeatMin || 0);
       if (ev.features) FEATURES = ev.features;
       TTSON = ev.tts !== false;
+      // ── Auto-approve-all toggle ──
+      syncAutoApproveUI(ev.autoApproveAll);
       SOCIALMIN = Number(ev.socialMin !== undefined ? ev.socialMin : 60);
       PROPOSALMIN = Number(ev.proposalMin !== undefined ? ev.proposalMin : 120);
       MAXSTAFF = Number(ev.maxStaff || 18);
@@ -5226,6 +5255,10 @@
       delete ROSTER[ev.agent];
       if (target === ev.agent) setTarget("main");
       renderRail();
+      return;
+    }
+    if (ev.type === "setting.changed") {
+      if (ev.key === "autoApproveAll") syncAutoApproveUI(ev.value);
       return;
     }
     if (ev.type === "projects.changed") {
