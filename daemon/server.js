@@ -3188,13 +3188,13 @@ async function generateMeetingSummary(entry, ids) {
   return { summary, actions };
 }
 
-async function runDiscussion(ids, topic, rounds, social) {
+async function runDiscussion(ids, topic, rounds, social, preKey) {
   activeDiscussions++;
   const task = "disc" + (Date.now() % 100000);
   // Every meeting is a persistent GROUP session ("@group" bucket): topic,
   // participants and the full transcript — readable later from the thread
   // menu, and written to workspace/meetings/ so agents can grep it too.
-  const entry = { key: "g" + Date.now(), sid: null, ts: Date.now(),
+  const entry = { key: preKey || ("g" + Date.now()), sid: null, ts: Date.now(),
     title: String(topic).replace(/\s+/g, " ").slice(0, 60),
     agents: ids.slice(), task, log: [] };
   sess["@group"] = sess["@group"] || [];
@@ -3597,9 +3597,10 @@ const server = http.createServer((req, res) => {
         if (!p.topic) throw new Error("no topic");
         // Concurrent meetings are allowed — disjoint teams huddle in parallel,
         // and the wallpaper ghost-splits anyone double-booked.
-        runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3));
+        const mkey = "g" + Date.now();
+        runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3), false, mkey);
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true }));
+        res.end(JSON.stringify({ ok: true, session: mkey }));
       } catch (e) {
         res.writeHead(400);
         res.end(String(e.message));
