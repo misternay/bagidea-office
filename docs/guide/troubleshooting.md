@@ -126,7 +126,7 @@ the installer** (re-running is safe; no data is lost).
 **The window state (open/closed) is out of sync**
 - The system sweeps every 5 seconds — wait a moment, or close and reopen the PROJECTS tab.
 
-## Voice (F6)
+## Voice (Right Ctrl)
 
 **Nothing happens when I press it**
 - Have you turned on Windows Voice Typing? Settings → Time & language → Speech
@@ -136,7 +136,7 @@ the installer** (re-running is safe; no data is lost).
 
 **My speech goes into another program**
 - The current version forces focus before opening the mic — if you still hit it, click the
-  chat window once before pressing F6, and feel free to file an issue.
+  chat window once before pressing Right Ctrl, and feel free to file an issue.
 
 ## Channels
 

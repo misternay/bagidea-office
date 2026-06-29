@@ -1045,17 +1045,45 @@ function pausePause(agent, prompt, project, key) {
   if (changed) savePaused();
 })();
 const WINPROJ = path.join(__dirname, "winproj.ps1");
+const MACPROJ = path.join(__dirname, "macproj.sh");
 const LIVEVIEW = path.join(__dirname, "liveview.ps1");
 
+// Cheap cached probe for `zenity` on PATH. Only meaningful on Linux; used by
+// the /platform endpoint's nativePick hint. Synchronous so the endpoint can
+// stay a plain JSON write — the result is memoized after the first call.
+let _zenityCache = null;
+function canZenity() {
+  if (process.platform !== "linux") return false;
+  if (_zenityCache !== null) return _zenityCache;
+  try {
+    // `command -v` is POSIX and always available in sh; throws when zenity
+    // is not on PATH — that's the "not installed" case.
+    require("child_process").execFileSync("sh", ["-c", "command -v zenity"],
+      { stdio: "ignore" });
+    _zenityCache = true;
+  } catch {
+    _zenityCache = false;
+  }
+  return _zenityCache;
+}
+
 function winproj(action, id, cb) {
-  // Windows-only: project-window show/hide/stop is driven by a PowerShell helper that
-  // walks the win32 window tree. On macOS/Linux there's no equivalent window tracking
-  // (projects just open in a terminal), so this is a graceful no-op.
-  if (process.platform !== "win32") { if (cb) cb(null, ""); return; }
-  const { execFile } = require("child_process");
-  execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass",
-    "-File", WINPROJ, action, String(id || "")],
-    { timeout: 20000, windowsHide: true }, (e, out) => cb && cb(e, out));
+  // Cross-platform project-window show/hide/stop/sweep.
+  // Windows: PowerShell helper (winproj.ps1) walks the win32 window tree.
+  // macOS:   AppleScript helper (macproj.sh) walks Terminal.app tabs.
+  // Linux:   no window tracking (projects open in user's terminal of choice).
+  if (process.platform === "win32") {
+    const { execFile } = require("child_process");
+    execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass",
+      "-File", WINPROJ, action, String(id || "")],
+      { timeout: 20000, windowsHide: true }, (e, out) => cb && cb(e, out));
+  } else if (process.platform === "darwin") {
+    const { execFile } = require("child_process");
+    execFile("/bin/bash", [MACPROJ, action, String(id || "")],
+      { timeout: 20000 }, (e, out) => cb && cb(e, out));
+  } else {
+    if (cb) cb(null, "");
+  }
 }
 
 function projectDir(id) {
@@ -1406,7 +1434,7 @@ SUB: <งานย่อยที่ชัดเจนครบถ้วนใ�
 </system-capability>`;
 
 function runClaude(agent, prompt, opts = {}) {
-  const task = "t" + ++taskCounter;
+  const task = opts.task || ("t" + ++taskCounter);   // opts.task: a failover re-run reuses the same task row
 
   // Session resolution: explicit key > latest > fresh. Fresh threads are
   // created up-front so their history records from the very first message.
@@ -1518,7 +1546,9 @@ function runClaude(agent, prompt, opts = {}) {
   let preamble = "";
   if (isFresh && a && (a.prompt || a.persona || (a.skills || []).length)) {
     preamble = `<persona>\nYou are "${a.name}" (${a.role}).\n${personaText(a)}\n`;
-    if (!nativeSkills) for (const sid of a.skills || []) {
+    // Inline-skills fallback (reg.nativeSkills === false): same baseline+assigned set
+    // the native path delivers as files, but written straight into the preamble.
+    if (!nativeSkills) for (const sid of skillsSync.effectiveIds(a.isUser ? [] : a.skills)) {
       const sk = reg.skills[sid];
       if (sk) preamble += `\n<skill name="${sk.name}">\n${sk.content}\n</skill>\n`;
     }
@@ -1557,7 +1587,11 @@ function runClaude(agent, prompt, opts = {}) {
   }
   if (entry && entry.sid) args.push("--resume", entry.sid);
   // Swappable brain: route this agent to its configured backend (else plain Claude).
-  const route = brainRoute(agent);
+  // opts.forceBrain (set by the failover path) overrides it — e.g. re-run on Claude
+  // after a non-Claude brain died mid-task.
+  const route = opts.forceBrain
+    ? providers.resolve(opts.forceBrain, "", reg, { proxyBase: "http://127.0.0.1:" + OEP_PORT })
+    : brainRoute(agent);
   if (route.modelArgs.length) args.push(...route.modelArgs);
   const child = spawn("claude", args, {
     cwd,
@@ -1605,18 +1639,35 @@ SPEAK: <ประโยคพูดสั้นๆ 1 ประโยค เป�
 ข้อยกเว้นเดียว: ถ้าเจ้าของสั่งให้อ่าน/รายงานด้วยเสียงแบบเต็มๆ ค่อยใส่เนื้อหายาวใน SPEAK ได้.
 </voice-capability>` : "";
   // 🖼 Make agent-shared media show inline. The chat auto-renders any absolute
-  // media path under the workspace/project as an image/video/audio player — so
-  // agents must SEND THE PATH, not describe the location or paste a link.
+  // media path — ANYWHERE on disk, not just under the workspace — as an image/
+  // video/audio player, so agents must SEND THE PATH, not describe the location
+  // or paste a link, and never need to copy a file into the workspace first.
   const MEDIA_NOTE = `
 
 <media-capability>
 ให้เจ้าของเห็น/ดู/ฟัง รูป-วิดีโอ-เสียง: พิมพ์ path เต็มของไฟล์ในบรรทัดของมันเอง
-(ไฟล์ต้องอยู่ในโปรเจค/workspace) ออฟฟิศจะ render เป็นรูป/เครื่องเล่นในแชทเอง —
+ออฟฟิศจะ render เป็นรูป/เครื่องเล่นในแชทเองทันที — ไฟล์อยู่ที่ไหนก็ได้บนเครื่อง
+(ในโปรเจค, workspace, Desktop, Downloads, ไดรฟ์อื่น…) ไม่ต้องก็อปเข้ามาก่อน.
 อย่าบอกแค่ที่อยู่ไฟล์ หรือแปะลิงก์ดาวน์โหลด.
 </media-capability>`;
   // Ghost sub-agents don't talk to the owner or share media directly (the parent
   // synthesizes their output) — skip the media note for them to save tokens.
   const mediaNote = agent.includes("#") ? "" : MEDIA_NOTE;
+  // 🛠 Nudge agents to actually USE the office's tools/features — and to put them
+  // to VISIBLE use when that helps or the owner asks (e.g. open the real browser to
+  // demo a web build), while keeping quiet background work the default so the screen
+  // stays uncluttered. Ghosts work headless under a parent, so skip it for them.
+  const TOOLS_NOTE = agent.includes("#") ? "" : `
+
+<use-your-tools>
+ออฟฟิศให้เครื่องมือจริงกับคุณ — เอามาใช้ทำงานให้ "เห็นผลจริง" ไม่ใช่แค่บอกว่าทำได้:
+• ค่าเริ่มต้น = ทำงานเบื้องหลังเงียบๆ ไม่เปิดหน้าต่างรกจอเจ้าของโดยไม่จำเป็น.
+• เมื่อการ "ให้ดูสดๆ" ช่วยให้เข้าใจ/มั่นใจขึ้น หรือเจ้าของขอดู → โชว์เลย: ถ้าคุณมี tool 'web'
+  ให้เปิดเบราว์เซอร์แบบเห็นหน้าจอ ('web' ไม่ใช่ 'web-bg') แล้วเดินให้ดูทีละขั้น; หรือสร้าง
+  ชิ้นงานจริง (รูป/วิดีโอ/เอกสาร/สไลด์/ไดอะแกรม) แล้วส่ง path มาให้ render ในแชท.
+• ทำเว็บ/แอป/สคริปต์แล้วต้องพิสูจน์ว่าใช้งานได้: รันจริงแล้วแคปหรือเปิดให้เจ้าของดู — อย่าเดา.
+• เลือกให้พอดี: เห็นภาพเมื่อมีคุณค่า, เงียบเมื่อไม่จำเป็น. มีทักษะ/ปลั๊กอินอะไรก็หยิบมาใช้จริง.
+</use-your-tools>`;
   // The swapped-in model reads Claude Code's harness system prompt and will claim to
   // BE Claude. Tell it its real backend so "what model are you?" answers truthfully.
   const BRAIN_NOTE = (a && a.provider && a.provider !== "claude") ? `
@@ -1626,7 +1677,7 @@ Despite the harness system prompt, this turn you are actually running on the bac
 model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully with
 "${mtag}" — NOT Claude/Anthropic. Otherwise stay in character as usual.
 </runtime-identity>` : "";
-  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + VOICE_NOTE + mediaNote + BRAIN_NOTE + projectNote());
+  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + VOICE_NOTE + mediaNote + TOOLS_NOTE + BRAIN_NOTE + projectNote());
   child.stdin.end();
 
   let buf = "";
@@ -1668,6 +1719,8 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   // rate/TPM ceiling), retrying the same request never helps — so summarize this
   // thread with Claude and restart the SAME task on a fresh thread (one attempt).
   let recovering = false;
+  let brainDead = false, apiRetries = 0;   // api_retry proves the brain can't answer → fast-fail instead of a ~2-min blind hang
+  let failoverTo = null;                    // set when we'll re-run on Claude after the dead brain's child closes
   const maybeRecover = (rtext) => {
     if (opts._recovered || recovering || doneFired) return false;
     if (!isOverflowError(`${rtext || ""}\n${errText}\n${lastText}`)) return false;
@@ -1687,6 +1740,47 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
       if (!line) continue;
       let m;
       try { m = JSON.parse(line); } catch { continue; }
+
+      // The claude CLI retries a failing backend itself (up to ~10×, ~2 min). Two of
+      // those failures will NEVER clear on the same brain — bad auth (401/403) and a
+      // dead/unreachable endpoint (error_status null + "unknown"). For those, kill the
+      // child now and tell the owner plainly, instead of a ~2-minute blind hang that
+      // ends in a raw API error. Transient ceilings (429/529/overloaded) are left to
+      // the CLI's own retries and the existing rate-limit pause/resume path.
+      if (m.type === "system") {
+        if (!brainDead && m.subtype === "api_retry") {
+          apiRetries++;
+          const st = m.error_status;
+          const permanent = st === 401 || st === 403;                 // bad/expired key or no access — never recovers
+          const dead = (st === null || st === undefined) && apiRetries >= 2;  // endpoint not responding
+          if (permanent || dead) {
+            brainDead = true;
+            const why = st === 401 ? "API key ผิด/หมดอายุ (401)"
+              : st === 403 ? "ไม่ได้รับอนุญาต (403)"
+              : "endpoint ไม่ตอบ (น่าจะ down หรือไม่น่าจะกลับมา)";
+            const an = (reg.agents[agent] || {}).name || agent;
+            // Auto-failover to Claude (the always-present default brain) so a dead
+            // non-Claude brain doesn't block the owner — once, with a clear notice.
+            // Disabled by reg.brainFailover === false; never loops (depth-bounded);
+            // Claude→Claude is pointless so only fail OVER from a non-Claude brain.
+            const depth = Number(opts._failover) || 0;
+            const canFailover = reg.brainFailover !== false && depth < 1
+              && typeof mtag === "string" && mtag && !mtag.startsWith("claude");
+            if (canFailover) {
+              failoverTo = "claude";   // the close handler re-runs on Claude
+              broadcast({ type: "chat.message", agent, task, session: entry.key, model: mtag,
+                text: `⚠️ สมองของ ${an} (${mtag}) ล้ม — ${why}.\n` +
+                  `🔁 รันต่อให้บน Claude อัตโนมัติเลย (ไม่ต้องสั่งใหม่)` });
+            } else {
+              broadcast({ type: "chat.message", agent, task, session: entry.key, model: mtag,
+                text: `⚠️ สมองของ ${an} (${mtag}) ใช้งานไม่ได้ — ${why}.\n` +
+                  `ตรวจ key/ตั้งค่าใน 🧠 BRAIN ของคุณคนนี้ (หรือเปลี่ยนสมอง) แล้วสั่งใหม่ — ไม่ต้องรอ retry ครบ 10 รอบ` });
+            }
+            try { killTree(child); } catch (e) { /* best-effort */ }
+          }
+        }
+        continue;   // system events carry no assistant/result content
+      }
 
       if (m.type === "assistant" && m.message && Array.isArray(m.message.content)) {
         for (const b of m.message.content) {
@@ -1807,7 +1901,22 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     broadcast({ type: "chat.message", agent, task, text: "adapter error: " + e.message });
     fireDone("", false);
   });
-  child.on("close", () => { if (!maybeRecover("")) fireDone(lastText, !!lastText); });
+  child.on("close", () => {
+    if (failoverTo) {
+      // The dead brain's run is over (don't fireDone — no task.failed for a
+      // failover); hand the SAME task to a fresh run on Claude so the row stays
+      // "running" and resolves normally when Claude finishes. Bounded by _failover
+      // depth in the brainDead handler, so this can fire at most once per task.
+      doneFired = true;
+      watchdog.clear();
+      runChildren.delete(task);
+      releaseProj();
+      runClaude(agent, prompt, { ...opts, task,
+        _failover: (Number(opts._failover) || 0) + 1, forceBrain: failoverTo });
+      return;
+    }
+    if (!maybeRecover("")) fireDone(lastText, !!lastText);
+  });
   return task;
 }
 
@@ -1888,10 +1997,16 @@ function autoRecoverOverflow(agent, prompt, opts, oldEntry) {
 let _teamListCache = null, _teamListKey = "";
 function teamList() {
   const ids = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main").sort();
-  const key = ids.map((id) => `${id}:${reg.agents[id].name}:${reg.agents[id].role}`).join("|");
+  const brainOf = (a) => a.model || a.provider || "claude";
+  // Include the brain in the cache key so a model change refreshes the list.
+  const key = ids.map((id) => { const a = reg.agents[id];
+    return `${id}:${a.name}:${a.role}:${brainOf(a)}`; }).join("|");
   if (_teamListKey === key && _teamListCache != null) return _teamListCache;
   _teamListKey = key;
-  _teamListCache = ids.map((id) => `- ${id}: ${reg.agents[id].name}, ${reg.agents[id].role}`)
+  // Show each teammate's fixed brain so the Director can route a task to the agent
+  // whose model fits — without changing anyone's model.
+  _teamListCache = ids.map((id) => { const a = reg.agents[id];
+    return `- ${id}: ${a.name}, ${a.role} · 🧠 ${brainOf(a)}`; })
     .join("\n") || "(no other staff yet)";
   return _teamListCache;
 }
@@ -1906,8 +2021,12 @@ function directorNote() {
   return `
 
 <system-capability>
-You are the Director. Your team:
+You are the Director. Your team (each with the brain 🧠 the owner gave them):
 ${teamList()}
+Each teammate runs on its OWN fixed brain (model) — and so do you. When a task suits a
+particular model, you do NOT switch models: you DELEGATE it to the teammate who already
+has that brain. You never change anyone's brain, or your own — that's the owner's 🧠
+editor, not your call. Your job is to analyze the task and route it, never to swap models.
 To hand work to a member, include a line EXACTLY in this format:
 DELEGATE: <agent_id> :: <clear, self-contained instruction>
 When the work belongs inside a registered project, ROUTE it explicitly:
@@ -1933,6 +2052,15 @@ PROJECT: <ชื่อโปรเจค> @ <ชื่อ place หรือ ful
 สำคัญมาก: ห้ามสั่งให้สมาชิกไปสร้างโปรเจคเอง และห้ามทำงานของโปรเจคนอกบรรทัด DELEGATE @ —
 ไม่งั้นงานจะไม่ได้รันอยู่ "ข้างใน" โปรเจคจริงๆ (เจ้าของ resume session ต่อไม่ได้).
 ห้ามสร้างโปรเจคเองโดยผู้ใช้ไม่ได้สั่ง
+
+DEFINITION OF DONE — งานจะ "เสร็จ" ก็ต่อเมื่อผลของมัน "มีผลจริงในระบบที่รันอยู่" และคุณ
+verify แล้วเท่านั้น — ไม่ใช่แค่ "เขียนไฟล์เสร็จ". ก่อนรายงานเจ้าของว่าเสร็จ ให้ยืนยันว่าการ
+เปลี่ยนแปลงถูกนำไปใช้จริง (ของที่ build/แก้ในโปรเจคหรือ mirror ยังไม่มีผลจนกว่าจะถูก deploy ไป
+ที่ที่ระบบโหลดจริง + reload + เช็คว่าเวอร์ชัน/พฤติกรรมที่รันอยู่ตรงกับที่ทำ). โดยเฉพาะ plugin:
+มันรันจาก plugins/<id>/ เท่านั้น — ถ้าทีม build/แก้ที่อื่น ต้อง copy เข้า plugins/<id> (ห้ามทับ
+data/), reload, แล้วเช็ค GET /plugins ว่าขึ้นเวอร์ชันใหม่ + log ไม่มี load fail ก่อนถือว่าเสร็จ
+(ใช้ skill "Plugin Builder"). "สร้างเสร็จ" ≠ "กำลังรันอยู่". การ push ขึ้น git/Hub เป็นขั้นแยก
+ที่ต้องให้เจ้าของอนุมัติเสมอ ไม่ถือว่าเป็นส่วนของ "เสร็จ" โดยอัตโนมัติ
 </system-capability>`;
 }
 
@@ -2881,6 +3009,16 @@ const PROPOSALS = path.join(__dirname, "proposals.json");
 let proposals = loadJson(PROPOSALS, []);
 const saveProposals = () => fs.writeFileSync(PROPOSALS, JSON.stringify(proposals, null, 2));
 
+// Action Items (per ADR-0001) — NOT jobs.json. A meeting's follow-ups live in
+// their own per-meeting file: workspace/meetings/<key>.actions.json. Each item
+// is { id, meeting, owner, text, due, status, created }. Owner is a roster id.
+function actionsPath(meetingKey) { return path.join(WORKSPACE, "meetings", `${meetingKey}.actions.json`); }
+function loadActions(meetingKey) { return loadJson(actionsPath(meetingKey), []); }
+function saveActions(meetingKey, arr) {
+  try { fs.mkdirSync(path.join(WORKSPACE, "meetings"), { recursive: true }); } catch {}
+  fs.writeFileSync(actionsPath(meetingKey), JSON.stringify(arr, null, 2));
+}
+
 const BANTER = [
   ["{a}: เห็นเจ้าเหมียวงีบบนโซฟาอีกแล้ว อิจฉาชีวิตมัน 🐱", "{b}: อย่าไปทักนะ เดี๋ยวตื่นมาเหยียบคีย์บอร์ดผม", "{a}: ครั้งก่อนมันพิมพ์ ggggggg ลงรายงานผมไป 555"],
   ["{a}: เมื่อกี้เตะบอลข้ามตึกไปเลยนะ เห็นป่ะ ⚽", "{b}: เห็น… มันลอยผ่านหัว CEO ไปเฉียดมาก", "{a}: งั้นทำเงียบๆ ไว้นะ 🤫"],
@@ -3001,78 +3139,247 @@ function addProposal(by, agents, name, detail) {
 // while ANY meeting is live, without forcing meetings to be one-at-a-time.
 let activeDiscussions = 0;
 
-async function runDiscussion(ids, topic, rounds, social) {
+// Live meetings: keyed by entry.key, value { entry, ctrl:{paused,ended} }.
+// The source of truth for "is this meeting live?" — the owner's speak bar and
+// the /discuss/message + /discuss/control endpoints consult it. (activeDiscussions
+// above is just a count, kept for socialTick gating; this Map is the lookup.)
+const activeMeetings = new Map();
+const PAUSE_AUTO_RESUME_MS = 10 * 60000;  // a forgotten pause must not freeze social ticks forever
+
+// Meeting phases — the structure every NON-social meeting runs through. Social
+// chats collapse to a single `chat` phase (the PROPOSAL block below still fires).
+// Decision/action synthesis is NOT a phase: one summary secretary owns it (see
+// generateMeetingSummary) so there's one canonical action-item list, not N.
+const OPENING_INSTRUCTION =
+  "Open the meeting: give YOUR 1–2 sentence starting position on the topic — " +
+  "your take, grounded in the context you were given. Do not yet react to others; " +
+  "just stake your opening. Plain text, same language as the topic.";
+const DISCUSSION_INSTRUCTION =
+  "Build on the others: respond to what's been said, advance the topic, " +
+  "stay concrete. Max 3 sentences, plain text, same language as the topic.";
+
+// The social/break-room PROPOSAL instruction block — preserved verbatim. Keeping
+// it as one extracted constant makes the social path explicit and prevents the
+// regression where a phase rewrite silently drops project-pitch generation.
+const SOCIAL_PROPOSAL_INSTRUCTION =
+  `\nคุณภาพสำคัญกว่าปริมาณเสมอ. ส่วนใหญ่ไอเดียควร "อยู่เป็นไอเดีย" — เสนอเฉพาะอันที่` +
+  `มีประโยชน์จริง ใช้ได้จริง และคุณจะใช้มันเองหรือเจ้าของได้ใช้จริง ๆ. ` +
+  `อย่าเสนอของเล่นทิ้งขว้างหรือ plugin ขยะ และอย่าเสนอถี่ — ถ้ายังไม่ตกผลึกหรือยังไม่คุ้ม อย่าเพิ่งเสนอ.\n` +
+  `ก่อนจะเสนอ ถามตัวเองให้ครบ: ใครได้ใช้? แก้ปัญหาอะไรจริง ๆ? ทำไมถึงคุ้มที่จะสร้าง? ดีกว่าของที่มีอยู่ตรงไหน?\n` +
+  `ถ้าตกผลึกเป็นโปรเจคที่ "ควรสร้างจริง" ให้เพิ่มบรรทัดสุดท้าย:\n` +
+  `PROPOSAL: <ชื่อโปรเจค> :: <อธิบายให้ชัด: ทำอะไร ใครใช้ แก้ปัญหาอะไร และทำไมถึงคุ้ม — ให้เจ้าของตัดสินใจได้>\n` +
+  `คิดให้รอบคอบและคิดการใหญ่ได้: plugin ที่จริงจังมี UI + แก้ปัญหาให้เจ้าของได้จริง, หรือเป็น` +
+  `เว็บ/เว็บแอป/โปรแกรม/เครื่องมือที่ใช้งานได้จริง (โปรเจคอิสระใน workspace). เลือกขนาดให้เหมาะกับคุณค่าของมัน.\n` +
+  `กติกาความปลอดภัยข้อเดียว: ถ้าจะต่อยอดกับตัวโปรแกรม BagIdea Office เองให้เสนอเป็น ` +
+  `"plugin" เท่านั้น (ดู docs/guide/plugins.md — plugin เข้าถึงโปรแกรมได้ลึก: panel, route, command, ` +
+  `broadcast, ฯลฯ ทำเป็น solution จริงให้เจ้าของได้) — ห้ามแก้ระบบหลัก (daemon/godot/shell) ตรง ๆ เพราะจะทำให้โปรแกรมพัง.`;
+
+// Meeting templates fill the launcher (topic + discussion depth). Pure data —
+// the overlay maps them to a <select>; they never change phase structure.
+const MEETING_TEMPLATES = [
+  { id: "standup",       label: "Standup",       topic: "Standup: what you did / will do / blockers", rounds: 1 },
+  { id: "retro",         label: "Retro",         topic: "Retro: what went well / badly / to improve", rounds: 2 },
+  { id: "brainstorm",    label: "Brainstorm",    topic: "Brainstorm: generate ideas, no judgment yet", rounds: 3 },
+  { id: "design-review", label: "Design Review", topic: "Design review: questions, critique, suggestions", rounds: 2 },
+  { id: "planning",      label: "Planning",      topic: "Planning: goal, steps, owners, timeline",     rounds: 2 }
+];
+
+// Build once-per-meeting grounding context. Projects come from the retrieval
+// index (tier "proj"); per-agent private memory (workspace/memory/<id>.md) is
+// returned keyed by agent so the caller injects it ONLY into that agent's own
+// opening prompt — memory never crosses between agents.
+function buildMeetingContext(topic, ids) {
+  let projectBlurb = "";
+  try {
+    if (retrievalOk) {
+      const hits = retrieval.search(topic, { k: 3, tiers: ["proj"] }) || [];
+      if (hits.length) projectBlurb = "Related projects:\n" +
+        hits.map((h) => `- ${(h.name || h.ref || "").slice(0, 80)}: ${(h.text || "").slice(0, 160)}`).join("\n");
+    }
+  } catch (e) { console.error("[meeting] context projects failed:", e && e.message); }
+  const memory = {};
+  try {
+    for (const id of ids) {
+      const file = path.join(WORKSPACE, "memory", `${id}.md`);
+      const m = fs.existsSync(file) && fs.readFileSync(file, "utf8");
+      if (m) memory[id] = m.slice(0, 1200);  // private to this agent
+    }
+  } catch (e) { console.error("[meeting] context memory failed:", e && e.message); }
+  return { projectBlurb, memory };
+}
+
+// Dynamic sliding window: enough turns to stay grounded, capped so a long
+// meeting never feeds the whole transcript to every call. The cap (20) only
+// bites around ~96 messages — a safety ceiling, not the common case.
+function windowSize(len) { return Math.min(20, 8 + Math.floor(len / 8)); }
+
+// Summarize a finished meeting in ONE call: markdown minutes + a fenced JSON
+// actionItems[] array. Owners are validated against the roster (unknown owners
+// are dropped — better a missing item than a phantom assignee). Returns
+// { summary, actions } where either may be "" / [] if the model declines.
+async function generateMeetingSummary(entry, ids) {
+  const names = ids.map((id) => `${id} (${(reg.agents[id] || { name: id }).name})`).join(", ");
+  const transcript = entry.log
+    .map((m) => `[${m.phase || "chat"}] ${(reg.agents[m.who] || { name: m.who }).name}: ${m.text}`)
+    .join("\n");
+  const roster = ids.join(", ");
+  const prompt =
+    `You are the secretary summarizing a just-finished team meeting.\n` +
+    `Topic: ${entry.title}\nParticipants: ${names}\n\nTranscript:\n${transcript}\n\n` +
+    `Write a concise markdown summary with sections: ## Summary, ## Decisions, ## Open Questions.\n` +
+    `Then output ONE fenced block of JSON — an array of action items, each ` +
+    `{ "owner": "<one of: ${roster}>", "text": "<the follow-up>", "due": "<optional>" }.\n` +
+    `Only use owners from the list above. If there are no action items, output [].\n` +
+    `\`\`\`json\n[]\n\`\`\``;
+  let raw = "";
+  try { raw = await claudeText(prompt, { tools: "" }); }
+  catch (e) { console.error("[meeting] summary claudeText failed:", e && e.message); }
+  // Pull the last fenced ```json ... ``` block out of the response.
+  const blocks = [...raw.matchAll(/```json\s*([\s\S]*?)```/gi)].map((m) => m[1]);
+  let actions = [];
+  if (blocks.length) {
+    try {
+      const parsed = JSON.parse(blocks[blocks.length - 1]);
+      if (Array.isArray(parsed)) actions = parsed
+        .filter((a) => a && ids.includes(a.owner) && a.text)
+        .map((a) => ({ owner: a.owner, text: String(a.text).slice(0, 300), due: a.due || "" }));
+    } catch (e) { console.error("[meeting] summary JSON parse failed:", e && e.message); }
+  }
+  // Summary prose = the markdown minus the fenced block(s).
+  const summary = raw.replace(/```json\s*[\s\S]*?```/gi, "").trim();
+  return { summary, actions };
+}
+
+async function runDiscussion(ids, topic, rounds, social, preKey) {
   activeDiscussions++;
   const task = "disc" + (Date.now() % 100000);
   // Every meeting is a persistent GROUP session ("@group" bucket): topic,
   // participants and the full transcript — readable later from the thread
   // menu, and written to workspace/meetings/ so agents can grep it too.
-  const entry = { key: "g" + Date.now(), sid: null, ts: Date.now(),
+  const entry = { key: preKey || ("g" + Date.now()), sid: null, ts: Date.now(),
     title: String(topic).replace(/\s+/g, " ").slice(0, 60),
-    agents: ids.slice(), log: [] };
+    agents: ids.slice(), task, log: [] };
   sess["@group"] = sess["@group"] || [];
   sess["@group"].push(entry);
   saveSess();
+  // Register as live so the owner can speak into it and control it. ctrl is a
+  // shared object the loop re-reads every turn; /discuss/control mutates it.
+  const ctrl = { paused: false, ended: false, pausedAt: 0 };
+  activeMeetings.set(entry.key, { entry, ctrl });
   broadcast({ type: "collab.started", agents: ids, task, text: topic, session: entry.key });
+  broadcast({ type: "meeting.live", session: entry.key, topic: entry.title, agents: ids });
+  // Build grounding context once. projectBlurb is shared; memory[id] is private.
+  const ctx = social ? { projectBlurb: "", memory: {} } : buildMeetingContext(topic, ids);
+  // Phases: social collapses to one `chat` phase (PROPOSAL block still fires).
+  const phases = social
+    ? [{ name: "chat", instruction: "", rounds: rounds || 1 }]
+    : [{ name: "opening", instruction: OPENING_INSTRUCTION, rounds: 1 },
+       { name: "discussion", instruction: DISCUSSION_INSTRUCTION, rounds: Math.max(1, rounds || 2) }];
   try {
-    for (let r = 0; r < rounds; r++) {
-      for (const id of ids) {
-        const a = reg.agents[id] || { name: id, role: "Staff", prompt: "" };
-        // Feed only the recent exchanges (sliding window), never the whole meeting
-        // — bounds each call instead of growing O(agents×rounds). The full record
-        // still lives in entry.log and the saved minutes.
-        const recent = entry.log.slice(-8)
-          .map((m) => `${(reg.agents[m.who] || { name: m.who }).name}: ${m.text}`).join("\n");
-        const text = await claudeText(
-          `You are "${a.name}" (${a.role}) in a ${social ? "casual break-room chat" : "team meeting"} at the office.\n` +
-          (a.prompt ? `Your persona: ${a.prompt}\n` : "") +
-          `Meeting topic: ${topic}\n` +
-          (recent ? `Recent discussion:\n${recent}\n` : "You open the meeting.\n") +
-          `Give YOUR next contribution as ${a.name}: concrete, build on the others, ` +
-          `max 3 sentences, plain text only, in the same language as the topic.` +
-          `\nถ้าจำเป็นต้องใช้ข้อมูลจริงเพื่อให้ความเห็นแน่นขึ้น คุณค้นเองได้ ` +
-          `(WebSearch / WebFetch / Read) — เฉพาะตอนที่จำเป็นจริงๆ เท่านั้น ไม่ต้องค้นพร่ำเพรื่อ ` +
-          `และตอบกลับเป็นข้อความสนทนาตามปกติ.` +
-          (social ? `\nคุณภาพสำคัญกว่าปริมาณเสมอ. ส่วนใหญ่ไอเดียควร "อยู่เป็นไอเดีย" — เสนอเฉพาะอันที่` +
-            `มีประโยชน์จริง ใช้ได้จริง และคุณจะใช้มันเองหรือเจ้าของได้ใช้จริง ๆ. ` +
-            `อย่าเสนอของเล่นทิ้งขว้างหรือ plugin ขยะ และอย่าเสนอถี่ — ถ้ายังไม่ตกผลึกหรือยังไม่คุ้ม อย่าเพิ่งเสนอ.\n` +
-            `ก่อนจะเสนอ ถามตัวเองให้ครบ: ใครได้ใช้? แก้ปัญหาอะไรจริง ๆ? ทำไมถึงคุ้มที่จะสร้าง? ดีกว่าของที่มีอยู่ตรงไหน?\n` +
-            `ถ้าตกผลึกเป็นโปรเจคที่ "ควรสร้างจริง" ให้เพิ่มบรรทัดสุดท้าย:\n` +
-            `PROPOSAL: <ชื่อโปรเจค> :: <อธิบายให้ชัด: ทำอะไร ใครใช้ แก้ปัญหาอะไร และทำไมถึงคุ้ม — ให้เจ้าของตัดสินใจได้>\n` +
-            `คิดให้รอบคอบและคิดการใหญ่ได้: plugin ที่จริงจังมี UI + แก้ปัญหาให้เจ้าของได้จริง, หรือเป็น` +
-            `เว็บ/เว็บแอป/โปรแกรม/เครื่องมือที่ใช้งานได้จริง (โปรเจคอิสระใน workspace). เลือกขนาดให้เหมาะกับคุณค่าของมัน.\n` +
-            `กติกาความปลอดภัยข้อเดียว: ถ้าจะต่อยอดกับตัวโปรแกรม BagIdea Office เองให้เสนอเป็น ` +
-            `"plugin" เท่านั้น (ดู docs/guide/plugins.md — plugin เข้าถึงโปรแกรมได้ลึก: panel, route, command, ` +
-            `broadcast, ฯลฯ ทำเป็น solution จริงให้เจ้าของได้) — ห้ามแก้ระบบหลัก (daemon/godot/shell) ตรง ๆ เพราะจะทำให้โปรแกรมพัง.` : ""),
-          { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
-        let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
-        // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
-        const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
-        if (pm) {
-          line = line.replace(/PROPOSAL:.*$/, "").trim();
-          addProposal(id, ids, pm[1], pm[2]);
-        }
-        if (line) {
-          entry.log.push({ who: id, text: line, ts: Date.now() });
-          saveSess();
-          broadcast({ type: "chat.message", agent: id, task, text: line, session: entry.key });
+    outerPhase:
+    for (const phase of phases) {
+      for (let r = 0; r < phase.rounds; r++) {
+        for (const id of ids) {
+          // Re-fetch controls before each turn — End while paused must exit the
+          // WHOLE meeting, not just the inner loop (hence the labeled break).
+          if (ctrl.ended) break outerPhase;
+          // Graceful pause: don't START the next turn (claudeText has no kill
+          // path, so a mid-turn pause can't interrupt). Spin until resumed or
+          // ended. Auto-resume after PAUSE_AUTO_RESUME_MS so a forgotten pause
+          // can't freeze social ticks indefinitely.
+          while (ctrl.paused && !ctrl.ended) {
+            if (ctrl.pausedAt && Date.now() - ctrl.pausedAt > PAUSE_AUTO_RESUME_MS) {
+              ctrl.paused = false; ctrl.pausedAt = 0;
+              broadcast({ type: "meeting.resumed", session: entry.key, via: "auto-resume" });
+              break;
+            }
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          if (ctrl.ended) break outerPhase;
+
+          const a = reg.agents[id] || { name: id, role: "Staff", prompt: "" };
+          // Sliding window — bounds each call instead of growing O(agents×rounds).
+          const win = windowSize(entry.log.length);
+          const recent = entry.log.slice(-win)
+            .map((m) => `${(reg.agents[m.who] || { name: m.who }).name}: ${m.text}`).join("\n");
+          const isOpening = phase.name === "opening";
+          const text = await claudeText(
+            `You are "${a.name}" (${a.role}) in a ${social ? "casual break-room chat" : "team meeting"} at the office.\n` +
+            (a.prompt ? `Your persona: ${a.prompt}\n` : "") +
+            `Meeting topic: ${topic}\n` +
+            (ctx.projectBlurb && isOpening ? `${ctx.projectBlurb}\n` : "") +
+            (isOpening && ctx.memory[id] ? `Your private memory (only you see this):\n${ctx.memory[id]}\n` : "") +
+            (recent ? `Recent discussion:\n${recent}\n` : "You open the meeting.\n") +
+            `Phase: ${phase.name}. ` +
+            (social ? `Give YOUR next contribution as ${a.name}.` : phase.instruction) +
+            `\nถ้าจำเป็นต้องใช้ข้อมูลจริงเพื่อให้ความเห็นแน่นขึ้น คุณค้นเองได้ ` +
+            `(WebSearch / WebFetch / Read) — เฉพาะตอนที่จำเป็นจริงๆ เท่านั้น ไม่ต้องค้นพร่ำเพรื่อ ` +
+            `และตอบกลับเป็นข้อความสนทนาตามปกติ.` +
+            (social ? SOCIAL_PROPOSAL_INSTRUCTION : ""),
+            { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
+          let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
+          // If the owner pressed End while this claude call was in flight, drop the
+          // lagging reply entirely — otherwise it would surface as a ghost message
+          // AFTER meeting.ended has already fired and the summary has been written
+          // (transcript would then disagree with the minutes).
+          if (ctrl.ended) break outerPhase;
+          // PROPOSAL: a project pitch for the owner to approve — protocol, not prose.
+          const pm = text.match(/PROPOSAL:\s*([^:]+?)\s*::\s*(.+)/);
+          if (pm) {
+            line = line.replace(/PROPOSAL:.*$/, "").trim();
+            addProposal(id, ids, pm[1], pm[2]);
+          }
+          if (line) {
+            entry.log.push({ who: id, text: line, ts: Date.now(), phase: phase.name });
+            saveSess();
+            broadcast({ type: "chat.message", agent: id, task, text: line, session: entry.key, phase: phase.name });
+          }
         }
       }
     }
   } finally {
     broadcast({ type: "collab.ended", agents: ids, task, session: entry.key });
+    broadcast({ type: "meeting.ended", session: entry.key });
+    activeMeetings.delete(entry.key);
     activeDiscussions = Math.max(0, activeDiscussions - 1);
+    // One summary secretary → one canonical action-item list (per ADR-0001 these
+    // live in their own .actions.json, NOT jobs.json, and NOT on Mission Control).
+    // The summary call is best-effort: it must NEVER block or throw away the
+    // minutes (a hung/slow/failed claude can't lose the transcript). Minutes are
+    // written FIRST with whatever we have, then enriched if the summary lands.
+    let summary = "", actions = [];
+    try {
+      ({ summary, actions } = social ? { summary: "", actions: [] }
+        : await generateMeetingSummary(entry, ids));
+    } catch (e) {
+      console.error("[meeting] summary generation failed:", e && e.message);
+      summary = "(summary generation failed)";
+      actions = [];
+    }
+    // Always attempt to save and broadcast action items, even if summary failed
+    try {
+      if (actions.length) {
+        const stamped = actions.map((a, i) => ({
+          id: `${entry.key}-${i + 1}`, meeting: entry.key, owner: a.owner,
+          text: a.text, due: a.due || "", status: "open", created: Date.now()
+        }));
+        saveActions(entry.key, stamped);
+        for (const a of stamped)
+          broadcast({ type: "meeting.action", action: a, session: entry.key });
+      }
+    } catch (e) { console.error("[meeting] action items save failed:", e && e.message); }
     // Markdown minutes inside the agents' workspace — searchable by them.
     try {
       const dir = path.join(WORKSPACE, "meetings");
       fs.mkdirSync(dir, { recursive: true });
       const names = ids.map((id) => (reg.agents[id] || { name: id }).name).join(", ");
+      const summaryBlock = summary ? `## Summary\n\n${summary}\n\n## Transcript\n\n` : "";
       const md = `# Meeting: ${entry.title}\n\n- Date: ${new Date(entry.ts).toISOString()}\n` +
-        `- Participants: ${names}\n\n## Transcript\n\n` +
-        entry.log.map((m) => `**${(reg.agents[m.who] || { name: m.who }).name}**: ${m.text}`).join("\n\n") + "\n";
+        `- Participants: ${names}\n\n${summaryBlock}` +
+        entry.log.map((m) => `**[${m.phase || "chat"}] ${(reg.agents[m.who] || { name: m.who }).name}**: ${m.text}`).join("\n\n") + "\n";
       fs.writeFileSync(path.join(dir, `${entry.key}.md`), md);
       try { if (retrievalOk) { retrieval.addDoc("arch", "meeting", `arch:meeting:${entry.key}`, md.slice(0, 1200)); retrieval.persist(); } } catch {}
-    } catch {}
+    } catch (e) { console.error("[meeting] minutes write failed:", e && e.message); }
   }
 }
 
@@ -3103,6 +3410,7 @@ const MEDIA_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
   mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime",
   mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg",
   pdf: "application/pdf" };
+const isMediaPath = (p) => !!MEDIA_MIME[String(p).split(".").pop().toLowerCase()];
 function serveMedia(res, full, req) {
   const ext = full.split(".").pop().toLowerCase();
   const mime = MEDIA_MIME[ext];
@@ -3375,7 +3683,11 @@ const server = http.createServer((req, res) => {
     const q = new URL(req.url, "http://x").searchParams;
     const entry = (sess[q.get("agent")] || []).find((e) => e.key === q.get("key"));
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ log: (entry && entry.log) || [] }));
+    // live=true tells the overlay it may show the speak bar + controls for this
+    // meeting (a finished Meeting Log stays read-only). Only group meetings are
+    // ever live; @sub logs never are.
+    res.end(JSON.stringify({ log: (entry && entry.log) || [],
+      live: !!(entry && activeMeetings.has(entry.key)) }));
 
   } else if (req.method === "GET" && req.url === "/sessions/all") {
     res.writeHead(200, { "content-type": "application/json" });
@@ -3483,6 +3795,24 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "GET" && req.url.startsWith("/sessions/") && req.url.includes("/actions")) {
+    // GET /sessions/:key/actions — retrieve action items for a historical meeting
+    const pathParts = req.url.split("/");
+    const key = pathParts[2];
+    try {
+      const actions = loadActions(key);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ actions }));
+    } catch (e) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ actions: [] }));
+    }
+
+  } else if (req.method === "GET" && req.url === "/meeting-templates") {
+    // GET /meeting-templates — serve meeting templates to eliminate client-side duplication
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ templates: MEETING_TEMPLATES }));
+
   } else if (req.method === "GET" && req.url.startsWith("/sessions")) {
     const agent = new URL(req.url, "http://x").searchParams.get("agent") || "main";
     const list = (sess[agent] || []).slice().sort((a, b) => b.ts - a.ts).slice(0, 20);
@@ -3524,13 +3854,74 @@ const server = http.createServer((req, res) => {
       try {
         const p = JSON.parse(body);
         const ids = (p.agents || []).filter((id) => id !== "ceo").slice(0, 4);
+        // Validate every participant exists in the roster — a stray id would
+        // otherwise be silently impersonated by the {name:id} fallback.
+        const bad = ids.find((id) => !reg.agents[id]);
+        if (bad) throw new Error("unknown agent: " + bad);
         if (ids.length < 2) throw new Error("need at least 2 agents");
         if (!p.topic) throw new Error("no topic");
         // Concurrent meetings are allowed — disjoint teams huddle in parallel,
         // and the wallpaper ghost-splits anyone double-booked.
-        runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3));
+        const mkey = "g" + Date.now();
+        runDiscussion(ids, String(p.topic), Math.min(Math.max(Number(p.rounds) || 2, 1), 3), false, mkey);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: mkey }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(String(e.message));
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/discuss/message") {
+    // Owner speaks into a LIVE meeting. No async chain, no per-agent claudeText:
+    // we just append the CEO's line to entry.log (phase "user") and broadcast
+    // it. The main loop's sliding window picks it up on the next agent's turn,
+    // so replies arrive in turn order — no racing claude processes.
+    // Owner-only — this is the human speaking AS the CEO into the meeting, so an
+    // agent must not be able to forge a CEO line and steer the discussion.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const { session, text } = JSON.parse(body);
+        const live = activeMeetings.get(session);
+        if (!live) { res.writeHead(404); return res.end("meeting not live"); }
+        const msg = String(text || "").trim().slice(0, 1000);
+        if (!msg) throw new Error("empty message");
+        live.entry.log.push({ who: "ceo", text: msg, ts: Date.now(), phase: "user" });
+        saveSess();
+        broadcast({ type: "chat.message", agent: "ceo", task: live.entry.task,
+          text: msg, session, phase: "user" });
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400);
+        res.end(String(e.message));
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/discuss/control") {
+    // Pause / resume / skip / end a live meeting. Mutates the shared ctrl object
+    // the loop re-reads every turn — graceful (pause = don't start next turn).
+    // Owner-only — the human controls meetings, not an agent (which could otherwise
+    // silently end or stall a discussion). Same boundary as the other control routes.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const { session, action } = JSON.parse(body);
+        const live = activeMeetings.get(session);
+        if (!live) { res.writeHead(404); return res.end("meeting not live"); }
+        const c = live.ctrl;
+        switch (String(action)) {
+          case "pause":  c.paused = true;  c.pausedAt = Date.now(); break;
+          case "resume": c.paused = false; c.pausedAt = 0;          break;
+          case "skip":   /* loop advances naturally; no-op flag */   break;
+          case "end":    c.ended = true;   c.paused = false;         break;
+          default: throw new Error("bad action");
+        }
+        broadcast({ type: "meeting.control", session, action,
+          paused: c.paused, ended: c.ended });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, paused: c.paused, ended: c.ended }));
       } catch (e) {
         res.writeHead(400);
         res.end(String(e.message));
@@ -3583,8 +3974,14 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ q, hits, stats: retrievalOk ? retrieval.stats() : null }));
 
   } else if (req.method === "POST" && req.url === "/registry/agent") {
-    // Create or update an agent. Protected rows (main/ceo) accept edits but
-    // never deletion; id is derived from the name on first save.
+    // Create or update an agent — including its BRAIN (provider/model), persona,
+    // skills and tools. Owner-only (the human editor): a teammate must never be able
+    // to reassign its own or anyone else's model. An agent told to "use the right
+    // model for the job" routes the work to whoever already has that brain — it does
+    // not edit brains here. Without the UI header this is a 403.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only — agents route work, they don't change brains"); }
+    // Protected rows (main/ceo) accept edits but never deletion; id is derived
+    // from the name on first save.
     readBody(req, (body) => {
       try {
         const p = JSON.parse(body);
@@ -3633,6 +4030,8 @@ const server = http.createServer((req, res) => {
     });
 
   } else if (req.method === "POST" && req.url === "/registry/agent/delete") {
+    // Owner-only — a teammate must not be able to remove other teammates.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
     readBody(req, (body) => {
       try {
         const { id } = JSON.parse(body);
@@ -3834,12 +4233,27 @@ const server = http.createServer((req, res) => {
             spawn("cmd.exe", [line],
               { windowsVerbatimArguments: true, windowsHide: true, detached: true });
           } else if (process.platform === "darwin") {
-            // macOS: Open a new terminal window, cd to project dir, run claude
+            // macOS: Open a new Terminal.app window, cd to project dir, run
+            // claude, then set the window's custom title to BAGIDEA_PROJ_<id>
+            // so macproj.sh sweep can identify it — mirrors the Windows
+            // --suppressApplicationTitle approach.
             const cmd = psCmd || "";
             // psCmd on Windows is `-Command "..."` — extract the inner command for macOS
             const innerCmd = cmd.match(/-Command\s+"(.+)"/)?.[1] || "";
             const shellCmd = innerCmd || "exec bash";
-            const script = `tell application "Terminal" to do script "cd '${dir.replace(/'/g, "'\\''")}' && ${shellCmd}"`;
+            // Extract marker (#BAGIDEA_PROJ_<id>) from the command, or fall
+            // back to the title parameter the caller already passes.
+            const marker = (innerCmd.match(/#(BAGIDEA_PROJ_[\w-]+)/) || [])[1] || title;
+            const esc = (s) => s.replace(/'/g, "'\\''");
+            // Escape for AppleScript double-quoted string: backslash first, then dquote.
+            const asEsc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+            // Capture the tab reference from `do script` so `set custom title`
+            // targets exactly the window we just opened — `front window` is a
+            // race when Terminal is busy creating the tab.
+            const script = `tell application "Terminal"
+  set t to do script "cd '${esc(dir)}' && ${esc(shellCmd)}"
+  set custom title of (window 1 where tabs contains t) to "${asEsc(marker)}"
+end tell`;
             spawn("osascript", ["-e", script], { detached: true });
           } else {
             // Linux: open a terminal at `dir` running the command. The Windows psCmd is
@@ -3998,6 +4412,49 @@ const server = http.createServer((req, res) => {
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
+
+  } else if (req.method === "POST" && req.url === "/fs/native-pick") {
+    // Native OS folder picker — cross-platform:
+    //   macOS:   osascript `choose folder` (NSOpenPanel)
+    //   Windows: PowerShell FolderBrowserDialog
+    //   Linux:   zenity --file-selection --directory (if installed)
+    // Linux without zenity returns 404 so the client falls back to the
+    // in-house picker. A cancelled dialog returns { path: null }.
+    // Human-UI only, same boundary as the other /fs + /task + /projects
+    // endpoints that surface a modal dialog to the user.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    const { execFile } = require("child_process");
+    const picked = (p) => {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ path: p || null }));
+    };
+    if (process.platform === "darwin") {
+      execFile("osascript", ["-e", "try\nPOSIX path of (choose folder)\non error\n\"\"\nend try"],
+        { timeout: 300000 }, (e, out) => {
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    } else if (process.platform === "win32") {
+      // FolderBrowserDialog.ShowDialog() needs STA. powershell.exe (5.1, the
+      // common case) is STA by default so this just works. pwsh (7+) is MTA
+      // and would throw — we hardcode "powershell" (5.1) to stay on STA.
+      const ps = "Add-Type -AssemblyName System.Windows.Forms; " +
+        "$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
+        "if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath } else { '' }";
+      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+        { timeout: 300000, windowsHide: true }, (e, out) => {
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    } else {
+      // Linux: zenity if installed. ENOENT → 404 (client falls back to in-house).
+      execFile("zenity", ["--file-selection", "--directory"],
+        { timeout: 300000 }, (e, out) => {
+          if (e && e.code === "ENOENT") { res.writeHead(404); res.end("zenity not installed"); return; }
+          if (e) { res.writeHead(500); res.end(String(e.message)); return; }
+          picked(String(out || "").trim());
+        });
+    }
 
   } else if (req.method === "POST" && req.url === "/places") {
     readBody(req, (body) => {
@@ -4175,6 +4632,8 @@ const server = http.createServer((req, res) => {
     // 🧠 Swappable-brain credentials: per-provider token / baseUrl / model
     // overrides (glm/deepseek/qwen/minimax/litellm…). Values live only in
     // registry.json + the agent's spawn env — never sent to Anthropic.
+    // Owner-only (handles secrets + brain config) — same boundary as /registry/agent.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
     readBody(req, (body) => {
       try {
         const { provider, token, baseUrl, model, kind, label, remove } = JSON.parse(body);
@@ -4345,16 +4804,17 @@ const server = http.createServer((req, res) => {
     serveMedia(res, path.join(WORKSPACE, "uploads", name), req);
 
   } else if (req.method === "GET" && req.url.startsWith("/media?")) {
-    // Render agent-produced media in chat: absolute path, but ONLY under the
-    // workspace or a registered project (img tags can't send auth headers —
-    // the path allowlist is the guard; daemon binds to localhost anyway).
+    // Render agent-produced or user-referenced media in chat from an absolute
+    // path ANYWHERE on disk — people kept having to copy images into the
+    // workspace just to see them, which defeats the point. <img> tags can't
+    // send auth headers, so we can't gate this by the UI header; instead the
+    // safety comes from serveMedia itself, which serves ONLY media MIME types
+    // (image/video/audio/pdf) — never source, .env, keys, or arbitrary files —
+    // and the daemon binds to localhost. So the worst a stray request can do is
+    // display a media file, and cross-origin pages can't read its bytes back
+    // (CORS + canvas taint). That's an acceptable trade for "media just shows".
     const p = new URL(req.url, "http://x").searchParams.get("p") || "";
-    const norm = path.resolve(p);
-    const roots = [path.resolve(WORKSPACE), ...projects.map((x) => path.resolve(x.dir))];
-    if (!roots.some((r) => norm.toLowerCase().startsWith(r.toLowerCase() + path.sep))) {
-      res.writeHead(403); return res.end("outside allowed roots");
-    }
-    serveMedia(res, norm, req);
+    serveMedia(res, path.resolve(p), req);
 
   } else if (req.method === "POST" && req.url === "/reveal") {
     // Open the OS file manager at a file (like LINE/other messengers). UI-only,
@@ -4366,10 +4826,10 @@ const server = http.createServer((req, res) => {
         if (p.startsWith("/uploads/"))
           p = path.join(WORKSPACE, "uploads", decodeURIComponent(p.slice(9)).replace(/[\\/]|\.\./g, ""));
         p = path.resolve(p);
-        const roots = [path.resolve(WORKSPACE), ...projects.map((x) => path.resolve(x.dir))];
-        const ok = roots.some((r) => p.toLowerCase() === r.toLowerCase() ||
-          p.toLowerCase().startsWith(r.toLowerCase() + path.sep));
-        if (!ok) { res.writeHead(403); return res.end("outside allowed roots"); }
+        // Reveal-in-folder just opens the OS file manager at a location — no file
+        // is executed — and this route is UI-gated (x-bagidea-ui, CSRF-safe), so a
+        // location anywhere on disk is fine. Lets the owner reveal media that lives
+        // outside the workspace (the same files chat now previews from anywhere).
         if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
         // explorer needs "/select," and the path as ONE argument or it ignores
         // the selection and opens Documents. spawn passes argv as-is (no shell),
@@ -4399,10 +4859,16 @@ const server = http.createServer((req, res) => {
         if (p.startsWith("/uploads/"))
           p = path.join(WORKSPACE, "uploads", decodeURIComponent(p.slice(9)).replace(/[\\/]|\.\./g, ""));
         p = path.resolve(p);
+        // "Open in default app" launches the file, so be stricter than chat preview
+        // / reveal: files under the workspace or a registered project may open as
+        // anything (a project .html, a report .txt…), but a path OUTSIDE those roots
+        // is only opened when it's a media file. That lets people pop external images/
+        // video out to a real viewer, without this becoming a way to run an arbitrary
+        // .exe/.bat/.ps1 sitting elsewhere on disk.
         const roots = [path.resolve(WORKSPACE), ...projects.map((x) => path.resolve(x.dir))];
-        const ok = roots.some((r) => p.toLowerCase() === r.toLowerCase() ||
+        const underRoot = roots.some((r) => p.toLowerCase() === r.toLowerCase() ||
           p.toLowerCase().startsWith(r.toLowerCase() + path.sep));
-        if (!ok) { res.writeHead(403); return res.end("outside allowed roots"); }
+        if (!underRoot && !isMediaPath(p)) { res.writeHead(403); return res.end("outside allowed roots"); }
         if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
         if (process.platform === "win32") spawn("cmd", ["/c", "start", "", p], { detached: true, windowsHide: true });
         else if (process.platform === "darwin") spawn("open", [p], { detached: true });
@@ -4605,9 +5071,9 @@ const server = http.createServer((req, res) => {
       try {
         if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
         const id = String(JSON.parse(body).id || "").replace(/[^\w-]/g, "");
-        const dir = path.join(__dirname, "..", "plugins", id);
-        const manFile = path.join(dir, "plugin.json");
-        if (!fs.existsSync(manFile)) throw new Error("ไม่พบ plugin");
+        const dir = plugins.dirOf(id);   // by manifest id — folder name may differ
+        const manFile = dir && path.join(dir, "plugin.json");
+        if (!dir || !fs.existsSync(manFile)) throw new Error("ไม่พบ plugin");
         // Core plugins ship with the office and can't be uninstalled; only
         // plugins the user added (e.g. via GitHub) are removable.
         let man = {}; try { man = JSON.parse(fs.readFileSync(manFile, "utf8")); } catch {}
@@ -4617,6 +5083,76 @@ const server = http.createServer((req, res) => {
         broadcast({ type: "plugins.changed" }, false);
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/plugins/check-updates") {
+    // 🔄 For every git-installed plugin, compare local HEAD to the remote's HEAD
+    // — read-only (`git ls-remote`, no fetch) — and report which ones are behind.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    (async () => {
+      const pexec = require("util").promisify(require("child_process").execFile);
+      const pluginsRoot = path.join(__dirname, "..", "plugins");
+      const out = {};
+      await Promise.all(plugins.list().map(async (p) => {
+        if (p.core) return;
+        const dir = plugins.dirOf(p.id);   // by manifest id — folder name may differ
+        if (!dir || !fs.existsSync(path.join(dir, ".git"))) return;
+        try {
+          const opt = { cwd: dir, timeout: 12000 };
+          // Only shallow clones are Hub-installed (depth 1, never developed in).
+          // A FULL clone is a dev's own working repo (e.g. waxwing) — never flag it,
+          // so a one-click "update" can't discard their unpushed commits.
+          const shallow = (await pexec("git", ["rev-parse", "--is-shallow-repository"], opt)).stdout.trim();
+          if (shallow !== "true") return;
+          const local = (await pexec("git", ["rev-parse", "HEAD"], opt)).stdout.trim();
+          const ls = (await pexec("git", ["ls-remote", "origin", "HEAD"], opt)).stdout.trim();
+          const remote = ls.split(/\s+/)[0] || "";
+          if (remote && remote !== local) out[p.id] = true;
+        } catch { /* offline / no remote → just don't flag it */ }
+      }));
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ updates: out }));
+    })();
+
+  } else if (req.method === "POST" && req.url === "/plugins/update") {
+    // ⬆ Update one plugin: git fetch + reset --hard to the remote HEAD, then reload.
+    // Guarded — refuses if the working tree is dirty, so it can never clobber a
+    // dev's own plugin checkout with uncommitted work (e.g. the canonical waxwing).
+    readBody(req, (body) => {
+      if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+      const { execFile } = require("child_process");
+      try {
+        const id = String(JSON.parse(body).id || "").replace(/[^\w-]/g, "");
+        const dir = plugins.dirOf(id);   // by manifest id — folder name may differ
+        const manFile = dir && path.join(dir, "plugin.json");
+        if (!dir || !fs.existsSync(manFile)) throw new Error("ไม่พบ plugin");
+        let man = {}; try { man = JSON.parse(fs.readFileSync(manFile, "utf8")); } catch {}
+        if (man.core) throw new Error("plugin หลักอัปเดตผ่านตัวแอป ไม่ใช่ที่นี่");
+        if (!fs.existsSync(path.join(dir, ".git"))) throw new Error("plugin นี้ไม่ได้ติดตั้งจาก git — อัปเดตอัตโนมัติไม่ได้");
+        const fail = (m) => { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(m); };
+        const opt = { cwd: dir, timeout: 60000 };
+        execFile("git", ["rev-parse", "--is-shallow-repository"], opt, (e0, sh) => {
+          if (e0) return fail("git error: " + e0.message);
+          // Full clone = a dev's own working repo → auto-update is disabled so a
+          // fetch+reset can never throw away unpushed commits. (Hub installs are shallow.)
+          if (String(sh).trim() !== "true") return fail("plugin นี้เป็น repo ที่พัฒนาเอง (full clone) — ปิดอัปเดตอัตโนมัติไว้กันงานหาย");
+          execFile("git", ["status", "--porcelain"], opt, (e1, so) => {
+            if (e1) return fail("git error: " + e1.message);
+            if (String(so).trim()) return fail("มีไฟล์ที่ยังไม่ commit ใน plugin นี้ — ไม่อัปเดตทับ (กันงานหาย)");
+            execFile("git", ["fetch", "--depth", "1", "origin", "HEAD"], opt, (e2) => {
+              if (e2) return fail("fetch ไม่สำเร็จ: " + e2.message);
+              execFile("git", ["reset", "--hard", "FETCH_HEAD"], opt, (e3) => {
+                if (e3) return fail("update ไม่สำเร็จ: " + e3.message);
+                plugins.load();
+                broadcast({ type: "plugins.changed" }, false);
+                let v = "?"; try { v = JSON.parse(fs.readFileSync(manFile, "utf8")).version || "?"; } catch {}
+                res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+                res.end(JSON.stringify({ ok: true, version: v }));
+              });
+            });
+          });
+        });
+      } catch (e) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(String(e.message)); }
     });
 
   } else if (req.url.startsWith("/plugin/") &&
@@ -5440,6 +5976,23 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ clients: wsClients.size, pendingPerms: pendingPerms.size,
       wt: HAS_WT }));
+
+  } else if (req.url === "/platform") {
+    // Single source of truth for the client: which OS is the daemon on,
+    // and which path separator to use. Avoids deprecated navigator.platform.
+    // nativePick is a hint: macOS/Windows always have a native picker; Linux
+    // does only when zenity is on PATH. The client still treats a 404 from
+    // /fs/native-pick as the authoritative "fall back to in-house" signal,
+    // so this field is informational, not a guarantee.
+    const nativePick = process.platform === "win32" || process.platform === "darwin"
+      ? true
+      : canZenity();
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      platform: process.platform,
+      sep: path.sep,
+      nativePick,
+    }));
 
   } else {
     res.writeHead(404);

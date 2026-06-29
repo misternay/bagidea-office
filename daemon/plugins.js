@@ -151,5 +151,11 @@ module.exports = function initPlugins(ctx) {
     }));
   }
 
-  return { load, list, handleHttp, agentNote };
+  // Resolve a plugin's on-disk dir by its manifest id. Most plugins live in a
+  // folder named after their id, but a manually-placed one may not (e.g. folder
+  // "waxwing" with id "wax-wallet") — so look it up in the loaded map, never
+  // assume plugins/<id>. Returns null if no loaded plugin has that id.
+  function dirOf(id) { return plugins[id] ? plugins[id].dir : null; }
+
+  return { load, list, handleHttp, agentNote, dirOf };
 };

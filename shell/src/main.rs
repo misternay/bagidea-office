@@ -1677,6 +1677,20 @@ fn chrome_window(
     b.build(el).expect("window")
 }
 
+// The overlay/orb hide themselves by parking off-screen at x = -9000 — a trick
+// that works on Windows/macOS. On X11 the window manager clamps an off-screen
+// window back onto the visible desktop, so it lingers as a blank grey panel
+// (GitHub #28). On Linux we therefore toggle REAL window visibility in lockstep
+// with the off-screen parking; elsewhere this is a no-op so the proven
+// position-only behavior is untouched.
+#[inline]
+fn overlay_vis(w: &Window, show: bool) {
+    #[cfg(target_os = "linux")]
+    w.set_visible(show);
+    #[cfg(not(target_os = "linux"))]
+    { let _ = (w, show); }
+}
+
 // --------------------------------------------------------------------- main
 // Hand a `bagidea://install?repo=<url>` deep link to the running office over the
 // daemon's localhost port. We don't install here — the daemon broadcasts an
@@ -1903,6 +1917,9 @@ fn main() {
         .build(&overlay)
         .expect("overlay webview");
     platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+    // The overlay was born visible (so its webview loads now) and parked off-screen.
+    // On X11 the WM won't keep it off-screen, so hide it for real until first open.
+    overlay_vis(&overlay, false);
 
     // ---- circular chat head
     let orb = chrome_window(
@@ -1985,6 +2002,7 @@ fn main() {
                 platform::hide_office(office_pid, hidden);
                 if hidden {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    overlay_vis(&overlay, false);
                     orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
                 } else {
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
@@ -2013,11 +2031,16 @@ fn main() {
                 .unwrap_or(true);
             if hidden {
                 let (px, py) = if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
+                // Map BEFORE positioning: X11 ignores set_outer_position on an unmapped
+                // window, so set_visible must come first or the overlay re-maps at the
+                // old parked x=-9000 and "Open" appears to do nothing (#28).
+                overlay_vis(&overlay, true);
                 overlay.set_outer_position(LogicalPosition::new(px, py));
                 overlay.set_focus();
                 raise_orb(&orb);
             } else {
                 overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                overlay_vis(&overlay, false);
             }
             let _ = &overlay_view;
         };
@@ -2030,6 +2053,7 @@ fn main() {
             Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
                 if window_id == overlay_id {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    overlay_vis(&overlay, false);
                 } else {
                     // A pop-out window's native ✕ — drop it (frees Window + WebView).
                     popups.retain(|(id, _, _, _)| *id != window_id);
@@ -2078,6 +2102,7 @@ fn main() {
                 UserEvent::Toggle => do_toggle(feed),
                 UserEvent::HideOverlay => {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    overlay_vis(&overlay, false);
                 }
                 UserEvent::MiniToggle => {
                     if !feed {
@@ -2094,6 +2119,8 @@ fn main() {
                         "window.setFeedMode && setFeedMode({})", feed));
                     let _ = overlay.set_ignore_cursor_events(false);
                     platform::set_feed_alpha(&overlay, feed);
+                    // Map before repositioning (see do_toggle) so X11 honors the new position.
+                    overlay_vis(&overlay, true);
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
@@ -2122,6 +2149,7 @@ fn main() {
                             } else {
                                 (overlay_x, overlay_y)
                             };
+                            overlay_vis(&overlay, true);
                             overlay.set_outer_position(LogicalPosition::new(px, py));
                             raise_orb(&orb);
                         }

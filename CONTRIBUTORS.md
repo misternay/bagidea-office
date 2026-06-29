@@ -25,8 +25,9 @@ early macOS support, when the project was Windows-only:
   timeouts, graceful shutdown, cross-platform process-tree kill
   ([#16](https://github.com/bagidea/bagidea-office/pull/16)), live chat status +
   inline permission approval ([#18](https://github.com/bagidea/bagidea-office/pull/18)),
-  and routing each agent's brain in meetings/reflection — the 401 fix
-  ([#22](https://github.com/bagidea/bagidea-office/pull/22)).
+  routing each agent's brain in meetings/reflection — the 401 fix
+  ([#22](https://github.com/bagidea/bagidea-office/pull/22)), and stopping phantom
+  agent seats after hire→delete ([#25](https://github.com/bagidea/bagidea-office/pull/25)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
@@ -44,7 +45,11 @@ means opening a PR that adds your plugin to `web/plugins.json`. When we merge it
 
 Your plugin's own code lives in your own repo, where you're of course the author.
 
-_(No community plugins in the catalog yet — yours could be the first!)_
+- **[@misternay](https://github.com/misternay)** — **🧪 Agent Workbench**
+  ([repo](https://github.com/misternay/bagidea-office-agent-workbench-plugin),
+  [#26](https://github.com/bagidea/bagidea-office/pull/26)) — the **first community plugin**
+  in the Hub: test & benchmark agents — run prompts, capture responses, measure token usage,
+  and save runs as reusable regression test cases.
 
 ## Built with Claude Code
 

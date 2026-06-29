@@ -957,6 +957,18 @@
 
 <div id="threadBar">🧵 thread: <b id="threadName">ล่าสุด (ต่อเนื่องอัตโนมัติ)</b><span id="threadCtx" style="color:var(--dim);font-size:10.5px"></span></div>
 <div id="attachRow"></div>
+<!-- Speak bar for LIVE meetings only. Separate element + handler from send():
+     send() hard-returns whenever groupView is set, so it can't be reused. -->
+<div id="speakBar" style="display:none">
+  <div style="display:flex;gap:6px;align-items:center;padding:6px 8px;background:rgba(80,160,255,.08);border:1px solid rgba(80,160,255,.25);border-radius:6px">
+    <span id="liveDot" style="font-size:11px;flex:1">🔴 LIVE meeting — พิมพ์เข้าวงประชุม</span>
+    <button id="mtPause" class="send" title="พักวงประชุม (หยุดเริ่มคนถัดไป)">⏸</button>
+    <button id="mtResume" class="send" title="ประชุมต่อ" style="display:none">▶</button>
+    <button id="mtEnd" class="send" title="เลิกประชุมเลย">🏁</button>
+  </div>
+  <textarea id="speakInp" rows="1" placeholder="พิมพ์ข้อความเข้าวงประชุม…   ⏎ send"
+            autocomplete="off" spellcheck="false" style="width:100%;margin-top:4px"></textarea>
+</div>
 <footer>
   <textarea id="inp" rows="1" placeholder="Message Main…   ⏎ send · ⇧⏎ new line"
             autofocus autocomplete="off" spellcheck="false"></textarea>
@@ -1247,6 +1259,7 @@
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
   let _plistScroll = 0, _plistQ = "";  // preserve project-list scroll + search across live refreshes
+  const _opsScroll = {};  // OFFICE OPS per-tab scroll memory — survives action re-renders (pin/approve/reject/edit/delete) so the list doesn't jump to top
   function npcOf(id) {
     if (ROSTER[id] && ROSTER[id].avatar) return ROSTER[id].avatar;
     if (id === "main") return 7;
@@ -1297,6 +1310,10 @@
   let target = "ceo";   // open on the CEO seat (you) — orders flow to the Director
 
   function ensureAgent(id, state) {
+    // Guard: never resurrect a deleted agent. ROSTER keys are the source of
+    // truth; before the first sync ROSTER is empty so we let everything through
+    // until the sync arrives and populates it.
+    if (Object.keys(ROSTER).length > 0 && !ROSTER[id]) return;
     if (!agents[id]) {
       agents[id] = { state: state || "idle" };
       renderRail();
@@ -1383,6 +1400,7 @@
 
   function setTarget(id) {
     groupView = null;  // leaving a meeting log view
+    if (typeof hideSpeakBar === "function") hideSpeakBar();
     target = id;
     document.getElementById("compName").textContent = nameOf(id);
     document.getElementById("compRole").textContent = roleOf(id);
@@ -3568,6 +3586,14 @@
   }
 
   // ---- 📂 in-house folder picker (Blender-style, on-theme) -----------------
+  // Server is the source of truth for platform + separator (avoids the
+  // deprecated navigator.platform). Fetched once at startup, defaults to
+  // a best guess if the daemon isn't up yet. "/" is the safe default sep
+  // (macOS + Linux); Windows gets overwritten by path.sep === "\\" quickly.
+  const _guessPlat = /Win/.test(navigator.platform) ? "win32" : "darwin";
+  let _plat = { platform: _guessPlat, sep: _guessPlat === "win32" ? "\\" : "/" };
+  fetch("/platform").then((r) => r.json()).then((j) => { _plat = j; }).catch(() => {});
+  const SEP = () => _plat.sep || "/";
   const fsPick = document.getElementById("fsPick");
   let _fsResolve = null, _fsDir = "", _fsSel = "";
   async function fsLoad(dir) {
@@ -3597,7 +3623,7 @@
         row.classList.add("sel");
         _fsSel = name;
       };
-      row.ondblclick = () => fsLoad(_fsDir.replace(/[\\/]+$/, "") + "\\" + name);
+      row.ondblclick = () => fsLoad(_fsDir.replace(/[\\/]+$/, "") + SEP() + name);
       list.appendChild(row);
     }
     const up = document.getElementById("fsUp");
@@ -3605,11 +3631,25 @@
     up.onclick = r.parent ? () => fsLoad(r.parent) : null;
   }
   function pickFolder(start) {
-    return new Promise((resolve) => {
-      _fsResolve = resolve;
-      fsPick.classList.add("open");
-      fsLoad(start || _fsDir || "");
-    });
+    // Try the native OS folder picker first (all platforms). Three outcomes:
+    //   404 / network error  → native picker unavailable → fall back to in-house
+    //   200 {path: "<dir>"}  → user picked a folder → resolve it
+    //   200 {path: null}      → user cancelled the native dialog → resolve null
+    // The previous version conflated cancel with unavailable, forcing the
+    // user to cancel twice.
+    return fetch("/fs/native-pick", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" }
+    }).then((r) => {
+      if (!r.ok) return { __fallback: true };      // 404 → no native picker here
+      return r.json().then((j) => ({ __fallback: false, path: j && j.path }));
+    }).catch(() => ({ __fallback: true }))
+      .then((res) => res.__fallback
+        ? new Promise((resolve) => {                // in-house on-theme picker
+            _fsResolve = resolve;
+            fsPick.classList.add("open");
+            fsLoad(start || _fsDir || "");
+          })
+        : res.path);                                // null = user cancelled
   }
   function fsDone(v) {
     fsPick.classList.remove("open");
@@ -3618,7 +3658,7 @@
   document.getElementById("fsCancel").onclick = () => fsDone(null);
   document.getElementById("fsNo").onclick = () => fsDone(null);
   document.getElementById("fsOk").onclick = () =>
-    fsDone(_fsSel ? _fsDir.replace(/[\\/]+$/, "") + "\\" + _fsSel : _fsDir);
+    fsDone(_fsSel ? _fsDir.replace(/[\\/]+$/, "") + SEP() + _fsSel : _fsDir);
   document.getElementById("fsGo").onclick = () =>
     fsLoad(document.getElementById("fsPath").value.trim());
   document.getElementById("fsPath").addEventListener("keydown", (e) => {
@@ -3686,7 +3726,11 @@
     for (const p of ordered) {
       const row = document.createElement("div");
       row.className = "arow";
-      row.innerHTML = `<div class="meta"><b>${p.name}</b>
+      row.dataset.pid = p.id;
+      // A plugin's icon is the emoji at the start of its manifest name. If the
+      // author didn't include one, fall back to 🧩 so the row never looks empty.
+      const pName = /^\p{Extended_Pictographic}/u.test(p.name || "") ? p.name : "🧩 " + (p.name || p.id);
+      row.innerHTML = `<div class="meta"><b>${pName}</b>
           <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
         pinBtn("plugins", p.id) +
@@ -3715,6 +3759,40 @@
     }
     wirePins(box, openPlugins);
     wireFilter(modalCard.querySelector("#plgFilter"), box);
+    // Async: ask the daemon which git-installed plugins are behind their repo,
+    // then drop an "⬆ update" control onto those rows (read-only check; no fetch).
+    fetch("/plugins/check-updates", { method: "POST", headers: { "x-bagidea-ui": "1" } })
+      .then((x) => x.json()).then((d) => {
+        const ups = (d && d.updates) || {};
+        for (const id of Object.keys(ups)) {
+          const row = box.querySelector(`[data-pid="${CSS.escape(id)}"]`);
+          if (!row || row.querySelector('[title="อัปเดต plugin"]')) continue;
+          const nameEl = row.querySelector(".meta b");
+          if (nameEl && !nameEl.querySelector(".updbadge")) {
+            const badge = document.createElement("span");
+            badge.className = "updbadge";
+            badge.textContent = " ⬆ " + tr("อัปเดตได้");
+            badge.style.cssText = "color:#4ade80;font-size:10px;font-weight:600";
+            nameEl.appendChild(badge);
+          }
+          const ub = document.createElement("div");
+          ub.className = "winbtn"; ub.title = "อัปเดต plugin"; ub.textContent = "⬆";
+          ub.style.color = "#4ade80";
+          ub.onclick = async (e) => {
+            e.stopPropagation();
+            ub.textContent = "…";
+            const rr = await fetch("/plugins/update", { method: "POST",
+              headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+              body: JSON.stringify({ id }) });
+            if (rr.ok) {
+              const j = await rr.json().catch(() => ({}));
+              addChip("⬆ " + tr("อัปเดต plugin แล้ว") + ": " + id + (j.version ? " · v" + j.version : ""));
+              openPlugins();
+            } else { addChip("✗ " + (await rr.text()).slice(0, 120)); ub.textContent = "⬆"; }
+          };
+          row.insertBefore(ub, row.lastElementChild);  // before 🗑
+        }
+      }).catch(() => {});
     modalCard.querySelector("#plgReload").onclick = () =>
       api("/plugins/reload", {}).then(() => openPlugins());
     const doInstall = async (url, mode) => {
@@ -4091,7 +4169,7 @@
             <select id="pPlace" style="flex:1"></select>
           </div>
           <div class="assistrow" id="pPathRow" style="margin-top:6px;display:none">
-            <input id="pPath" placeholder="full path เช่น D:\\Works\\my-app" style="flex:1">
+            <input id="pPath" placeholder="full path เช่น /Users/me/my-app" style="flex:1">
             <button id="pPathBrowse" title="เลือกโฟลเดอร์">📂</button>
           </div>
           <button class="bigbtn" id="pAdd" style="margin-top:8px">📁 สร้าง / ลงทะเบียน</button></div>
@@ -4099,7 +4177,7 @@
           <div id="pllist"></div>
           <div class="assistrow" style="margin-top:6px">
             <input id="plName" placeholder="ชื่อย่อ เช่น ห้องสมุด" style="width:110px">
-            <input id="plFolder" placeholder="โฟลเดอร์ เช่น D:\\Library" style="flex:1">
+            <input id="plFolder" placeholder="โฟลเดอร์ เช่น /Users/me/Library" style="flex:1">
             <button id="plBrowse" title="เลือกโฟลเดอร์">📂</button>
             <button class="primary" id="plAdd">＋</button>
           </div></div>`;
@@ -4432,7 +4510,7 @@
         pathRow.style.display = "flex";
         pathInp.value = p;
         const nm = modalCard.querySelector("#pName");
-        if (!nm.value.trim()) nm.value = p.split("\\").pop() || p;
+        if (!nm.value.trim()) nm.value = p.split(/[\\/]/).pop() || p;
       };
       modalCard.querySelector("#pAdd").onclick = async () => {
         const name = modalCard.querySelector("#pName").value.trim();
@@ -4450,7 +4528,7 @@
       // Places manager.
       const pl = modalCard.querySelector("#pllist");
       pl.innerHTML = placeNames.length ? "" :
-        `<div style="font-size:11px;color:var(--dim)">เช่น "ห้องสมุด" → D:\\Library แล้วสั่งงานว่า "สร้างโปรเจคใหม่ที่ห้องสมุด" ได้เลย</div>`;
+        `<div style="font-size:11px;color:var(--dim)">เช่น "ห้องสมุด" → /Users/me/Library แล้วสั่งงานว่า "สร้างโปรเจคใหม่ที่ห้องสมุด" ได้เลย</div>`;
       for (const n of placeNames) {
         const row = document.createElement("div");
         row.className = "arow";
@@ -4521,6 +4599,11 @@
           box.appendChild(card);
         }
         wirePins(box, () => openOps("jobs"));
+        // prBox sits below the job list and only fills in here (async), AFTER the
+        // tail scroll-restore ran. Re-apply the saved offset now that its full height
+        // exists, so approving/rejecting a proposal deep in this list keeps the view
+        // in place instead of snapping up to where the list ended.
+        modalCard.scrollTop = _opsScroll.jobs || 0;
         clearSelBtn.onclick = async () => {
           if (!selected.size) return;
           if (!await confirmDanger(t("ลบ"),
@@ -4785,6 +4868,16 @@
         s.onclick = () => openCard(s.dataset.id);
       });
     }
+
+    // Keep the scroll position across action re-renders (pin/approve/reject/edit/
+    // delete all call openOps(tab) again). The main list of each of these tabs is
+    // rendered by an awaited fetch above, so by here its height is settled — we can
+    // restore the saved offset without it snapping back to the top. proj manages its
+    // own scroll via _plistScroll; dash/org have no in-list actions to preserve for.
+    if (tab === "jobs" || tab === "cal" || tab === "notes") {
+      modalCard.scrollTop = _opsScroll[tab] || 0;
+      modalCard.onscroll = () => { _opsScroll[tab] = modalCard.scrollTop; };
+    }
   }
 
   // ---- sessions (threads) ---------------------------------------------------
@@ -4838,16 +4931,80 @@
       ? "งานของ sub-agent (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย"
       : "บันทึกการประชุม (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย";
     log.innerHTML = "";
+    let live = false;
     try {
       const r = await fetch(`/sessions/log?agent=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`)
         .then((x) => x.json());
+      live = !!r.live;
       for (const m of r.log || []) {
-        if (m.who === "tool") addToolRow(m.text);
-        else if (m.who === "you") addMsg("you", null, m.text, m.ts);
-        else addMsg("agent", faceId || m.who, m.text, m.ts);
+        renderGroupMsg(m, faceId);
       }
     } catch {}
+    // Load historical action items for finished meetings (if any)
+    if (!live && bucket === "@group") {
+      try {
+        const actionsRes = await fetch(`/sessions/${encodeURIComponent(key)}/actions`);
+        if (actionsRes.ok) {
+          const { actions } = await actionsRes.json();
+          if (actions && actions.length) {
+            for (const a of actions) {
+              const ownerName = (reg.agents[a.owner] || { name: a.owner }).name;
+              addMsg("you", null, `✅ <b>${ownerName}</b>: ${a.text}`, a.created, "· action item");
+            }
+          }
+        }
+      } catch {}
+    }
+    // Speak bar shows ONLY on the exact live meeting — never on a finished log
+    // or a @sub log. liveMeetings is kept in sync by meeting.live/ended events.
+    syncSpeakBar(key, live);
   }
+
+  // Render one message from a group/@sub transcript. Factored out so both the
+  // history replay (above) and the live chat.message handler use one path.
+  function renderGroupMsg(m, faceId) {
+    if (m.who === "tool") addToolRow(m.text);
+    else if (m.who === "you") addMsg("you", null, m.text, m.ts);
+    else if (m.who === "ceo") addMsg("you", null, m.text, m.ts);   // CEO = you
+    else addMsg("agent", faceId || m.who, m.text, m.ts, m.phase ? "· " + m.phase : "");
+  }
+
+  // ── Live-meeting speak bar + controls ───────────────────────────────────
+  // liveMeetings: set of session keys that are currently live (synced from
+  // meeting.live / meeting.ended / meeting.control events). The speak bar
+  // appears only when groupView is one of these.
+  const liveMeetings = new Set();
+  function syncSpeakBar(key, live) {
+    const bar = document.getElementById("speakBar");
+    if (!bar) return;
+    const show = live && groupView === key;
+    bar.style.display = show ? "block" : "none";
+  }
+  function hideSpeakBar() {
+    const bar = document.getElementById("speakBar");
+    if (bar) bar.style.display = "none";
+  }
+  function speakIntoMeeting() {
+    const inp = document.getElementById("speakInp");
+    const text = (inp.value || "").trim();
+    if (!text || !groupView) return;
+    api("/discuss/message", { session: groupView, text })
+      .then(() => { inp.value = ""; })
+      .catch((e) => addChip("⚠ ส่งไม่ได้: " + (e && e.message)));
+  }
+  // Wire the speak bar once (Enter to send, control buttons).
+  (function wireSpeakBar() {
+    const go = () => speakIntoMeeting();
+    document.getElementById("speakInp").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); }
+    });
+    const pause = document.getElementById("mtPause");
+    const resume = document.getElementById("mtResume");
+    pause.onclick = () => groupView && api("/discuss/control", { session: groupView, action: "pause" });
+    resume.onclick = () => groupView && api("/discuss/control", { session: groupView, action: "resume" });
+    document.getElementById("mtEnd").onclick = () =>
+      groupView && confirm("เลิกประชุมเลย?") && api("/discuss/control", { session: groupView, action: "end" });
+  })();
 
   // CEO orders run as the Director's sessions (👑-prefixed) — the CEO pane
   // reads and resumes those threads, so "what did my order produce" is one
@@ -4914,11 +5071,11 @@
     };
     mk("🆕 เริ่ม thread ใหม่", "ความจำใหม่ ไม่ต่อจากของเดิม", "new",
       SESS[target] === "new",
-      () => { groupView = null; SESS[target] = "new"; addChip(`🧵 เริ่ม thread ใหม่กับ <b>${nameOf(target)}</b>`); });
+      () => { groupView = null; hideSpeakBar(); SESS[target] = "new"; addChip(`🧵 เริ่ม thread ใหม่กับ <b>${nameOf(target)}</b>`); });
     for (const s of list)
       mk(`🧵 ${s.title || s.key}`, new Date(s.ts).toLocaleString(), s.key,
         !groupView && SESS[target] !== "new" && s.key === activeKey,
-        () => { groupView = null; CUR[target] = null; SESS[target] = s.key;
+        () => { groupView = null; hideSpeakBar(); CUR[target] = null; SESS[target] = s.key;
           addChip(`🧵 สลับไป thread: <b>${(s.title || s.key).slice(0, 40)}</b>`); });
     if (!list.length && SESS[target] !== "new")
       mk("(ยังไม่มี thread เก่า — คุยครั้งแรกจะสร้างให้เอง)", "", undefined, false, () => {});
@@ -4997,21 +5154,60 @@
 
   // ---- discussion launcher ----------------------------------------------------
   document.getElementById("discussBtn").onclick = () => openDiscuss();
+  // Meeting templates — loaded from server to avoid duplication
+  let MEETING_TEMPLATES = [
+    { id: "custom", label: "✏️ Custom topic", topic: "", rounds: 2 }
+  ];
+  // Load templates from server on startup
+  fetch("/meeting-templates")
+    .then(r => r.json())
+    .then(data => {
+      if (data.templates && data.templates.length) {
+        // Prepend custom option to server templates
+        MEETING_TEMPLATES = [
+          { id: "custom", label: "✏️ Custom topic", topic: "", rounds: 2 },
+          ...data.templates.map(t => ({
+            ...t,
+            label: getLabelIcon(t.id) + " " + t.label
+          }))
+        ];
+      }
+    })
+    .catch(err => console.error("Failed to load meeting templates:", err));
+
+  function getLabelIcon(id) {
+    const icons = {
+      standup: "📋", retro: "🔁", brainstorm: "💡",
+      "design-review": "🎨", planning: "🗓"
+    };
+    return icons[id] || "📝";
+  }
   function openDiscuss() {
     modal.classList.add("open");
     const picked = new Set();
+    const tmplOpts = MEETING_TEMPLATES
+      .map((t) => `<option value="${t.id}">${t.label}</option>`).join("");
     modalCard.innerHTML = hdr("🗣 AGENT DISCUSSION") +
-      `<div class="field"><label>TOPIC — หัวข้อให้ทีมถกกัน</label>
+      `<div class="field"><label>TEMPLATE</label>
+         <select id="dTmpl">${tmplOpts}</select></div>
+       <div class="field"><label>TOPIC — หัวข้อให้ทีมถกกัน</label>
          <input id="dTopic" placeholder='เช่น "วางแผนฟีเจอร์ onboarding ใหม่"'></div>
        <div class="field"><label>PARTICIPANTS (เลือก 2-4 ตัว)</label>
          <div class="checks" id="dWho"></div></div>
-       <div class="field"><label>ROUNDS</label>
+       <div class="field"><label>DISCUSSION ROUNDS (ความลึกของวงถก)</label>
          <select id="dRounds"><option value="1">1 — เร็ว</option>
          <option value="2" selected>2 — มาตรฐาน</option><option value="3">3 — ลึก</option></select></div>
        <div class="btnrow">
          <button id="dCancel">Cancel</button>
          <button class="primary" id="dGo">🗣 Start discussion</button>
        </div>`;
+    // Picking a template fills topic + rounds (unless the user edits them after).
+    modalCard.querySelector("#dTmpl").onchange = function () {
+      const t = MEETING_TEMPLATES.find((x) => x.id === this.value);
+      if (!t) return;
+      if (t.topic) modalCard.querySelector("#dTopic").value = t.topic;
+      modalCard.querySelector("#dRounds").value = String(t.rounds);
+    };
     const box = modalCard.querySelector("#dWho");
     // ทีมทั้งหมดจาก registry (CEO คือคุณ — ไม่เข้าร่วมวงประชุมของ AI)
     for (const id of Object.keys(ROSTER).filter((x) => x !== "ceo")) {
@@ -5032,10 +5228,15 @@
     modalCard.querySelector("#dGo").onclick = async () => {
       const topic = modalCard.querySelector("#dTopic").value.trim();
       if (!topic || picked.size < 2) return;
-      await api("/discuss", { agents: [...picked], topic,
-        rounds: Number(modalCard.querySelector("#dRounds").value) });
+      const r = await api("/discuss", { agents: [...picked], topic,
+        rounds: Number(modalCard.querySelector("#dRounds").value) }).catch(() => ({}));
       closeModal();
       addChip(`🗣 meeting started: <b>${topic.slice(0, 50)}</b>`);
+      // Open the live meeting so messages stream in and the speak bar appears.
+      // /discuss returns the session key synchronously; liveMeetings.add is a
+      // belt-and-suspenders in case the meeting.live broadcast hasn't landed.
+      const key = r && r.session;
+      if (key) { liveMeetings.add(key); openGroupLog(key, topic); }
     };
   }
 
@@ -5352,7 +5553,7 @@
       return;
     }
     if (ev.agent) ensureAgent(ev.agent);
-    if (ev.agents) ev.agents.forEach((a) => ensureAgent(a, "meeting"));
+    if (ev.agents) ev.agents.forEach((a) => { if (typeof a === "string") ensureAgent(a, "meeting"); });
 
     if (ev.type === "chat.message") {
       // The pane is per-conversation: bubble only for the current agent's
@@ -5360,7 +5561,15 @@
       // come from /sessions/log instead.
       if (!ev.replay && groupView && ev.session === groupView) {
         hideTyping();
-        addMsg("agent", ev.agent, ev.text, ev.ts, ev.model ? "🧠 " + ev.model : "");
+        if (ev.isSummary) {
+          // Secretary's minutes — render distinctly, prefixed so it reads as a recap.
+          addMsg("agent", ev.agent, "📝\n" + ev.text, ev.ts, "· summary");
+        } else if (ev.agent === "ceo") {
+          addMsg("you", null, ev.text, ev.ts);   // owner spoke into the meeting
+        } else {
+          addMsg("agent", ev.agent, ev.text, ev.ts,
+            ev.phase ? "· " + ev.phase : (ev.model ? "🧠 " + ev.model : ""));
+        }
         uiSnd("msg");
       } else if (!ev.replay && !groupView &&
           (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
@@ -5480,6 +5689,46 @@
     }
     else if (ev.type === "collab.ended") {
       if (!ev.replay) addLog(`🤝 ประชุมจบ`);
+    }
+    else if (ev.type === "meeting.live") {
+      // A meeting just went live. Track it so the speak bar can show when the
+      // owner opens it. (No auto-open: the launcher already opens its own.)
+      liveMeetings.add(ev.session);
+    }
+    else if (ev.type === "meeting.ended") {
+      liveMeetings.delete(ev.session);
+      if (groupView === ev.session) { hideSpeakBar(); }
+    }
+    else if (ev.type === "meeting.control") {
+      // Reflect pause/resume state on the speak bar buttons.
+      if (groupView === ev.session) {
+        const pause = document.getElementById("mtPause");
+        const resume = document.getElementById("mtResume");
+        const dot = document.getElementById("liveDot");
+        if (pause) pause.style.display = ev.paused ? "none" : "";
+        if (resume) resume.style.display = ev.paused ? "" : "none";
+        if (dot) dot.textContent = ev.paused ? "⏸ พักวงประชุม" : "🔴 LIVE meeting — พิมพ์เข้าวงประชุม";
+        if (ev.ended && dot) dot.textContent = "🏁 กำลังจบ…";
+      }
+    }
+    else if (ev.type === "meeting.resumed") {
+      // Auto-resume after a forgotten pause; just flip the UI back.
+      if (groupView === ev.session) {
+        const pause = document.getElementById("mtPause");
+        const resume = document.getElementById("mtResume");
+        const dot = document.getElementById("liveDot");
+        if (pause) pause.style.display = "";
+        if (resume) resume.style.display = "none";
+        if (dot) dot.textContent = "🔴 LIVE meeting — พิมพ์เข้าวงประชุม";
+      }
+    }
+    else if (ev.type === "meeting.action") {
+      // An action item was minted by the summary secretary. Surface it as a
+      // chip in the feed (NOT on Mission Control — see ADR-0001).
+      if (!ev.replay && ev.action) {
+        addChip(`✅ <b>${nameOf(ev.action.owner)}</b>: ${ev.action.text}` +
+          (ev.action.due ? ` <span style="color:var(--dim)">⏰ ${ev.action.due}</span>` : ""));
+      }
     }
     else if (ev.type === "skill.created") {
       if (!ev.replay) addLog(`📚 <b>${nameOf(ev.agent)}</b> learned a new skill: <b>${ev.skill}</b>`);

@@ -110,6 +110,30 @@
   .stop .when{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.05em}
   .stop.done .when{color:var(--dim);text-decoration:line-through}
   .stop h3{font-size:16px;font-weight:700;margin-bottom:4px}.stop p{color:var(--dim);font-size:13.5px;line-height:1.5}
+  /* comparison matrix */
+  .compare{width:100%;border-collapse:collapse;margin-top:34px;font-size:14.5px}
+  .compare th,.compare td{padding:12px 12px;text-align:center;border-bottom:1px solid var(--line)}
+  .compare thead th{font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--dim);
+    text-transform:uppercase;font-weight:600;vertical-align:bottom;line-height:1.3}
+  .compare tbody th{text-align:left;font-weight:600;color:var(--text);font-size:14.5px;max-width:30ch}
+  .compare .us{background:linear-gradient(180deg,rgba(94,200,255,.14),rgba(94,200,255,.04))}
+  .compare thead th.us{color:var(--accent);border-bottom:2px solid var(--accent);border-radius:10px 10px 0 0}
+  .compare tbody tr:last-child td,.compare tbody tr:last-child th{border-bottom:none}
+  .compare .yes{color:var(--accent);font-size:17px;font-weight:800}
+  .compare .par{color:var(--accent-2);font-size:15px}
+  .compare .no{color:#54647e;font-size:15px}
+  .cmpnote{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:16px;letter-spacing:.04em}
+  /* sponsor tiers */
+  .tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:36px}
+  .tier{background:linear-gradient(160deg,var(--panel),var(--ground-2));border:1px solid var(--line);
+    border-radius:14px;padding:20px 18px}
+  .tier.gold{border-color:rgba(255,180,84,.5);box-shadow:0 0 30px rgba(255,180,84,.1)}
+  .tier .tk{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  .tier.gold .tk{color:var(--accent-2)}
+  .tier h3{font-size:18px;font-weight:800;margin-bottom:6px}
+  .tier p{color:var(--dim);font-size:13px;line-height:1.5}
+  .tier .badge{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:10.5px;
+    color:var(--accent-2);border:1px solid rgba(255,180,84,.4);border-radius:999px;padding:3px 9px}
   /* close */
   .cta{display:inline-flex;align-items:center;gap:12px;font-family:var(--mono);font-size:14px;
     letter-spacing:.05em;color:var(--ground);background:var(--accent);border-radius:10px;
@@ -132,6 +156,8 @@
     .g3,.g2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}
     .stop{grid-template-columns:80px 1fr;gap:14px}#bar .dots{display:none}.slide{padding:9vh 7vw 15vh}
     .heroshot{order:-1}
+    .tiers{grid-template-columns:repeat(2,1fr)}
+    .compare{font-size:11.5px}.compare th,.compare td{padding:8px 5px}.compare tbody th{font-size:11.5px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important}html{scroll-behavior:auto}}
   a{color:var(--accent)}
@@ -257,18 +283,51 @@
       <div>
         <div class="eyebrow">An ecosystem, not an app</div>
         <h2>A workplace that <b class="am">extends itself</b>.</h2>
-        <div class="grid g2" style="margin-top:30px">
-          <div class="card"><div class="k">plugins</div><h3>Apps inside the office</h3><p>Panels, routes and agent commands — a music player, a standup board, a live briefing — that pop out into their own windows.</p></div>
-          <div class="card"><div class="k">the hub</div><h3>A marketplace</h3><p>Browse and one-click-install community plugins. Anyone can publish from a template repo.</p></div>
-          <div class="card"><div class="k">self-building</div><h3>It writes its own</h3><p>Ask the team for a tool and an agent scaffolds, builds and installs a working plugin.</p></div>
-          <div class="card"><div class="k">channels</div><h3>Run it from your phone</h3><p>Telegram, Discord and LINE connect straight in — assign work from the couch.</p></div>
+        <div class="grid g2" style="margin-top:26px">
+          <div class="card"><div class="k">🧩 plugins hub</div><h3>Apps inside the office</h3><p>Panels, routes and agent commands that pop out into their own windows. Browse the community Hub and <b class="cy">one-click install</b> — and one click <b class="cy">updates</b> them.</p></div>
+          <div class="card"><div class="k">🧰 tools hub</div><h3>Capabilities on tap</h3><p>Built-in tools plus MCP servers — a real browser, Google, databases and more — granted per agent from a curated catalog.</p></div>
+          <div class="card"><div class="k">🏆 showcase</div><h3>What people built</h3><p>A public gallery of offices, shipped projects, plugins and art. Submit yours with a PR and get credited.</p></div>
+          <div class="card"><div class="k">🛠 self-building</div><h3>It writes its own</h3><p>Ask the team for a tool and an agent scaffolds, builds, deploys and installs a working plugin onto the office itself.</p></div>
+        </div>
+        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:30px">
+          <div class="stat"><div class="num">6+</div><div class="lab">community plugins<br>in the Hub</div></div>
+          <div class="stat"><div class="num">31</div><div class="lab">tools — built-in<br>+ MCP servers</div></div>
+          <div class="stat"><div class="num">1-click</div><div class="lab">install · update<br>· publish via PR</div></div>
         </div>
       </div>
       <div class="shot"><img src="../img/briefing.png" alt="A briefing plugin panel running inside the office" loading="lazy"></div>
     </div>
   </section>
 
-  <!-- 08 — REACH -->
+  <!-- 08 — WHY WE WIN (comparison) -->
+  <section class="slide" data-title="Why we win">
+    <div class="eyebrow">How we compare</div>
+    <h2>What an <b class="cy">office</b> does<br>that a chat box can't.</h2>
+    <table class="compare">
+      <thead>
+        <tr>
+          <th style="text-align:left">Capability</th>
+          <th>Chat&nbsp;AI<br><span style="opacity:.55">ChatGPT-style</span></th>
+          <th>CLI&nbsp;agents<br><span style="opacity:.55">terminal</span></th>
+          <th>IDE&nbsp;copilots<br><span style="opacity:.55">Cursor-style</span></th>
+          <th class="us">BagIdea<br>Office</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>A team you watch work — embodied, on your desktop</th><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>A Director that plans &amp; delegates across agents</th><td class="par">~</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Swappable brain per agent — 18 providers, local&nbsp;$0</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Self-extending plugin + tool ecosystem the agents build</th><td class="no">✗</td><td class="par">~</td><td class="par">~</td><td class="us yes">✓</td></tr>
+        <tr><th>Visual, per-action permission approvals</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Always-on · lives on the wallpaper · resumable</th><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Command it from your phone — 6 channels</th><td class="par">~</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>100% local · open source · 14 languages</th><td class="par">~</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+      </tbody>
+    </table>
+    <div class="cmpnote">✓ built in &nbsp;·&nbsp; ~ partial / varies &nbsp;·&nbsp; ✗ not really &nbsp;—&nbsp; vs the typical tool in each category</div>
+  </section>
+
+  <!-- 09 — REACH -->
   <section class="slide" data-title="Built for everyone">
     <div class="eyebrow">Built for everyone</div>
     <h2>Everywhere you work, in your language.</h2>
@@ -276,7 +335,7 @@
     <div class="stats">
       <div class="stat"><div class="num">3</div><div class="lab">OSes — Windows, macOS,<br>Linux (one engine)</div></div>
       <div class="stat"><div class="num">14</div><div class="lab">languages, fully<br>localized UI</div></div>
-      <div class="stat"><div class="num">F6</div><div class="lab">push-to-talk — speak<br>an order, hear a reply</div></div>
+      <div class="stat"><div class="num">🎤</div><div class="lab">push-to-talk (Right Ctrl)<br>— speak, hear a reply</div></div>
       <div class="stat"><div class="num">24h</div><div class="lab">living world — day/night<br>on your real clock</div></div>
     </div>
   </section>
@@ -306,7 +365,21 @@
     </div>
   </section>
 
-  <!-- 11 — CLOSE -->
+  <!-- 12 — SPONSORS -->
+  <section class="slide" data-title="Back the build">
+    <div class="eyebrow">Support the office</div>
+    <h2>Free for everyone —<br><b class="am">powered by backers</b>.</h2>
+    <p class="lede">BagIdea Office is 100% open source and free to install. Sponsorship is what keeps it that way — it funds the daily build, the art that ships free (CC0), and the community Hub. Back us and your logo rides <strong>in the office, on the site, and in the README</strong>.</p>
+    <div class="tiers">
+      <div class="tier gold"><div class="tk">Gold Partner</div><h3>$3,000+<span style="font-size:13px;color:var(--dim)">/mo</span></h3><p>Logo in-world + pinned #1 on the site &amp; README.<span class="badge">WARRIX — founding partner</span></p></div>
+      <div class="tier"><div class="tk">Silver Partner</div><h3>$300+<span style="font-size:13px;color:var(--dim)">/mo</span></h3><p>Logo on the site &amp; README, in the silver tier.</p></div>
+      <div class="tier"><div class="tk">Bronze · Backer</div><h3>$30+<span style="font-size:13px;color:var(--dim)">/mo</span></h3><p>Name + link in the backers list, with our thanks.</p></div>
+      <div class="tier"><div class="tk">Supporter</div><h3>any amount</h3><p>Every bit keeps the lights on — listed with gratitude.</p></div>
+    </div>
+    <div class="repo" style="margin-top:30px">Become a sponsor → <b>bagidea.github.io/bagidea-office</b> (#sponsors) &nbsp;·&nbsp; or open an issue to talk partnership</div>
+  </section>
+
+  <!-- 13 — CLOSE -->
   <section class="slide" id="close" data-title="Open it">
     <div class="split">
       <div>

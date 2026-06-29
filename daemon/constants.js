@@ -81,6 +81,9 @@ const SKILL_LIBRARY = {
       "  runs INSIDE that folder (resumable). Create one first with 'PROJECT: <name> @ <place|path>'.",
       "- Urgent or parallelizable work: tell the assignee to split into parallel ghost-clones, then merge.",
       "- Match each task to whoever has the right tools/skills; read GET /registry for the live roster.",
+      "- Each teammate runs on its OWN brain (model) the owner chose — and so do you. To put 'the right",
+      "  model' on a task, DELEGATE it to the teammate who already has that brain; you NEVER switch models,",
+      "  not theirs and not your own. Brains are owner-only (the 🧠 editor) — your job is to analyze and route.",
       "- Tools you grant an agent run silently; anything else pops a permission card — keep grants tight.",
       "- Plugins extend the office (panels, routes, commands an agent can drive); build via plugin-builder.",
       "- On slow days, gather the team and turn ideas into things genuinely WORTH building — quality over",
@@ -95,18 +98,28 @@ const SKILL_LIBRARY = {
   },
   "plugin-builder": {
     name: "Plugin Builder",
-    description: "Scaffold a working office plugin from scratch.",
+    description: "Build, deploy, and update an office plugin — end to end.",
     content: [
-      "To build an office plugin (full spec: docs/guide/plugins.md):",
-      "1. Create plugins/<id>/plugin.json (id, name, description, panel?, commands[]).",
+      "To build OR update an office plugin (full spec: docs/guide/plugins.md):",
+      "1. plugins/<id>/plugin.json (id, name, description, panel?, commands[]). START the",
+      "   name with an emoji — that emoji is the plugin's icon in the Plugins panel.",
       "2. Add index.js exporting (ctx) => ({ onCommand?, routes? }) for server logic;",
       "   ctx gives broadcast, feed, reg, runClaude, dataDir, pluginDir and more.",
       "3. Add panel.html for a UI (dark theme #0c1322 / #5ec8ff; slim scrollbar).",
       "   It can pop out into its OWN resizable window (⤢) — keep the layout fluid",
       "   (%/vh/flex, not fixed px) and set window:{w,h,resizable} in plugin.json.",
       "4. Keep private state in ctx.dataDir; broadcast {type:'plugin.event',plugin:'<id>'}.",
-      "5. Reload: curl -s -X POST http://127.0.0.1:8787/plugins/reload -H 'x-bagidea-ui: 1'.",
-      "6. Test: POST /plugin/<id>/cmd returns what you expect. Mirror the music/calculator plugins.",
+      "5. DEPLOY — the office ONLY runs plugins from plugins/<id>/. If you developed or",
+      "   edited the plugin ANYWHERE ELSE (a workspace project, a dev mirror, a clone),",
+      "   copy the changed files INTO plugins/<id>/ — but NEVER overwrite its data/ dir",
+      "   (user state / keys) or node_modules. Building it elsewhere does NOT make it run.",
+      "6. Reload: curl -s -X POST http://127.0.0.1:8787/plugins/reload -H 'x-bagidea-ui: 1'.",
+      "7. VERIFY it took effect — the job is NOT done until the RUNNING office reflects it:",
+      "   GET /plugins must show your plugin at the NEW version (not a stale old one), and",
+      "   the daemon log shows '[plugin] loaded <id> v<new>' with no 'load fail'. Only then",
+      "   is it deployed. Then POST /plugin/<id>/cmd to confirm behavior. (Publishing to a",
+      "   git repo / the Hub is a separate, owner-approved step — never assumed.)",
+      "Mirror the music/calculator plugins.",
     ].join("\n"),
   },
   "code-review": {
@@ -302,11 +315,24 @@ const DEFAULT_CEO_AGENT = {
   aura: "ice", tier: 3, prompt: "", skills: [], tools: [],
 };
 
+// Baseline skills EVERY working agent carries without being assigned them — the
+// cross-cutting competence a teammate should just have. Delivered as native skill
+// files (progressive disclosure), so they cost almost nothing per turn but are
+// there the moment they're needed. Kept deliberately tight to three universals:
+//   • archive-search     — recall what the office already knows before guessing.
+//   • file-media-toolkit — reach for the bundled tools instead of "I can't".
+//   • doc-writer         — turn work into clean, skimmable deliverables.
+// NOT here on purpose: web-automation (assigning it GRANTS the browser tool, so it
+// must stay opt-in), and the orchestration/specialist skills (office-ops, plugin-
+// builder, code-review, …) that belong to specific roles or are auto-learned.
+const DEFAULT_SKILLS = ["archive-search", "file-media-toolkit", "doc-writer"];
+
 module.exports = {
   REPLAY_COUNT,
   MAX_STAFF,
   BUILTIN_TOOLS,
   SKILL_LIBRARY,
+  DEFAULT_SKILLS,
   DEFAULT_MAIN_AGENT,
   DEFAULT_CEO_AGENT
 };

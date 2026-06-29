@@ -20,7 +20,7 @@ The program's AI features are powered by **Main API Keys** — set them once at
 ## 🎤 Speech-to-text
 
 - **🎤 button** next to the chat box: click to record, speak, click again → text drops into the input field.
-- **F6**: press to start recording, press again → sent as a command on behalf of the CEO immediately (works in every mode).
+- **Right Ctrl**: press to start recording, press again → sent as a command on behalf of the CEO immediately (works in every mode).
 - A live VU meter appears in the red box so you know the mic is picking you up.
 - The first time, the WebView asks for mic permission — click Allow once.
 

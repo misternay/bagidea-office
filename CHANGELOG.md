@@ -4,6 +4,108 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.32] — Agents stay on the brain you gave them
+
+**Fixed**
+- **An agent can no longer change which model it (or anyone) runs on.** The endpoints that set
+  an agent's brain (provider/model), create or remove agents, and store provider credentials
+  weren't restricted to the in-app editor — so a teammate with shell access, when asked to "pick
+  the right model," could reassign models itself instead of delegating. They're now owner-only
+  (the 🧠 editor), like every other roster and credential setting. Each teammate runs strictly on
+  the brain you assigned it, and the Director keeps its own.
+
+**Changed**
+- **The Director routes by brain instead of switching models.** Its operating brief now says it
+  plainly — every teammate has a fixed brain you chose, so putting "the right model" on a task
+  means handing it to the teammate who already has that brain, never changing models — and the
+  team roster it works from now shows each member's brain (🧠) so it can match a task to the right
+  one at a glance.
+
+## [0.9.31] — Cross-platform project folders + Linux lifecycle fixes
+
+**Added**
+- **Native folder picker on every platform.** The PROJECTS tab's 📂 browse button now opens
+  your OS's real folder chooser — `choose folder` on macOS, the Windows folder dialog, and
+  `zenity` on Linux (falling back to the built-in picker when `zenity` isn't installed). The
+  path separator and platform are now reported by the daemon instead of the deprecated
+  `navigator.platform`. Thanks to **[@misternay](https://github.com/misternay)** (#30, closes #29).
+
+**Fixed**
+- **macOS project terminals.** Opening a project on macOS now reliably tags its Terminal window
+  (previously a race when Terminal was busy) and no longer breaks on folder titles that contain
+  quotes or backslashes.
+- **Linux: no more orphaned daemon.** Closing the office on Linux could leave `daemon/server.js`
+  running and holding port 8787. The Linux launcher no longer starts the daemon separately — the
+  shell owns the whole stack (daemon + Godot) and shuts it down on quit, like the other launch
+  paths already did. Reported by **[@nookpp](https://github.com/nookpp)** (#28).
+- **Linux/X11: the stray blank grey window is gone.** The chat overlay hid itself by parking
+  off-screen — which X11 window managers clamp back onto the desktop as a blank fixed-size panel.
+  On Linux the overlay now hides for real. (#28)
+
+## [0.9.30] — Media from anywhere, baseline skills for everyone, no more scroll jumps
+
+**Fixed**
+- **Tasks / Calendar / Notes stop jumping to the top.** Pinning a row, approving or rejecting
+  a proposal, or editing a job/event/note in OFFICE OPS re-rendered the whole panel and snapped
+  the scrollbar back to the top every time. Each of those tabs now keeps its scroll position
+  across those actions (and across the live job refresh), the same way the project list already did.
+
+**Changed**
+- **Chat shows media from anywhere on your disk.** Images, video and audio rendered inline only
+  when the file lived under the workspace or a registered project — anything on the Desktop, in
+  Downloads, or on another drive fell back to a bare path link, so the team copied files in just
+  to show them. Now an absolute media path previews inline wherever it lives, and the row's open/
+  reveal actions follow. Only media files are ever served this way (never source, `.env`, keys or
+  other files) and the office still listens only on your own machine.
+- **Every agent starts with three baseline skills.** New and existing teammates now carry
+  **archive-search** (recall what the office already knows before guessing), the **file & media
+  toolkit** (reach for the bundled tools instead of "I can't"), and **doc-writer** (clean,
+  skimmable deliverables) without having to be assigned them — the shared competence a teammate
+  should just have. Specialist skills, and tool-granting ones like web automation, stay opt-in.
+- **Agents put their tools to visible use when it helps.** Quiet background work stays the default,
+  but when seeing something live makes it clearer — or you ask — an agent will open the real
+  browser to walk you through a web build, or produce an artifact and show it in chat, instead of
+  only describing what it could do.
+
+**Security**
+- Hardened `.gitignore` so key material, `.env` files, keystores and `*.bak` runtime logs can't be
+  committed by accident.
+
+## [0.9.29] — Uninstall/update any plugin; agents deploy & verify their plugin work
+
+**Fixed**
+- **Uninstall and update now work for every plugin.** A plugin whose folder name differed
+  from its manifest id (so it lived somewhere other than `plugins/<its-id>`) couldn't be
+  removed or updated — the buttons failed with "plugin not found". The office now resolves
+  a plugin by its id wherever its folder lives.
+
+**Changed**
+- **Agents finish plugin work properly by default.** When the team builds or improves a
+  plugin, they now deploy it into the running office and **verify it actually took effect**
+  (the office only runs plugins from `plugins/<id>`, so a plugin built in a project or a dev
+  copy doesn't count until it's deployed, reloaded, and confirmed at the new version) before
+  reporting it done — so a finished-looking plugin can't quietly leave the office running an
+  old version. Publishing to a git repo or the Hub stays a separate, owner-approved step.
+
+## [0.9.28] — One-click plugin updates + a default plugin icon
+
+**Added**
+- **Update a plugin in one click.** Open the 🧩 Plugins panel and any plugin you installed
+  from the Hub that has a newer version now shows an **⬆ update** button — click it and the
+  office pulls the latest and reloads it live. The check is read-only (it just compares your
+  copy to the plugin's repo), and it only ever touches plugins you installed from the Hub:
+  a plugin repo you're developing yourself is never auto-updated, and one with uncommitted
+  changes is left alone — so an update can't throw away your own work.
+
+**Fixed**
+- **Plugins without an emoji get a default 🧩 icon.** A plugin whose name didn't start with
+  an emoji used to render with a blank icon slot in the Plugins panel; it now falls back to
+  🧩 so no row looks empty. (Plugin authors: the leading emoji in your manifest `name` is your
+  icon — see the plugins guide.)
+
+> The Plugins, Tools, and Showcase pages on the website also gained a **search box** this
+> cycle (already live).
+
 ## [0.9.27] — A full team always shows up; tidier mini header; smarter persona drafts
 
 **Fixed**

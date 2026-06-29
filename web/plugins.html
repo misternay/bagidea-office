@@ -28,6 +28,11 @@
   .prow .src:hover { text-decoration:underline; }
   .btn.sm { padding:9px 15px; font-size:14px; border-radius:10px; }
   .safety { text-align:center; color:#e6b873; font-size:13.5px; margin-top:16px; }
+  .psearch { display:block; width:100%; max-width:440px; margin:30px auto 0; padding:11px 16px;
+    background:rgba(255,255,255,.04); border:1px solid var(--line,rgba(255,255,255,.12));
+    border-radius:12px; color:var(--text); font-size:15px; outline:none; }
+  .psearch:focus { border-color:var(--accent); }
+  .psearch::placeholder { color:var(--dim); }
   .steps3 { display:flex; flex-wrap:wrap; gap:18px; margin-top:30px; justify-content:center; }
   .step3 { flex:1 1 260px; max-width:340px; background:rgba(255,255,255,.03); border:1px solid var(--line,rgba(255,255,255,.1));
     border-radius:14px; padding:18px 20px; }
@@ -67,10 +72,13 @@
 
 <section>
   <div class="wrap phwrap">
+    <input type="search" class="psearch" id="psearch" autocomplete="off"
+      data-i18n-attr="placeholder:ph_search" placeholder="Search plugins…" aria-label="Search plugins">
     <p class="muted" id="pcount" style="text-align:center;font-size:14px"></p>
     <div class="pgrid" id="pgrid">
       <p class="muted" data-i18n="ph_loading">Loading plugins…</p>
     </div>
+    <p class="muted" id="pnomatch" data-i18n="ph_nomatch" hidden style="text-align:center;font-size:14px">No plugins match your search.</p>
   </div>
 </section>
 
@@ -134,6 +142,7 @@
           empty:"ยังไม่มี plugin ในแคตตาล็อก", count:"plugin ในแคตตาล็อก", copied:"📋 คัดลอกแล้ว — วางในหน้า Plugins ของออฟฟิศได้เลย" },
   };
   let CATALOG = [];
+  let QUERY = "";
   const lang = () => (document.documentElement.lang === "th" ? "th" : "en");
   const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;" }[c]));
 
@@ -141,9 +150,17 @@
     const L = lang(), u = PH[L] || PH.en;
     const grid = document.getElementById("pgrid");
     const count = document.getElementById("pcount");
-    if (!CATALOG.length) { grid.innerHTML = `<p class="muted">${u.empty}</p>`; count.textContent = ""; return; }
-    count.textContent = `${CATALOG.length} ${u.count}`;
-    grid.innerHTML = CATALOG.map((p) => {
+    const nomatch = document.getElementById("pnomatch");
+    if (!CATALOG.length) { grid.innerHTML = `<p class="muted">${u.empty}</p>`; count.textContent = ""; if (nomatch) nomatch.hidden = true; return; }
+    // Filter by name / author / description (any language) / tags.
+    const q = QUERY.trim().toLowerCase();
+    const list = !q ? CATALOG : CATALOG.filter((p) => {
+      const desc = [(p.en && p.en.desc), (p.th && p.th.desc), (p[L] && p[L].desc)].filter(Boolean).join(" ");
+      return [p.name, p.author, desc, (p.tags || []).join(" ")].join(" ").toLowerCase().includes(q);
+    });
+    if (nomatch) nomatch.hidden = list.length > 0;
+    count.textContent = list.length ? `${list.length} ${u.count}` : "";
+    grid.innerHTML = list.map((p) => {
       const desc = (p[L] && p[L].desc) || (p.en && p.en.desc) || (p.th && p.th.desc) || "";
       const tags = (p.tags || []).filter((t) => t !== "official").map((t) => `<span class="ptag">${esc(t)}</span>`).join("");
       const official = p.official ? `<span class="ptag official">${u.official}</span>` : "";
@@ -181,6 +198,9 @@
     CATALOG = (d.plugins || []).filter((p) => p && p.id && p.repo);
     render();
   }).catch(() => render());
+
+  const psearch = document.getElementById("psearch");
+  if (psearch) psearch.addEventListener("input", (e) => { QUERY = e.target.value; render(); });
 
   const topBtn = document.querySelector(".toplink");
   addEventListener("scroll", () => topBtn.classList.toggle("show", scrollY > 600));
