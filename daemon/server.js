@@ -1715,6 +1715,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   // rate/TPM ceiling), retrying the same request never helps — so summarize this
   // thread with Claude and restart the SAME task on a fresh thread (one attempt).
   let recovering = false;
+  let brainDead = false, apiRetries = 0;   // api_retry proves the brain can't answer → fast-fail instead of a ~2-min blind hang
   const maybeRecover = (rtext) => {
     if (opts._recovered || recovering || doneFired) return false;
     if (!isOverflowError(`${rtext || ""}\n${errText}\n${lastText}`)) return false;
@@ -1734,6 +1735,34 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
       if (!line) continue;
       let m;
       try { m = JSON.parse(line); } catch { continue; }
+
+      // The claude CLI retries a failing backend itself (up to ~10×, ~2 min). Two of
+      // those failures will NEVER clear on the same brain — bad auth (401/403) and a
+      // dead/unreachable endpoint (error_status null + "unknown"). For those, kill the
+      // child now and tell the owner plainly, instead of a ~2-minute blind hang that
+      // ends in a raw API error. Transient ceilings (429/529/overloaded) are left to
+      // the CLI's own retries and the existing rate-limit pause/resume path.
+      if (m.type === "system") {
+        if (!brainDead && m.subtype === "api_retry") {
+          apiRetries++;
+          const st = m.error_status;
+          const permanent = st === 401 || st === 403;                 // bad/expired key or no access — never recovers
+          const dead = (st === null || st === undefined) && apiRetries >= 2;  // endpoint not responding
+          if (permanent || dead) {
+            brainDead = true;
+            const why = st === 401 ? "API key ผิด/หมดอายุ (401)"
+              : st === 403 ? "ไม่ได้รับอนุญาต (403)"
+              : "endpoint ไม่ตอบ (น่าจะ down หรือไม่น่าจะกลับมา)";
+            const an = (reg.agents[agent] || {}).name || agent;
+            broadcast({ type: "chat.message", agent, task,
+              text: `⚠️ สมองของ ${an} (${mtag}) ใช้งานไม่ได้ — ${why}.\n` +
+                `ตรวจ key/ตั้งค่าใน 🧠 BRAIN ของคุณคนนี้ (หรือเปลี่ยนสมอง) แล้วสั่งใหม่ — ไม่ต้องรอ retry ครบ 10 รอบ`,
+              session: entry.key, model: mtag });
+            try { killTree(child); } catch (e) { /* best-effort */ }
+          }
+        }
+        continue;   // system events carry no assistant/result content
+      }
 
       if (m.type === "assistant" && m.message && Array.isArray(m.message.content)) {
         for (const b of m.message.content) {
