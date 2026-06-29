@@ -1997,6 +1997,7 @@ fn main() {
                 let _ = godot.kill();
             }
             *control_flow = ControlFlow::Exit;
+            return;
         }
 
         // A slow poll tick keeps the tray channels live without pinning a core.
